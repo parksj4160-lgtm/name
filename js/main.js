@@ -1,8 +1,12 @@
 window.addEventListener('DOMContentLoaded', () => {
   const canvas = document.getElementById('gameCanvas');
-  canvas.width = LOGICAL_W;
-  canvas.height = LOGICAL_H;
   const ctx = canvas.getContext('2d');
+
+  // 선명한 렌더링을 위해 devicePixelRatio 반영 (논리 좌표계는 1280x720 유지)
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  canvas.width = LOGICAL_W * dpr;
+  canvas.height = LOGICAL_H * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
   const container = document.getElementById('game-container');
   function resize() {
@@ -16,7 +20,7 @@ window.addEventListener('DOMContentLoaded', () => {
   bindHoldButton(document.getElementById('btn-left'), () => Input.setLeft(true), () => Input.setLeft(false));
   bindHoldButton(document.getElementById('btn-right'), () => Input.setRight(true), () => Input.setRight(false));
   bindTapButton(document.getElementById('btn-jump'), () => Input.queueJump());
-  bindTapButton(document.getElementById('btn-attack'), () => Input.queueAction());
+  bindTapButton(document.getElementById('btn-attack'), () => Input.queueAttack());
 
   const gm = new GameManager();
   window.__gm = gm; // 디버그/테스트용 훅

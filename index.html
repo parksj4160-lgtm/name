@@ -3,136 +3,215 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<title>2D 횡스크롤 RPG 프로토타입</title>
+<title>횡스크롤 RPG</title>
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 
 <div id="rotate-warning">
-  <div>📱↻</div>
-  <div>가로 모드로 회전해주세요<br>이 게임은 가로 화면 전용입니다.</div>
+  <div class="rot-icon">📱</div>
+  <div class="rot-text">가로 모드로 회전해주세요<br><span>이 게임은 가로 화면 전용입니다</span></div>
 </div>
 
 <div id="game-container">
   <canvas id="gameCanvas"></canvas>
+  <div id="vignette"></div>
 
   <div id="ui-overlay">
-    <!-- 상단바 -->
+
+    <!-- ===== 상단 HUD ===== -->
     <div id="top-bar">
-      <div class="profile-chip">프로필</div>
-      <div class="stat-group">❤️
-        <div class="bar-track"><div id="top-hp-bar" class="bar-fill"></div></div>
-        <span id="top-hp">100/100</span>
+      <div class="hud-card player-card">
+        <div class="avatar">
+          <span class="avatar-face">🧝</span>
+          <span class="avatar-lv" id="hud-level">1</span>
+        </div>
+        <div class="player-meta">
+          <div class="player-name-row">
+            <span id="hud-name">모험가</span>
+            <span class="weapon-chip" id="hud-weapon">맨손</span>
+          </div>
+          <div class="gauge hp">
+            <div class="gauge-fill" id="hud-hp-bar"></div>
+            <span class="gauge-text" id="hud-hp">100 / 100</span>
+          </div>
+          <div class="gauge mp">
+            <div class="gauge-fill" id="hud-mp-bar"></div>
+            <span class="gauge-text" id="hud-mp">50 / 50</span>
+          </div>
+          <div class="gauge exp">
+            <div class="gauge-fill" id="hud-exp-bar"></div>
+            <span class="gauge-text small" id="hud-exp">EXP 0%</span>
+          </div>
+        </div>
       </div>
-      <div class="stat-group">🔵
-        <div class="bar-track"><div id="top-mp-bar" class="bar-fill"></div></div>
-        <span id="top-mp">50/50</span>
+
+      <div class="hud-card place-card">
+        <div class="place-floor" id="hud-floor">1F</div>
+        <div class="place-name" id="hud-place">햇살 광장</div>
       </div>
-      <div class="stat-group"><span id="top-level">Lv.1</span>
-        <div class="bar-track exp-track"><div id="top-exp-bar" class="bar-fill"></div></div>
-      </div>
-      <div class="stat-group" id="top-gold">80</div>
-      <div class="top-right-icons">
-        <button class="icon-btn" id="btn-settings">⚙ 설정</button>
-        <button class="icon-btn" id="btn-achievements">🏆 업적</button>
-        <button class="icon-btn" id="btn-dex">📖 도감</button>
+
+      <div class="hud-right">
+        <div class="hud-chip gold-chip"><span class="chip-ico">🪙</span><span id="hud-gold">80</span></div>
+        <div class="hud-chip net-chip" id="hud-net"><span class="chip-ico">📡</span><span id="hud-net-text">솔로</span></div>
+        <button class="icon-btn" id="btn-settings" title="설정">⚙</button>
+        <button class="icon-btn" id="btn-achievements" title="업적">🏆</button>
+        <button class="icon-btn" id="btn-dex" title="도감">📖</button>
       </div>
     </div>
 
-    <!-- 좌측 목표 / 파티 패널 -->
+    <!-- ===== 좌측 패널 ===== -->
     <div id="left-panel"></div>
 
-    <!-- 보스 체력바 -->
+    <!-- ===== 보스 체력바 ===== -->
     <div id="boss-bar" class="hidden">
-      <div id="boss-bar-label"></div>
-      <div id="boss-bar-track"><div id="boss-bar-fill"></div></div>
+      <div id="boss-bar-label">보스</div>
+      <div id="boss-bar-track">
+        <div id="boss-bar-fill"></div>
+        <div class="boss-bar-sheen"></div>
+      </div>
     </div>
 
-    <!-- 상호작용 프롬프트 -->
-    <div id="interact-prompt" class="hidden clickable"></div>
+    <!-- ===== 상호작용 프롬프트 ===== -->
+    <button id="interact-prompt" class="hidden">
+      <span class="prompt-key">E</span>
+      <span class="prompt-label"></span>
+    </button>
 
-    <!-- 토스트 -->
-    <div id="toast" class="hidden"></div>
+    <!-- ===== 토스트 ===== -->
+    <div id="toast-wrap"></div>
 
-    <!-- 도움 요청 (던전에서만 표시) -->
-    <button id="btn-help-request">🆘 도움 요청</button>
-
-    <!-- 하단바 -->
+    <!-- ===== 하단바 ===== -->
     <div id="bottom-bar">
-      <div id="move-buttons">
-        <button class="pad-btn" id="btn-left">←</button>
-        <button class="pad-btn" id="btn-right">→</button>
+      <div class="pad-group">
+        <button class="pad-btn move" id="btn-left">◀</button>
+        <button class="pad-btn move" id="btn-right">▶</button>
       </div>
 
       <div id="menu-icons">
-        <button class="menu-icon-btn" id="btn-menu-bag"><span class="ico">🎒</span>가방</button>
-        <button class="menu-icon-btn" id="btn-menu-character"><span class="ico">🧍</span>캐릭터</button>
-        <button class="menu-icon-btn" id="btn-menu-skill"><span class="ico">📘</span>스킬</button>
-        <button class="menu-icon-btn" id="btn-menu-shop"><span class="ico">🏬</span>상점</button>
-        <button class="menu-icon-btn" id="btn-menu-menu"><span class="ico">☰</span>메뉴</button>
+        <button class="menu-icon-btn" id="btn-menu-bag"><span class="ico">🎒</span><span>가방</span></button>
+        <button class="menu-icon-btn" id="btn-menu-character"><span class="ico">🧍</span><span>캐릭터</span></button>
+        <button class="menu-icon-btn" id="btn-menu-skill"><span class="ico">📘</span><span>스킬</span></button>
+        <button class="menu-icon-btn" id="btn-menu-shop"><span class="ico">🏬</span><span>상점</span></button>
+        <button class="menu-icon-btn" id="btn-menu-party"><span class="ico">🛡️</span><span>파티</span></button>
       </div>
 
-      <div id="action-buttons">
-        <button class="pad-btn" id="btn-attack">⚔</button>
-        <button class="pad-btn" id="btn-jump">↑</button>
+      <div class="pad-group">
+        <button class="pad-btn jump" id="btn-jump">↑</button>
+        <button class="pad-btn attack" id="btn-attack">⚔</button>
       </div>
     </div>
 
-    <!-- 장비 상점 모달 -->
+    <!-- ===== 장비 상점 ===== -->
     <div id="modal-shop" class="modal hidden">
       <div class="modal-box">
-        <button class="modal-close" data-target="modal-shop">✕</button>
-        <h3>🏪 장비 상점</h3>
+        <div class="modal-head">
+          <h3><span class="mh-ico">⚔️</span>장비 상점</h3>
+          <button class="modal-close" data-target="modal-shop">✕</button>
+        </div>
         <div id="shop-body"></div>
       </div>
     </div>
 
-    <!-- 회복 상점 모달 -->
+    <!-- ===== 회복 상점 ===== -->
     <div id="modal-heal" class="modal hidden">
       <div class="modal-box">
-        <button class="modal-close" data-target="modal-heal">✕</button>
-        <h3>➕ 회복 상점</h3>
-        <div class="heal-row"><span>HP 회복</span><button id="btn-heal-hp" class="action-btn">회복하기</button></div>
-        <div class="heal-row"><span>MP 회복</span><button id="btn-heal-mp" class="action-btn">회복하기</button></div>
+        <div class="modal-head">
+          <h3><span class="mh-ico">➕</span>회복 상점</h3>
+          <button class="modal-close" data-target="modal-heal">✕</button>
+        </div>
+        <div id="heal-body"></div>
       </div>
     </div>
 
-    <!-- 포탈(층 이동) 모달 -->
+    <!-- ===== 층 이동 포탈 ===== -->
     <div id="modal-portal" class="modal hidden">
       <div class="modal-box">
-        <button class="modal-close" data-target="modal-portal">✕</button>
-        <h3>🔮 층 이동</h3>
+        <div class="modal-head">
+          <h3><span class="mh-ico">🔮</span>층 이동</h3>
+          <button class="modal-close" data-target="modal-portal">✕</button>
+        </div>
         <div id="portal-body"></div>
       </div>
     </div>
 
-    <!-- 파티 구성 모달 -->
+    <!-- ===== 파티 로비 (실제 플레이어만) ===== -->
     <div id="modal-party" class="modal hidden">
-      <div class="modal-box">
-        <button class="modal-close" data-target="modal-party">✕</button>
-        <h3>🕳️ 던전 입장 - 파티 구성</h3>
-        <div id="party-body"></div>
-        <button id="btn-dungeon-enter" class="action-btn" style="margin-top:12px;width:100%;">던전 입장</button>
+      <div class="modal-box wide">
+        <div class="modal-head">
+          <h3><span class="mh-ico">🛡️</span>파티 · 던전 입장</h3>
+          <button class="modal-close" data-target="modal-party">✕</button>
+        </div>
+
+        <div class="room-bar">
+          <div class="room-state">
+            <span class="room-dot" id="room-dot"></span>
+            <span id="room-state-text">오프라인 · 혼자 플레이 중</span>
+          </div>
+          <div class="room-actions">
+            <button class="btn ghost" id="btn-room-create">방 만들기</button>
+            <input id="room-code-input" maxlength="4" placeholder="코드" autocomplete="off">
+            <button class="btn ghost" id="btn-room-join">참여</button>
+            <button class="btn ghost danger hidden" id="btn-room-leave">나가기</button>
+          </div>
+        </div>
+
+        <div id="party-slots" class="party-slots"></div>
+
+        <p class="hint" id="party-hint"></p>
+
+        <button id="btn-dungeon-enter" class="btn primary block">던전 입장</button>
       </div>
     </div>
 
-    <!-- 던전 클리어 모달 -->
+    <!-- ===== 던전 클리어 ===== -->
     <div id="modal-clear" class="modal hidden">
-      <div class="modal-box">
-        <h3>🎉 던전 클리어</h3>
+      <div class="modal-box celebrate">
+        <div class="burst"></div>
+        <h3 class="clear-title">DUNGEON CLEAR</h3>
         <div id="clear-body"></div>
-        <button id="btn-clear-confirm" class="action-btn" style="margin-top:12px;width:100%;">광장으로 돌아가기</button>
+        <button id="btn-clear-confirm" class="btn primary block">광장으로 돌아가기</button>
       </div>
     </div>
+
+    <!-- ===== 설정 ===== -->
+    <div id="modal-settings" class="modal hidden">
+      <div class="modal-box">
+        <div class="modal-head">
+          <h3><span class="mh-ico">⚙</span>설정</h3>
+          <button class="modal-close" data-target="modal-settings">✕</button>
+        </div>
+        <label class="field">
+          <span>캐릭터 이름</span>
+          <input id="set-name" maxlength="8" placeholder="모험가">
+        </label>
+        <label class="field">
+          <span>멀티플레이 서버 (선택)</span>
+          <input id="set-server" placeholder="wss://내서버:8080">
+        </label>
+        <p class="hint">
+          비워두면 <b>같은 브라우저의 다른 탭</b>끼리 같은 방 코드로 함께 플레이합니다.<br>
+          다른 기기(친구 PC/휴대폰)와 하려면 <code>server/relay.js</code>를 실행하고 주소를 넣어주세요.
+        </p>
+        <button id="btn-settings-save" class="btn primary block">저장</button>
+      </div>
+    </div>
+
   </div>
 </div>
 
 <script src="js/constants.js"></script>
 <script src="js/utils.js"></script>
+<script src="js/fx.js"></script>
+<script src="js/character.js"></script>
+<script src="js/scenery.js"></script>
 <script src="js/input.js"></script>
 <script src="js/camera.js"></script>
+<script src="js/net.js"></script>
 <script src="js/player.js"></script>
+<script src="js/remotePlayer.js"></script>
 <script src="js/enemy.js"></script>
+<script src="js/combat.js"></script>
 <script src="js/npc.js"></script>
 <script src="js/party.js"></script>
 <script src="js/world.js"></script>
