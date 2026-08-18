@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<title>크리스탈 디펜스 (Crystal Defense)</title>
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+<canvas id="scene"></canvas>
+<div id="fx-layer"></div>
+
+<!-- ================= HUD ================= -->
+<div id="hud" class="hidden">
+  <!-- 좌상단: 자원 -->
+  <div id="res-panel" class="panel">
+    <div class="res"><span class="ic">🪵</span><b id="res-wood">0</b><span class="lbl">목재</span></div>
+    <div class="res"><span class="ic">🪨</span><b id="res-stone">0</b><span class="lbl">광물</span></div>
+    <div class="res"><span class="ic">💠</span><b id="res-shard">0</b><span class="lbl">정수 <kbd>R</kbd></span></div>
+    <button id="btn-hup" class="mini">채집속도 <b id="hup-lv">Lv.1</b> <span id="hup-cost" class="cost"></span></button>
+    <div id="pool-mode" class="tag">팀 공유 자원</div>
+  </div>
+
+  <!-- 상단 중앙: 크리스탈 / 웨이브 -->
+  <div id="wave-panel" class="panel">
+    <div class="crystal-row">
+      <span class="ic">💎</span>
+      <div class="bar big"><i id="crystal-fill"></i><span id="crystal-text">1000 / 1000</span></div>
+    </div>
+    <div class="wave-row">
+      <span id="wave-label">웨이브 1 / 10</span>
+      <span id="wave-state" class="state">준비 60초</span>
+      <button id="btn-wave" class="go">웨이브 시작 <kbd>Enter</kbd></button>
+    </div>
+  </div>
+
+  <!-- 우상단: 파티 -->
+  <div id="party-panel" class="panel">
+    <div class="head">파티 <span id="net-status" class="dim">오프라인</span></div>
+    <ul id="party-list"></ul>
+  </div>
+
+  <!-- 좌하단: 플레이어 상태 -->
+  <div id="player-panel" class="panel">
+    <div class="bar hp"><i id="hp-fill"></i><span id="hp-text">100 / 100</span></div>
+    <div id="harvest-wrap" class="bar harvest hidden"><i id="harvest-fill"></i><span>채집 중…</span></div>
+    <div id="prompt" class="prompt hidden"></div>
+  </div>
+
+  <!-- 하단 중앙: 건설 바 -->
+  <div id="build-bar"></div>
+  <div id="build-hint" class="hint"></div>
+
+  <!-- 우하단: 미니맵 -->
+  <canvas id="minimap" width="200" height="200"></canvas>
+
+  <div id="toasts"></div>
+
+  <!-- 모바일 컨트롤 -->
+  <div id="touch" class="hidden">
+    <div id="stick"><i></i></div>
+    <div id="touch-buttons">
+      <button id="tb-harvest">채집</button>
+      <button id="tb-attack">공격</button>
+    </div>
+  </div>
+
+  <button id="btn-help" class="corner">?</button>
+  <div id="help" class="panel hidden">
+    <h3>조작</h3>
+    <table>
+      <tr><td>이동</td><td><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> / 방향키 (<kbd>Shift</kbd> 달리기)</td></tr>
+      <tr><td>채집</td><td>나무·돌 근처에서 <kbd>F</kbd> 꾹 누르기</td></tr>
+      <tr><td>공격</td><td>좌클릭 또는 <kbd>Space</kbd></td></tr>
+      <tr><td>건설</td><td><kbd>1</kbd> 벽 · <kbd>2</kbd> 화살탑 · <kbd>3</kbd> 서리탑 · <kbd>4</kbd> 대포탑 → 좌클릭 배치</td></tr>
+      <tr><td>업그레이드</td><td><kbd>U</kbd> 후 건물 클릭</td></tr>
+      <tr><td>철거(50% 환급)</td><td><kbd>X</kbd> 후 건물 클릭</td></tr>
+      <tr><td>웨이브 시작</td><td><kbd>Enter</kbd> (준비 시간이 끝나면 자동 시작)</td></tr>
+      <tr><td>수정 정수</td><td><kbd>R</kbd> — 크리스탈 25% 회복</td></tr>
+      <tr><td>카메라</td><td>우클릭 드래그 회전 · 휠 확대/축소</td></tr>
+      <tr><td>취소</td><td><kbd>Esc</kbd> 또는 우클릭</td></tr>
+    </table>
+  </div>
+</div>
+
+<!-- ================= 로비 ================= -->
+<div id="lobby" class="overlay">
+  <div class="card">
+    <h1>크리스탈 디펜스</h1>
+    <p class="sub">중앙의 수정을 지켜라. 파밍 → 건설 → 방어의 반복. 목표는 <b>10웨이브 생존</b>.</p>
+
+    <div class="row">
+      <label>닉네임</label>
+      <input id="in-name" maxlength="10" placeholder="플레이어" />
+    </div>
+
+    <div class="btns">
+      <button id="btn-single" class="primary">싱글 플레이 시작</button>
+      <button id="btn-create">방 만들기</button>
+    </div>
+
+    <div class="row join">
+      <input id="in-code" maxlength="4" placeholder="방 코드" />
+      <button id="btn-join">참여</button>
+    </div>
+
+    <div id="room-box" class="room hidden">
+      <div class="code-row">방 코드 <b id="room-code">----</b> <span id="lobby-status" class="dim"></span></div>
+      <ul id="lobby-list"></ul>
+      <label class="check"><input type="checkbox" id="chk-shared" checked /> 팀 공유 자원 (끄면 각자 개인 자원)</label>
+      <button id="btn-start" class="primary">게임 시작 (방장)</button>
+      <button id="btn-leave" class="ghost">나가기</button>
+    </div>
+
+    <details class="settings">
+      <summary>멀티플레이 서버 설정</summary>
+      <p class="dim">
+        기본값은 <b>BroadcastChannel</b> — 같은 브라우저의 다른 탭/창과 바로 연결된다.<br />
+        다른 기기와 하려면 <code>node server/relay.js</code> 를 켜고 아래에 주소를 입력한다.
+      </p>
+      <div class="row">
+        <input id="in-server" placeholder="ws://192.168.0.10:8080" />
+        <button id="btn-server">저장</button>
+      </div>
+    </details>
+
+    <p class="tip">팁: 파밍하러 멀리 나가면 크리스탈이 비어버린다. 웨이브 전에 무엇을 지을지 매번 고민하게 된다.</p>
+  </div>
+</div>
+
+<!-- ================= 결과 ================= -->
+<div id="result" class="overlay hidden">
+  <div class="card center">
+    <h1 id="result-title">승리!</h1>
+    <p id="result-sub"></p>
+    <ul id="result-stats"></ul>
+    <button id="btn-again" class="primary">다시 하기</button>
+  </div>
+</div>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
