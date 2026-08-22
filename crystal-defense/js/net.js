@@ -3,7 +3,7 @@ import { shortId } from './utils.js';
 export var Net = class {
   constructor() {
     this.selfId = shortId();
-    this.name = "\uD50C\uB808\uC774\uC5B4";
+    this.name = "플레이어";
     this.roomCode = null;
     this.mode = "off";
     this.joinTs = 0;
@@ -12,7 +12,7 @@ export var Net = class {
     this._chan = null;
     this._ws = null;
     this._hbTimer = 0;
-    this.status = "\uC624\uD504\uB77C\uC778 (\uC2F1\uAE00 \uD50C\uB808\uC774)";
+    this.status = "오프라인 (싱글 플레이)";
     addEventListener("beforeunload", () => this.leave());
   }
   get serverUrl() {
@@ -71,17 +71,17 @@ export var Net = class {
         };
         this._ws.onopen = () => {
           this.mode = "ws";
-          this.status = `\uC628\uB77C\uC778 \xB7 \uBC29 ${this.roomCode}`;
+          this.status = `온라인 \xB7 방 ${this.roomCode}`;
           this._post({ type: "join" });
         };
         this._ws.onclose = () => {
           if (this.mode === "ws") {
             this.mode = "off";
-            this.status = "\uC11C\uBC84 \uC5F0\uACB0 \uB04A\uAE40";
+            this.status = "서버 연결 끊김";
           }
         };
         this._ws.onerror = () => {
-          this.status = "\uC11C\uBC84 \uC5F0\uACB0 \uC2E4\uD328 \u2014 \uAC19\uC740 \uBE0C\uB77C\uC6B0\uC800 \uD0ED\uB07C\uB9AC\uB9CC \uC5F0\uACB0\uB429\uB2C8\uB2E4";
+          this.status = "서버 연결 실패 — 같은 브라우저 탭끼리만 연결됩니다";
         };
         this.mode = "ws";
       } catch (_) {
@@ -92,10 +92,10 @@ export var Net = class {
       this._chan = new BroadcastChannel("crystal-defense-" + this.roomCode);
       this._chan.onmessage = (ev) => this._receive(ev.data);
       this.mode = "local";
-      this.status = `\uAC19\uC740 \uBE0C\uB77C\uC6B0\uC800 \xB7 \uBC29 ${this.roomCode}`;
+      this.status = `같은 브라우저 \xB7 방 ${this.roomCode}`;
       this._post({ type: "join" });
     }
-    if (this.mode === "off") this.status = "\uC774 \uBE0C\uB77C\uC6B0\uC800\uB294 \uBA40\uD2F0\uD50C\uB808\uC774\uB97C \uC9C0\uC6D0\uD558\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4";
+    if (this.mode === "off") this.status = "이 브라우저는 멀티플레이를 지원하지 않습니다";
     return this.mode !== "off";
   }
   leave() {
@@ -114,7 +114,7 @@ export var Net = class {
     this.mode = "off";
     this.roomCode = null;
     this.peers.clear();
-    this.status = "\uC624\uD504\uB77C\uC778 (\uC2F1\uAE00 \uD50C\uB808\uC774)";
+    this.status = "오프라인 (싱글 플레이)";
   }
   _post(msg) {
     if (!this.roomCode) return;
@@ -133,7 +133,7 @@ export var Net = class {
   _touch(id, info) {
     let p2 = this.peers.get(id);
     if (!p2) {
-      p2 = { id, name: info.name || "\uD50C\uB808\uC774\uC5B4", joinTs: info.joinTs || Date.now(), lastSeen: performance.now() };
+      p2 = { id, name: info.name || "플레이어", joinTs: info.joinTs || Date.now(), lastSeen: performance.now() };
       this.peers.set(id, p2);
       this._emit("peerJoin", p2, id);
     }

@@ -1,13 +1,13 @@
 import { CFG, waveComposition } from './config.js';
 import { keyLabel } from './keymap.js';
-import { canAfford, clamp, costText, fmtTime, roomCode } from './utils.js';
+import { canAfford, clamp, costText, dist, fmtTime, roomCode } from './utils.js';
 import { PHASE } from './wave.js';
 
 var $2 = (id) => document.getElementById(id);
 var TUTORIAL_STEPS = [
-  "\u{1F333} \uADFC\uCC98 \uB098\uBB34\uC5D0 \uB2E4\uAC00\uAC00 <kbd>F</kbd> \uB97C \uAFB9 \uB20C\uB7EC \uCC44\uC9D1\uD558\uC138\uC694 (\uBC14\uC704\uB294 \uC81C\uC791\uB300\uC5D0\uC11C \uACE1\uAD2D\uC774\uB97C \uB9CC\uB4E4\uC5B4\uC57C \uCE98 \uC218 \uC788\uC5B4\uC694)",
-  "<kbd>1</kbd>~<kbd>7</kbd> \uB85C \uD06C\uB9AC\uC2A4\uD0C8 \uC8FC\uBCC0\uC5D0 \uBCBD\xB7\uD0C0\uC6CC\uB97C \uC9C0\uC73C\uC138\uC694",
-  "\uC900\uBE44\uAC00 \uB418\uBA74 <kbd>Enter</kbd> \uB85C \uCCAB \uC6E8\uC774\uBE0C\uB97C \uC2DC\uC791\uD558\uC138\uC694!"
+  "🌳 근처 나무에 다가가 <kbd>F</kbd> 를 꾹 눌러 채집하세요 (바위는 제작대에서 곡괭이를 만들어야 캘 수 있어요)",
+  "<kbd>1</kbd>~<kbd>8</kbd> 로 크리스탈 주변에 벽\xB7타워를 지으세요",
+  "준비가 되면 <kbd>Enter</kbd> 로 첫 웨이브를 시작하세요!"
 ];
 export var UI = class {
   constructor(game2) {
@@ -26,9 +26,12 @@ export var UI = class {
       hupLv: $2("hup-lv"),
       hupCost: $2("hup-cost"),
       poolMode: $2("pool-mode"),
-      pickaxeBtn: $2("btn-pickaxe"),
-      pickaxeStatus: $2("pickaxe-status"),
-      pickaxeCost: $2("pickaxe-cost"),
+      iron: $2("res-iron"),
+      toolRow: $2("tool-row"),
+      station: $2("station"),
+      stationTitle: $2("station-title"),
+      stationDesc: $2("station-desc"),
+      stationList: $2("station-list"),
       crystalFill: $2("crystal-fill"),
       crystalText: $2("crystal-text"),
       waveLabel: $2("wave-label"),
@@ -88,9 +91,9 @@ export var UI = class {
     for (const [key, def] of Object.entries(CFG.builds)) {
       add(key, def.icon, def.name, costText(def.cost), "build:" + key);
     }
-    add("upgrade", "\u2B06\uFE0F", "\uC5C5\uADF8\uB808\uC774\uB4DC", "\uAC74\uBB3C \uD074\uB9AD", "upgrade");
-    add("repair", "\u{1F527}", "\uC218\uB9AC", "\uC190\uC0C1 \uBE44\uB840", "repair");
-    add("sell", "\u{1F528}", "\uCCA0\uAC70", "50% \uD658\uAE09", "sell");
+    add("upgrade", "⬆️", "업그레이드", "건물 클릭", "upgrade");
+    add("repair", "🔧", "수리", "손상 비례", "repair");
+    add("sell", "🔨", "철거", "50% 환급", "sell");
     this.repairBadge = document.createElement("span");
     this.repairBadge.className = "badge hidden";
     this.slots.repair.appendChild(this.repairBadge);
@@ -123,18 +126,18 @@ export var UI = class {
     if (!mode) {
       this.el.buildHint.textContent = "";
     } else if (CFG.builds[mode]) {
-      this.el.buildHint.textContent = `${CFG.builds[mode].name}: ${CFG.builds[mode].desc} \u2014 \uC88C\uD074\uB9AD \uBC30\uCE58 / \uC6B0\uD074\uB9AD\xB7Esc \uCDE8\uC18C`;
+      this.el.buildHint.textContent = `${CFG.builds[mode].name}: ${CFG.builds[mode].desc} — 좌클릭 배치 / 우클릭\xB7Esc 취소`;
     } else {
       const hovered = g2.buildMgr?.hover;
       const detail = hovered ? this._hoverDetail(mode, hovered) : null;
       if (detail) {
         this.el.buildHint.innerHTML = detail;
       } else if (mode === "upgrade") {
-        this.el.buildHint.textContent = "\uC5C5\uADF8\uB808\uC774\uB4DC\uD560 \uAC74\uBB3C\uC744 \uD074\uB9AD\uD558\uC138\uC694 (\uBCBD\uC740 \uB0B4\uAD6C\uB3C4, \uD0C0\uC6CC\uB294 \uACF5\uACA9\uB825\xB7\uC0AC\uAC70\uB9AC \uC0C1\uC2B9)";
+        this.el.buildHint.textContent = "업그레이드할 건물을 클릭하세요 (벽은 내구도, 타워는 공격력\xB7사거리 상승)";
       } else if (mode === "repair") {
-        this.el.buildHint.textContent = "\uC218\uB9AC\uD560 \uAC74\uBB3C\uC744 \uD074\uB9AD\uD558\uC138\uC694 (\uC190\uC0C1\uB41C \uBE44\uC728\uB9CC\uD07C \uC790\uC6D0 \uC18C\uBAA8, \uC644\uC804 \uD30C\uAD34 \uC7AC\uAC74\uCD95\uBCF4\uB2E4 \uC800\uB834)";
+        this.el.buildHint.textContent = "수리할 건물을 클릭하세요 (손상된 비율만큼 자원 소모, 완전 파괴 재건축보다 저렴)";
       } else {
-        this.el.buildHint.textContent = "\uCCA0\uAC70\uD560 \uAC74\uBB3C\uC744 \uD074\uB9AD\uD558\uC138\uC694 (\uD22C\uC790 \uC790\uC6D0\uC758 50% \uD658\uAE09)";
+        this.el.buildHint.textContent = "철거할 건물을 클릭하세요 (투자 자원의 50% 환급)";
       }
     }
   }
@@ -142,16 +145,16 @@ export var UI = class {
   _buildSpec(key) {
     const def = CFG.builds[key];
     const st = def.levels[0];
-    const parts = [`\uB0B4\uAD6C\uB3C4 <b>${st.hp}</b>`];
-    if (st.dmg) parts.push(`\uACF5\uACA9\uB825 <b>${st.dmg}</b>`);
-    if (st.range) parts.push(`\uC0AC\uAC70\uB9AC <b>${st.range}</b>`);
-    if (st.rate) parts.push(`\uCD08\uB2F9 <b>${st.rate}</b>\uBC1C`);
-    if (st.splash) parts.push(`\uBC94\uC704 <b>${st.splash}</b>`);
-    if (st.slow) parts.push(`\uB454\uD654 <b>${Math.round(st.slow * 100)}%</b>`);
-    if (st.poisonDps) parts.push(`\uB3C5 <b>${st.poisonDps}</b>/\uCD08`);
-    if (st.buffMult) parts.push(`\uC8FC\uBCC0 \uD0C0\uC6CC \uACF5\uACA9\uB825 <b>+${Math.round(st.buffMult * 100)}%</b> (\uBC94\uC704 ${st.buffRadius})`);
+    const parts = [`내구도 <b>${st.hp}</b>`];
+    if (st.dmg) parts.push(`공격력 <b>${st.dmg}</b>`);
+    if (st.range) parts.push(`사거리 <b>${st.range}</b>`);
+    if (st.rate) parts.push(`초당 <b>${st.rate}</b>발`);
+    if (st.splash) parts.push(`범위 <b>${st.splash}</b>`);
+    if (st.slow) parts.push(`둔화 <b>${Math.round(st.slow * 100)}%</b>`);
+    if (st.poisonDps) parts.push(`독 <b>${st.poisonDps}</b>/초`);
+    if (st.buffMult) parts.push(`주변 타워 공격력 <b>+${Math.round(st.buffMult * 100)}%</b> (범위 ${st.buffRadius})`);
     const ok = canAfford(this.game.myPool, def.cost);
-    return `${def.icon} ${def.name} \u2014 ${parts.join(" \xB7 ")} \xB7 \uBE44\uC6A9 <b class="${ok ? "" : "lack"}">${costText(def.cost)}</b>`;
+    return `${def.icon} ${def.name} — ${parts.join(" \xB7 ")} \xB7 비용 <b class="${ok ? "" : "lack"}">${costText(def.cost)}</b>`;
   }
   // 업그레이드/수리/철거 모드에서 가리킨 건물의 수치를 한 줄로 만든다
   _hoverDetail(mode, b) {
@@ -159,34 +162,34 @@ export var UI = class {
     const name = `${b.def.icon} ${b.def.name} <b>Lv.${b.level}</b>`;
     if (mode === "sell") {
       const back = g2.buildMgr.refund(b);
-      return `${name} \uCCA0\uAC70 \u2014 \uD658\uAE09 <b>${costText(back) || "-"}</b>`;
+      return `${name} 철거 — 환급 <b>${costText(back) || "-"}</b>`;
     }
     if (mode === "repair") {
       const cost = g2.buildMgr.repairCost(b);
-      const hp = `\uCCB4\uB825 <b>${Math.ceil(b.hp)}/${b.maxHp}</b>`;
-      if (!cost) return `${name} \u2014 ${hp} \xB7 \uC190\uC0C1 \uC5C6\uC74C`;
+      const hp = `체력 <b>${Math.ceil(b.hp)}/${b.maxHp}</b>`;
+      if (!cost) return `${name} — ${hp} \xB7 손상 없음`;
       const ok2 = canAfford(g2.myPool, cost);
-      return `${name} \u2014 ${hp} \xB7 \uC218\uB9AC \uBE44\uC6A9 <b class="${ok2 ? "" : "lack"}">${costText(cost)}</b>`;
+      return `${name} — ${hp} \xB7 수리 비용 <b class="${ok2 ? "" : "lack"}">${costText(cost)}</b>`;
     }
     const next = b.def.levels[b.level];
-    if (!next) return `${name} \u2014 \uC774\uBBF8 \uCD5C\uB300 \uB808\uBCA8`;
+    if (!next) return `${name} — 이미 최대 레벨`;
     const cur = b.stats;
     const parts = [];
     const diff = (label, a, c2, unit = "") => {
       if (a === void 0 || c2 === void 0 || a === c2) return;
-      parts.push(`${label} ${a}${unit}\u2192<b>${c2}${unit}</b>`);
+      parts.push(`${label} ${a}${unit}→<b>${c2}${unit}</b>`);
     };
-    diff("\uB0B4\uAD6C\uB3C4", cur.hp, next.hp);
-    diff("\uACF5\uACA9\uB825", cur.dmg, next.dmg);
-    diff("\uC0AC\uAC70\uB9AC", cur.range, next.range);
-    diff("\uC5F0\uC0AC", cur.rate, next.rate);
-    diff("\uB454\uD654", cur.slow, next.slow);
-    diff("\uBC94\uC704", cur.splash, next.splash);
-    diff("\uB3C5 \uD53C\uD574", cur.poisonDps, next.poisonDps);
-    diff("\uBC84\uD504", cur.buffMult, next.buffMult);
-    diff("\uBC84\uD504 \uBC94\uC704", cur.buffRadius, next.buffRadius);
+    diff("내구도", cur.hp, next.hp);
+    diff("공격력", cur.dmg, next.dmg);
+    diff("사거리", cur.range, next.range);
+    diff("연사", cur.rate, next.rate);
+    diff("둔화", cur.slow, next.slow);
+    diff("범위", cur.splash, next.splash);
+    diff("독 피해", cur.poisonDps, next.poisonDps);
+    diff("버프", cur.buffMult, next.buffMult);
+    diff("버프 범위", cur.buffRadius, next.buffRadius);
     const ok = canAfford(g2.myPool, next.cost);
-    return `${name} \u2192 <b>Lv.${b.level + 1}</b> \xB7 ${parts.join(" \xB7 ")} \xB7 \uBE44\uC6A9 <b class="${ok ? "" : "lack"}">${costText(next.cost)}</b>`;
+    return `${name} → <b>Lv.${b.level + 1}</b> \xB7 ${parts.join(" \xB7 ")} \xB7 비용 <b class="${ok ? "" : "lack"}">${costText(next.cost)}</b>`;
   }
   // ---------------------------------------------------------------- 로비
   _bindLobby() {
@@ -194,7 +197,7 @@ export var UI = class {
     const nameIn = $2("in-name");
     nameIn.value = localStorage.getItem("cd.name") || "";
     const takeName = () => {
-      const n = (nameIn.value || "\uD50C\uB808\uC774\uC5B4").trim().slice(0, 10) || "\uD50C\uB808\uC774\uC5B4";
+      const n = (nameIn.value || "플레이어").trim().slice(0, 10) || "플레이어";
       localStorage.setItem("cd.name", n);
       g2.net.name = n;
       return n;
@@ -202,7 +205,7 @@ export var UI = class {
     $2("in-server").value = g2.net.serverUrl;
     $2("btn-server").onclick = () => {
       g2.net.setServerUrl($2("in-server").value.trim());
-      this.toast("\uC11C\uBC84 \uC8FC\uC18C\uB97C \uC800\uC7A5\uD588\uB2E4. \uBC29\uC744 \uB2E4\uC2DC \uB9CC\uB4E4\uBA74 \uC801\uC6A9\uB41C\uB2E4.", "good");
+      this.toast("서버 주소를 저장했다. 방을 다시 만들면 적용된다.", "good");
     };
     $2("btn-single").onclick = () => {
       takeName();
@@ -221,7 +224,7 @@ export var UI = class {
       takeName();
       const code = ($2("in-code").value || "").trim().toUpperCase();
       if (code.length < 3) {
-        this.toast("\uBC29 \uCF54\uB4DC\uB97C \uC785\uB825\uD558\uC138\uC694", "bad");
+        this.toast("방 코드를 입력하세요", "bad");
         return;
       }
       g2.net.connect(code);
@@ -235,7 +238,7 @@ export var UI = class {
     };
     $2("btn-start").onclick = () => {
       if (!g2.net.isHost) {
-        this.toast("\uBC29\uC7A5\uB9CC \uC2DC\uC791\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4", "bad");
+        this.toast("방장만 시작할 수 있습니다", "bad");
         return;
       }
       const shared = $2("chk-shared").checked;
@@ -248,7 +251,7 @@ export var UI = class {
     $2("btn-again").onclick = () => {
       const g22 = this.game;
       if (g22.net.online && !g22.net.isHost) {
-        this.toast("\uBC29\uC7A5\uC774 \uB2E4\uC2DC \uC2DC\uC791\uD558\uAE30\uB97C \uAE30\uB2E4\uB9AC\uB294 \uC911\u2026", "warn");
+        this.toast("방장이 다시 시작하기를 기다리는 중…", "warn");
         return;
       }
       this.el.result.classList.add("hidden");
@@ -271,24 +274,28 @@ export var UI = class {
     list.innerHTML = "";
     for (const p2 of g2.net.roster()) {
       const li2 = document.createElement("li");
-      li2.innerHTML = `<span>${p2.isHost ? "\u{1F451}" : "\u{1F642}"}</span><span>${escapeHtml(p2.name)}${p2.isSelf ? " (\uB098)" : ""}</span>`;
+      li2.innerHTML = `<span>${p2.isHost ? "👑" : "🙂"}</span><span>${escapeHtml(p2.name)}${p2.isSelf ? " (나)" : ""}</span>`;
       list.appendChild(li2);
     }
     $2("btn-start").disabled = !g2.net.isHost;
-    $2("btn-start").textContent = g2.net.isHost ? "\uAC8C\uC784 \uC2DC\uC791 (\uBC29\uC7A5)" : "\uBC29\uC7A5\uC774 \uC2DC\uC791\uD558\uAE30\uB97C \uAE30\uB2E4\uB9AC\uB294 \uC911\u2026";
+    $2("btn-start").textContent = g2.net.isHost ? "게임 시작 (방장)" : "방장이 시작하기를 기다리는 중…";
   }
   // ---------------------------------------------------------------- HUD 바인딩
   _bindHud() {
     const g2 = this.game;
     this.el.waveBtn.onclick = () => g2.requestStartWave();
     this.el.hupBtn.onclick = () => g2.requestHarvestUpgrade();
-    this.el.pickaxeBtn.onclick = () => g2.requestPickaxe();
+    $2("station-close").onclick = () => this.closeStation();
     $2("btn-help").onclick = () => this.el.help.classList.toggle("hidden");
     $2("tutorial-skip").onclick = () => this._endTutorial();
     addEventListener("keydown", (e) => {
       if (e.target.closest("input")) return;
       if (this._listeningFor) return;
       const k2 = e.key.toLowerCase();
+      if (k2 === "escape" && this.stationOpen) {
+        this.closeStation();
+        return;
+      }
       if (k2 === g2.km.get("help")) this.el.help.classList.toggle("hidden");
       if (k2 === g2.km.get("mute")) this._toggleMute();
     });
@@ -308,7 +315,7 @@ export var UI = class {
       this.game.km.reset();
       this._refreshRebindLabels();
       this._refreshSlotHotkeys();
-      this.toast("\uD0A4\uB97C \uAE30\uBCF8\uAC12\uC73C\uB85C \uB418\uB3CC\uB838\uB2E4", "good");
+      this.toast("키를 기본값으로 되돌렸다", "good");
     };
     const cbBox = $2("chk-colorblind");
     this.colorblind = localStorage.getItem("cd.colorblind") === "1";
@@ -330,7 +337,7 @@ export var UI = class {
     this._listeningFor = action;
     this._listeningEl = el2;
     el2.classList.add("listening");
-    el2.textContent = "\uC785\uB825\u2026";
+    el2.textContent = "입력…";
     const finish = () => {
       el2.classList.remove("listening");
       this._listeningFor = null;
@@ -349,7 +356,7 @@ export var UI = class {
         return;
       }
       if (["shift", "control", "alt", "meta"].includes(k2) || RESERVED_KEYS.has(k2)) {
-        this.toast("\uC774\uB3D9 \uD0A4\uB098 \uBCF4\uC870 \uD0A4\uB294 \uC7AC\uC9C0\uC815\uD560 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4", "bad");
+        this.toast("이동 키나 보조 키는 재지정할 수 없습니다", "bad");
         finish();
         this._refreshRebindLabels();
         return;
@@ -360,9 +367,9 @@ export var UI = class {
       km.set(action, k2);
       if (conflict) {
         km.set(conflict, prevKey);
-        this.toast(`${km.label(conflict)} \uD0A4\uC640 \uC11C\uB85C \uBC14\uB00C\uC5C8\uB2E4`, "warn");
+        this.toast(`${km.label(conflict)} 키와 서로 바뀌었다`, "warn");
       } else {
-        this.toast(`${km.label(action)} \u2192 ${keyLabel(k2)}`, "good");
+        this.toast(`${km.label(action)} → ${keyLabel(k2)}`, "good");
       }
       finish();
       this._refreshRebindLabels();
@@ -378,7 +385,7 @@ export var UI = class {
   }
   _syncMuteBtn() {
     const muted = this.game.sfx.muted;
-    this.el.mute.textContent = muted ? "\u{1F507}" : "\u{1F50A}";
+    this.el.mute.textContent = muted ? "🔇" : "🔊";
     this.el.mute.classList.toggle("off", muted);
   }
   // 음량 슬라이더. 끌면 음소거는 자동으로 풀린다 (소리를 키우려는 의도이므로)
@@ -454,8 +461,11 @@ export var UI = class {
     this.el.lobby.classList.add("hidden");
     this.el.result.classList.add("hidden");
     this.el.pauseOverlay.classList.add("hidden");
+    this._station = null;
+    this._stationRows = null;
+    this.el.station.classList.add("hidden");
     this.refreshBuildBar();
-    this.toast("\uD06C\uB9AC\uC2A4\uD0C8\uC744 \uC9C0\uCF1C\uB77C! F\uB85C \uCC44\uC9D1, 1~7\uB85C \uAC74\uC124", "good");
+    this.toast("크리스탈을 지켜라! F로 채집, 1~8로 건설", "good");
     if (localStorage.getItem("cd.tutorialDone")) {
       this.el.tutorial.classList.add("hidden");
       this._tutStep = -1;
@@ -473,6 +483,82 @@ export var UI = class {
     this.el.tutorial.classList.add("hidden");
     localStorage.setItem("cd.tutorialDone", "1");
   }
+  // ------------------------------------------------ 제작대 / 화로 작업창
+  openStation(kind) {
+    this._station = kind;
+    this.el.station.classList.remove("hidden");
+    this._renderStation();
+  }
+  closeStation() {
+    this._station = null;
+    this.el.station.classList.add("hidden");
+  }
+  get stationOpen() {
+    return !!this._station;
+  }
+  _renderStation() {
+    const g2 = this.game;
+    const pool = g2.myPool;
+    const rows = [];
+    if (this._station === "craft") {
+      this.el.stationTitle.textContent = "🪚 제작대";
+      this.el.stationDesc.textContent = "도구와 무기를 만든다. 하나씩만 가질 수 있다.";
+      for (const [key, r] of Object.entries(CFG.craft)) {
+        rows.push({
+          key,
+          icon: r.icon,
+          name: r.name,
+          desc: r.desc,
+          cost: r.cost,
+          owned: !!g2.local.tools[key],
+          action: () => g2.requestCraft(key)
+        });
+      }
+    } else {
+      const y2 = CFG.smelt.yield;
+      this.el.stationTitle.textContent = "🔥 화로";
+      this.el.stationDesc.textContent = "광물을 녹여 철을 만든다. 철은 무기 재료다.";
+      rows.push({
+        key: "smelt",
+        icon: "⚙️",
+        name: `철 ${y2}개 제련`,
+        desc: "제작대에서 칼·활을 만들 때 쓴다.",
+        cost: CFG.smelt.cost,
+        owned: false,
+        action: () => g2.requestSmelt()
+      });
+    }
+    // 이미 그려둔 행은 상태만 갱신해서 클릭 도중에 DOM 이 날아가지 않게 한다
+    if (this._stationRows !== this._station) {
+      this.el.stationList.innerHTML = "";
+      this._rowEls = {};
+      for (const r of rows) {
+        const btn = document.createElement("button");
+        btn.className = "station-item";
+        btn.innerHTML = `<span class="si-icon">${r.icon}</span>
+<span class="si-body"><b>${r.name}</b><span class="si-desc">${r.desc}</span></span>
+<span class="si-cost"></span>`;
+        btn.onclick = r.action;
+        this.el.stationList.appendChild(btn);
+        this._rowEls[r.key] = btn;
+      }
+      this._stationRows = this._station;
+    }
+    for (const r of rows) {
+      const btn = this._rowEls[r.key];
+      if (!btn) continue;
+      const afford = canAfford(pool, r.cost);
+      btn.querySelector(".si-cost").textContent = r.owned ? "보유 중" : costText(r.cost);
+      btn.classList.toggle("owned", r.owned);
+      btn.classList.toggle("poor", !r.owned && !afford);
+      btn.disabled = r.owned || !afford;
+    }
+  }
+  _refreshTools() {
+    const t2 = this.game.local.tools;
+    const owned = Object.keys(CFG.craft).filter((k2) => t2[k2]);
+    this.el.toolRow.innerHTML = owned.length ? owned.map((k2) => `<span class="tool" title="${CFG.craft[k2].name}">${CFG.craft[k2].icon}</span>`).join("") : `<span class="dim">제작대에서 도구를 만드세요</span>`;
+  }
   // 채집 → 건설 → 웨이브 시작 진행에 맞춰 튜토리얼 단계를 넘긴다
   _updateTutorial() {
     if (this._tutStep < 0) return;
@@ -489,18 +575,18 @@ export var UI = class {
   }
   showResult(win, stats, wave) {
     this.el.result.classList.remove("hidden");
-    $2("result-title").textContent = win ? "\uC2B9\uB9AC! \u{1F389}" : "\uD06C\uB9AC\uC2A4\uD0C8 \uD30C\uAD34\u2026 \u{1F4A5}";
-    $2("result-sub").textContent = win ? `${CFG.wave.goal}\uC6E8\uC774\uBE0C\uB97C \uBAA8\uB450 \uB9C9\uC544\uB0C8\uB2E4.` : `${wave}\uC6E8\uC774\uBE0C\uAE4C\uC9C0 \uBC84\uD17C\uB2E4.`;
+    $2("result-title").textContent = win ? "승리! 🎉" : "크리스탈 파괴… 💥";
+    $2("result-sub").textContent = win ? `${CFG.wave.goal}웨이브를 모두 막아냈다.` : `${wave}웨이브까지 버텼다.`;
     $2("result-stats").innerHTML = `
-  <li>\uC0DD\uC874 \uC2DC\uAC04 <b>${fmtTime(stats.time)}</b></li>
-  <li>\uCC98\uCE58\uD55C \uBAAC\uC2A4\uD130 <b>${stats.kills}</b></li>
-  <li>\uCC44\uC9D1\uD55C \uC790\uC6D0 <b>${stats.harvested}</b></li>
-  <li>\uC18C\uBAA8\uD55C \uC790\uC6D0 <b>\u{1FAB5}${stats.spentWood} \u{1FAA8}${stats.spentStone}</b>${this._spendBreakdown(stats)}</li>
-  <li>\uAC74\uC124\uD55C \uAD6C\uC870\uBB3C <b>${stats.built}</b></li>`;
+  <li>생존 시간 <b>${fmtTime(stats.time)}</b></li>
+  <li>처치한 몬스터 <b>${stats.kills}</b></li>
+  <li>채집한 자원 <b>${stats.harvested}</b></li>
+  <li>소모한 자원 <b>🪵${stats.spentWood} 🪨${stats.spentStone}</b>${this._spendBreakdown(stats)}</li>
+  <li>건설한 구조물 <b>${stats.built}</b></li>`;
     const log = $2("result-wavelog");
     if (stats.waveLog && stats.waveLog.length) {
       log.innerHTML = stats.waveLog.map(
-        (w2) => `<li><span>\uC6E8\uC774\uBE0C ${w2.wave}</span><span>${fmtTime(w2.time)} \xB7 \uCC98\uCE58 <b>${w2.kills}</b></span></li>`
+        (w2) => `<li><span>웨이브 ${w2.wave}</span><span>${fmtTime(w2.time)} \xB7 처치 <b>${w2.kills}</b></span></li>`
       ).join("");
       log.classList.remove("hidden");
     } else {
@@ -508,18 +594,18 @@ export var UI = class {
     }
     const rec = this._recordStats(win, stats, win ? CFG.wave.goal : wave);
     $2("result-record").innerHTML = `
-  <li class="${rec.isNewBest ? "new-best" : ""}">\u{1F3C6} \uC5ED\uB300 \uCD5C\uACE0 \uC6E8\uC774\uBE0C <b>${rec.bestWave}</b>${rec.isNewBest ? " \u2014 \uC2E0\uAE30\uB85D!" : ""}</li>
-  <li>\u2694\uFE0F \uB204\uC801 \uCC98\uCE58 <b>${rec.totalKills}</b></li>
-  <li>\u{1F3AE} \uD50C\uB808\uC774 \uD69F\uC218 <b>${rec.plays}</b> (\uC2B9\uB9AC ${rec.wins}\uD68C)</li>`;
+  <li class="${rec.isNewBest ? "new-best" : ""}">🏆 역대 최고 웨이브 <b>${rec.bestWave}</b>${rec.isNewBest ? " — 신기록!" : ""}</li>
+  <li>⚔️ 누적 처치 <b>${rec.totalKills}</b></li>
+  <li>🎮 플레이 횟수 <b>${rec.plays}</b> (승리 ${rec.wins}회)</li>`;
   }
   // 자원을 어디에 썼는지 항목별로 쪼개 보여준다 (쓴 곳만)
   _spendBreakdown(stats) {
-    const LABELS2 = { build: "\uAC74\uC124", upgrade: "\uC5C5\uADF8\uB808\uC774\uB4DC", repair: "\uC218\uB9AC", harvest: "\uCC44\uC9D1\uC18D\uB3C4", craft: "\uC81C\uC791" };
+    const LABELS2 = { build: "건설", upgrade: "업그레이드", repair: "수리", harvest: "채집속도", craft: "제작" };
     const by = stats.spentBy || {};
     const rows = Object.entries(LABELS2).map(([key, label]) => [label, by[key] || { wood: 0, stone: 0 }]).filter(([, c2]) => c2.wood || c2.stone).map(([label, c2]) => {
       const parts = [];
-      if (c2.wood) parts.push(`\u{1FAB5}${c2.wood}`);
-      if (c2.stone) parts.push(`\u{1FAA8}${c2.stone}`);
+      if (c2.wood) parts.push(`🪵${c2.wood}`);
+      if (c2.stone) parts.push(`🪨${c2.stone}`);
       return `<span>${label} ${parts.join(" ")}</span>`;
     });
     return rows.length ? `<div class="breakdown">${rows.join("")}</div>` : "";
@@ -569,38 +655,44 @@ export var UI = class {
     this.el.wood.textContent = Math.floor(pool.wood);
     this.el.stone.textContent = Math.floor(pool.stone);
     this.el.shard.textContent = Math.floor(pool.shard || 0);
-    this.el.poolMode.textContent = g2.shared ? "\uD300 \uACF5\uC720 \uC790\uC6D0" : "\uAC1C\uC778 \uC790\uC6D0";
+    this.el.poolMode.textContent = g2.shared ? "팀 공유 자원" : "개인 자원";
     const nextUp = CFG.harvest.upgrade[g2.local.harvestLv];
     this.el.hupLv.textContent = `Lv.${g2.local.harvestLv}`;
-    this.el.hupCost.textContent = nextUp ? costText(nextUp.cost) : "\uCD5C\uB300";
+    this.el.hupCost.textContent = nextUp ? costText(nextUp.cost) : "최대";
     this.el.hupBtn.disabled = !nextUp || !canAfford(pool, nextUp.cost);
-    const pkCost = CFG.craft.pickaxe.cost;
-    this.el.pickaxeStatus.textContent = g2.local.hasPickaxe ? "\uBCF4\uC720" : "\uD544\uC694";
-    this.el.pickaxeCost.textContent = g2.local.hasPickaxe ? "" : costText(pkCost);
-    this.el.pickaxeBtn.disabled = g2.local.hasPickaxe || !canAfford(pool, pkCost);
+    this.el.iron.textContent = Math.floor(pool.iron || 0);
+    this._refreshTools();
+    if (this._station) {
+      // 시설에서 멀어지면 창을 닫는다
+      const near = [...g2.buildMgr.buildings.values()].some(
+        (b) => b.stationKind === this._station && !b.dead && dist(g2.local.x, g2.local.z, b.x, b.z) <= CFG.station.range
+      );
+      if (near) this._renderStation();
+      else this.closeStation();
+    }
     const c2 = g2.world.crystal;
     const ratio = clamp(c2.hp / c2.maxHp, 0, 1);
     this.el.crystalFill.style.transform = `scaleX(${ratio})`;
     this.el.crystalText.textContent = `${Math.ceil(c2.hp)} / ${c2.maxHp}`;
     const w2 = g2.wave;
-    this.el.waveLabel.textContent = `\uC6E8\uC774\uBE0C ${Math.min(CFG.wave.goal, w2.wave + 1)} / ${CFG.wave.goal}`;
+    this.el.waveLabel.textContent = `웨이브 ${Math.min(CFG.wave.goal, w2.wave + 1)} / ${CFG.wave.goal}`;
     if (w2.phase === PHASE.PREP) {
-      this.el.waveState.textContent = `\uC900\uBE44 \uC2DC\uAC04 ${fmtTime(w2.prepLeft)}`;
+      this.el.waveState.textContent = `준비 시간 ${fmtTime(w2.prepLeft)}`;
       this.el.waveBtn.classList.remove("hidden");
       this._showWavePreview(Math.min(CFG.wave.goal, w2.wave + 1));
     } else if (w2.phase === PHASE.COMBAT) {
-      this.el.waveState.textContent = `\uB0A8\uC740 \uBAAC\uC2A4\uD130 ${w2.remaining}`;
+      this.el.waveState.textContent = `남은 몬스터 ${w2.remaining}`;
       this.el.waveBtn.classList.add("hidden");
       this.el.wavePreview.classList.add("hidden");
     } else {
-      this.el.waveState.textContent = w2.phase === PHASE.WON ? "\uBC29\uC5B4 \uC131\uACF5" : "\uD328\uBC30";
+      this.el.waveState.textContent = w2.phase === PHASE.WON ? "방어 성공" : "패배";
       this.el.waveBtn.classList.add("hidden");
       this.el.wavePreview.classList.add("hidden");
     }
     const p2 = g2.local;
     const hpR = clamp(p2.hp / p2.maxHp, 0, 1);
     this.el.hpFill.style.transform = `scaleX(${hpR})`;
-    this.el.hpText.textContent = p2.alive ? `${Math.ceil(p2.hp)} / ${p2.maxHp}` : `\uBD80\uD65C\uAE4C\uC9C0 ${Math.ceil(p2.downTimer)}\uCD08`;
+    this.el.hpText.textContent = p2.alive ? `${Math.ceil(p2.hp)} / ${p2.maxHp}` : `부활까지 ${Math.ceil(p2.downTimer)}초`;
     if (p2.harvesting) {
       this.el.harvestWrap.classList.remove("hidden");
       this.el.harvestFill.style.transform = `scaleX(${clamp(p2.harvesting.t / p2.harvesting.need, 0, 1)})`;
@@ -611,15 +703,15 @@ export var UI = class {
     if (near && !g2.buildMgr.mode) {
       this.el.prompt.classList.remove("hidden");
       if (near.type === "gem" && !p2.hasPickaxe) {
-        this.el.prompt.innerHTML = `\u{1F4A0} \uC815\uC218\uC11D \u2014 \uACE1\uAD2D\uC774\uAC00 \uC788\uC5B4\uC57C \uCE98 \uC218 \uC788\uC2B5\uB2C8\uB2E4 (\uC81C\uC791\uB300\uC5D0\uC11C \uC81C\uC791)`;
+        this.el.prompt.innerHTML = `💠 정수석 — 곡괭이가 있어야 캘 수 있습니다 (제작대에서 제작)`;
       } else {
-        const label = near.type === "tree" ? "\u{1F333} \uB098\uBB34" : near.type === "gem" ? "\u{1F4A0} \uC815\uC218\uC11D" : "\u{1FAA8} \uBC14\uC704";
-        this.el.prompt.innerHTML = `${label} \u2014 <kbd>F</kbd> \uAFB9 \uB20C\uB7EC \uCC44\uC9D1 (\uB0A8\uC740 ${near.charges})`;
+        const label = near.type === "tree" ? "🌳 나무" : near.type === "gem" ? "💠 정수석" : "🪨 바위";
+        this.el.prompt.innerHTML = `${label} — <kbd>F</kbd> 꾹 눌러 채집 (남은 ${near.charges})`;
       }
     } else {
       this.el.prompt.classList.add("hidden");
     }
-    this.el.netStatus.textContent = g2.net.online ? g2.isHost ? "\uD638\uC2A4\uD2B8" : "\uCC38\uAC00\uC790" : "\uC2F1\uAE00";
+    this.el.netStatus.textContent = g2.net.online ? g2.isHost ? "호스트" : "참가자" : "싱글";
     this._updateTutorial();
     this._updateParty();
     this._updateNametags();
@@ -641,7 +733,7 @@ export var UI = class {
       const slowed = now < e.slowUntil;
       const poisoned = now < e.poisonUntil;
       if (!isNotable && !slowed && !poisoned) continue;
-      const text = (isNotable ? CFG.enemies[e.type].icon : "") + (slowed ? "\u2744\uFE0F" : "") + (poisoned ? "\u2620\uFE0F" : "");
+      const text = (isNotable ? CFG.enemies[e.type].icon : "") + (slowed ? "❄️" : "") + (poisoned ? "☠️" : "");
       seen.add(e.id);
       let tag = this.enemyTags.get(e.id);
       if (!tag) {
@@ -712,16 +804,16 @@ export var UI = class {
         dot.style.background = "#" + p2.color.toString(16).padStart(6, "0");
         const who = document.createElement("span");
         who.className = "who";
-        who.textContent = p2.name + (p2.isLocal ? " (\uB098)" : "");
+        who.textContent = p2.name + (p2.isLocal ? " (나)" : "");
         li2.append(dot, who);
         if (!p2.isLocal && !g2.shared) {
           const give = document.createElement("button");
           give.className = "give";
-          give.textContent = "\u{1FAB5}10";
+          give.textContent = "🪵10";
           give.onclick = () => g2.requestGive(p2.id, 10, 0);
           const give2 = document.createElement("button");
           give2.className = "give";
-          give2.textContent = "\u{1FAA8}10";
+          give2.textContent = "🪨10";
           give2.onclick = () => g2.requestGive(p2.id, 0, 10);
           li2.append(give, give2);
         }

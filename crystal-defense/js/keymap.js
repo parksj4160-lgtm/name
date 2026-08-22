@@ -12,17 +12,17 @@ var DEFAULTS = {
   mute: "m"
 };
 var LABELS = {
-  harvest: "\uCC44\uC9D1",
-  attack: "\uACF5\uACA9",
-  upgrade: "\uC5C5\uADF8\uB808\uC774\uB4DC \uBAA8\uB4DC",
-  repair: "\uC218\uB9AC \uBAA8\uB4DC",
-  sell: "\uCCA0\uAC70 \uBAA8\uB4DC",
-  cancel: "\uCDE8\uC18C",
-  shard: "\uC218\uC815 \uC815\uC218 \uC0AC\uC6A9",
-  startWave: "\uC6E8\uC774\uBE0C \uC2DC\uC791",
-  pause: "\uC77C\uC2DC\uC815\uC9C0",
-  help: "\uB3C4\uC6C0\uB9D0",
-  mute: "\uC74C\uC18C\uAC70"
+  harvest: "채집",
+  attack: "공격",
+  upgrade: "업그레이드 모드",
+  repair: "수리 모드",
+  sell: "철거 모드",
+  cancel: "취소",
+  shard: "수정 정수 사용",
+  startWave: "웨이브 시작",
+  pause: "일시정지",
+  help: "도움말",
+  mute: "음소거"
 };
 var STORE_KEY = "cd.keymap";
 export var KeyMap = class {
@@ -83,9 +83,9 @@ export function keyLabel(k2) {
   if (k2 === " ") return "Space";
   if (k2 === "escape") return "Esc";
   if (k2 === "enter") return "Enter";
-  if (k2 === "arrowup") return "\u2191";
-  if (k2 === "arrowdown") return "\u2193";
-  if (k2 === "arrowleft") return "\u2190";
-  if (k2 === "arrowright") return "\u2192";
+  if (k2 === "arrowup") return "↑";
+  if (k2 === "arrowdown") return "↓";
+  if (k2 === "arrowleft") return "←";
+  if (k2 === "arrowright") return "→";
   return k2.length === 1 ? k2.toUpperCase() : k2[0].toUpperCase() + k2.slice(1);
 }

@@ -44,13 +44,13 @@ export var CFG = {
   // 건설물 정의. key 는 네트워크 메시지에도 그대로 쓰인다.
   builds: {
     wall: {
-      name: "\uBCBD",
-      icon: "\u{1F9F1}",
+      name: "벽",
+      icon: "🧱",
       hotkey: "1",
       cost: { wood: 12, stone: 4 },
       hp: 260,
       blocks: true,
-      desc: "\uBAAC\uC2A4\uD130\uC758 \uAE38\uC744 \uB9C9\uB294\uB2E4. \uAE38\uC774 \uC644\uC804\uD788 \uB9C9\uD788\uBA74 \uBAAC\uC2A4\uD130\uAC00 \uBCBD\uC744 \uBD80\uC21C\uB2E4.",
+      desc: "몬스터의 길을 막는다. 길이 완전히 막히면 몬스터가 벽을 부순다.",
       levels: [
         { hp: 260 },
         { hp: 520, cost: { wood: 20, stone: 20 } },
@@ -58,13 +58,13 @@ export var CFG = {
       ]
     },
     arrow: {
-      name: "\uD654\uC0B4\uD0D1",
-      icon: "\u{1F3F9}",
+      name: "화살탑",
+      icon: "🏹",
       hotkey: "2",
       cost: { wood: 35, stone: 15 },
       hp: 180,
       blocks: true,
-      desc: "\uAC00\uC7A5 \uC55E\uC120 \uC801\uC744 \uBE60\uB974\uAC8C \uC800\uACA9\uD55C\uB2E4.",
+      desc: "가장 앞선 적을 빠르게 저격한다.",
       levels: [
         { hp: 180, dmg: 11, range: 13, rate: 1.15 },
         { hp: 280, dmg: 18, range: 14.5, rate: 1.35, cost: { wood: 40, stone: 30 } },
@@ -72,13 +72,13 @@ export var CFG = {
       ]
     },
     frost: {
-      name: "\uC11C\uB9AC\uD0D1",
-      icon: "\u2744\uFE0F",
+      name: "서리탑",
+      icon: "❄️",
       hotkey: "3",
       cost: { wood: 25, stone: 45 },
       hp: 200,
       blocks: true,
-      desc: "\uC801\uC911\uD55C \uC801\uC744 \uB290\uB9AC\uAC8C \uB9CC\uB4E0\uB2E4. \uBE60\uB978 \uBAAC\uC2A4\uD130 \uB300\uC751\uC6A9.",
+      desc: "적중한 적을 느리게 만든다. 빠른 몬스터 대응용.",
       levels: [
         { hp: 200, dmg: 5, range: 10, rate: 0.9, slow: 0.45, slowTime: 1.6 },
         { hp: 320, dmg: 9, range: 11.5, rate: 1, slow: 0.55, slowTime: 2, cost: { wood: 30, stone: 55 } },
@@ -86,13 +86,13 @@ export var CFG = {
       ]
     },
     cannon: {
-      name: "\uB300\uD3EC\uD0D1",
-      icon: "\u{1F4A3}",
+      name: "대포탑",
+      icon: "💣",
       hotkey: "4",
       cost: { wood: 55, stone: 70 },
       hp: 240,
       blocks: true,
-      desc: "\uB290\uB9AC\uC9C0\uB9CC \uBC94\uC704 \uD53C\uD574\uB97C \uC900\uB2E4. \uBB49\uCE5C \uC801\uC5D0\uAC8C \uAC15\uD558\uB2E4.",
+      desc: "느리지만 범위 피해를 준다. 뭉친 적에게 강하다.",
       levels: [
         { hp: 240, dmg: 26, range: 15, rate: 0.55, splash: 3.2 },
         { hp: 380, dmg: 42, range: 16.5, rate: 0.62, splash: 3.6, cost: { wood: 60, stone: 80 } },
@@ -100,13 +100,13 @@ export var CFG = {
       ]
     },
     poison: {
-      name: "\uB3C5\uD0D1",
-      icon: "\u2620\uFE0F",
+      name: "독탑",
+      icon: "☠️",
       hotkey: "5",
       cost: { wood: 30, stone: 50 },
       hp: 190,
       blocks: true,
-      desc: "\uC801\uC911\uD55C \uC801\uC5D0\uAC8C \uC9C0\uC18D \uD53C\uD574\uB97C \uB0A8\uAE34\uB2E4. \uC5EC\uB7EC \uB9C8\uB9AC\uB97C \uB3D9\uC2DC\uC5D0 \uAC09\uC544\uBA39\uAE30 \uC88B\uB2E4.",
+      desc: "적중한 적에게 지속 피해를 남긴다. 여러 마리를 동시에 갉아먹기 좋다.",
       levels: [
         { hp: 190, dmg: 4, range: 11, rate: 0.8, poisonDps: 6, poisonTime: 3 },
         { hp: 300, dmg: 6, range: 12.5, rate: 0.9, poisonDps: 10, poisonTime: 3.5, cost: { wood: 40, stone: 70 } },
@@ -114,13 +114,13 @@ export var CFG = {
       ]
     },
     support: {
-      name: "\uBCF4\uB8E8",
-      icon: "\u{1F531}",
+      name: "보루",
+      icon: "🔱",
       hotkey: "6",
       cost: { wood: 40, stone: 60 },
       hp: 150,
       blocks: true,
-      desc: "\uC2A4\uC2A4\uB85C \uACF5\uACA9\uD558\uC9C0 \uC54A\uC9C0\uB9CC, \uC8FC\uBCC0 \uD0C0\uC6CC\uC758 \uACF5\uACA9\uB825\uC744 \uB192\uC778\uB2E4. \uD0C0\uC6CC \uBC00\uC9D1 \uC9C0\uC5ED\uC5D0 \uC138\uC6B0\uBA74 \uC88B\uB2E4.",
+      desc: "스스로 공격하지 않지만, 주변 타워의 공격력을 높인다. 타워 밀집 지역에 세우면 좋다.",
       levels: [
         { hp: 150, buffRadius: 6, buffMult: 0.2 },
         { hp: 220, buffRadius: 7, buffMult: 0.3, cost: { wood: 50, stone: 90 } },
@@ -128,32 +128,69 @@ export var CFG = {
       ]
     },
     workbench: {
-      name: "\uC81C\uC791\uB300",
-      icon: "\u{1FA9A}",
+      name: "제작대",
+      icon: "🪚",
       hotkey: "7",
       cost: { wood: 20 },
       hp: 80,
       blocks: true,
-      desc: "\uB098\uBB34\uB85C \uC9D3\uB294 \uC791\uC5C5\uB300. \uD300\uC5D0 \uD558\uB098\uB9CC \uC788\uC73C\uBA74 \uACE1\uAD2D\uC774\uB97C \uC81C\uC791\uD560 \uC218 \uC788\uB2E4.",
+      station: "craft",
+      desc: "다가가서 클릭하면 도구와 무기를 만든다. 팀에 하나만 있으면 된다.",
       levels: [
         { hp: 80 }
       ]
+    },
+    furnace: {
+      name: "화로",
+      icon: "🔥",
+      hotkey: "8",
+      cost: { wood: 15, stone: 30 },
+      hp: 120,
+      blocks: true,
+      station: "smelt",
+      desc: "다가가서 클릭하면 광물을 녹여 철을 얻는다. 무기 재료가 된다.",
+      levels: [
+        { hp: 120 }
+      ]
     }
   },
-  // 제작대에서 만드는 도구. 곡괭이가 있어야 정수석을 캘 수 있다.
+  // 시설에 다가가 클릭하면 열리는 작업창. range 는 상호작용 가능 거리.
+  station: { range: 3.6 },
+  // 화로 제련: 광물 -> 철
+  smelt: { cost: { stone: 6 }, yield: 1 },
+  // 제작대에서 만드는 것들. 각자 하나씩만 가질 수 있다.
   craft: {
-    pickaxe: { name: "\uACE1\uAD2D\uC774", cost: { wood: 15 } }
+    pickaxe: {
+      name: "곡괭이",
+      icon: "⛏️",
+      cost: { wood: 15 },
+      desc: "정수석을 캘 수 있게 된다."
+    },
+    sword: {
+      name: "칼",
+      icon: "🗡️",
+      cost: { wood: 10, iron: 4 },
+      effect: { dmg: 12 },
+      desc: "근접 공격력 +12."
+    },
+    bow: {
+      name: "활",
+      icon: "🏹",
+      cost: { wood: 20, iron: 3 },
+      effect: { range: 2.4, arc: 0.5 },
+      desc: "공격 사거리 +2.4 · 범위도 넓어진다."
+    }
   },
   // 몬스터 종류 (일반형 / 빠른형 / 탱커형 / 원거리형 / 건물추적형 / 보스)
   enemies: {
-    grunt: { name: "\uADF8\uB7F0\uD2B8", icon: "\u{1F479}", hp: 60, speed: 3, dmg: 12, rate: 1, radius: 0.6, color: 12735546, bounty: { wood: 2, stone: 1 }, scale: 1 },
-    runner: { name: "\uB7EC\uB108", icon: "\u{1F3C3}", hp: 34, speed: 5.6, dmg: 7, rate: 1.6, radius: 0.48, color: 14205258, bounty: { wood: 2, stone: 1 }, scale: 0.85 },
-    brute: { name: "\uBE0C\uB8E8\uD2B8", icon: "\u{1F98F}", hp: 210, speed: 1.9, dmg: 34, rate: 0.6, radius: 0.9, color: 8018896, bounty: { wood: 5, stone: 4 }, scale: 1.5 },
+    grunt: { name: "그런트", icon: "👹", hp: 60, speed: 3, dmg: 12, rate: 1, radius: 0.6, color: 12735546, bounty: { wood: 2, stone: 1 }, scale: 1 },
+    runner: { name: "러너", icon: "🏃", hp: 34, speed: 5.6, dmg: 7, rate: 1.6, radius: 0.48, color: 14205258, bounty: { wood: 2, stone: 1 }, scale: 0.85 },
+    brute: { name: "브루트", icon: "🦏", hp: 210, speed: 1.9, dmg: 34, rate: 0.6, radius: 0.9, color: 8018896, bounty: { wood: 5, stone: 4 }, scale: 1.5 },
     // 벽에 막히지 않고 사거리 안에서 크리스탈을 저격한다 — 벽만 세우는 전략을 견제한다
-    shooter: { name: "\uC8FC\uC220\uC0AC", icon: "\u{1F9D9}", hp: 45, speed: 2.4, dmg: 9, rate: 0.5, radius: 0.5, color: 3526479, bounty: { wood: 3, stone: 2 }, scale: 0.95, ranged: true, atkRange: 11 },
+    shooter: { name: "주술사", icon: "🧙", hp: 45, speed: 2.4, dmg: 9, rate: 0.5, radius: 0.5, color: 3526479, bounty: { wood: 3, stone: 2 }, scale: 0.95, ranged: true, atkRange: 11 },
     // 경로상의 벽을 무시하고 가장 가까운 타워로 직행해 부순다 — 타워를 뒤에 숨기는 전략을 견제한다
-    raider: { name: "\uC57D\uD0C8\uC790", icon: "\u{1FA93}", hp: 80, speed: 2.6, dmg: 10, rate: 0.8, radius: 0.55, color: 11887901, bounty: { wood: 3, stone: 2 }, scale: 1.05, seeksBuildings: true, buildingDmgMult: 1.8 },
-    boss: { name: "\uD30C\uAD34\uC790", icon: "\u{1F480}", hp: 900, speed: 2.1, dmg: 70, rate: 0.7, radius: 1.4, color: 3092282, bounty: { wood: 30, stone: 30 }, scale: 2.3 }
+    raider: { name: "약탈자", icon: "🪓", hp: 80, speed: 2.6, dmg: 10, rate: 0.8, radius: 0.55, color: 11887901, bounty: { wood: 3, stone: 2 }, scale: 1.05, seeksBuildings: true, buildingDmgMult: 1.8 },
+    boss: { name: "파괴자", icon: "💀", hp: 900, speed: 2.1, dmg: 70, rate: 0.7, radius: 1.4, color: 3092282, bounty: { wood: 30, stone: 30 }, scale: 2.3 }
   },
   wave: {
     goal: 10,

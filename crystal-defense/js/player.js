@@ -25,7 +25,7 @@ var Player = class {
     this.downTimer = 0;
     this.res = { wood: 40, stone: 20 };
     this.shards = 0;
-    this.hasPickaxe = false;
+    this.tools = {};
     this.harvestLv = 1;
     this.harvesting = null;
     this.attackCd = 0;
@@ -69,6 +69,21 @@ var Player = class {
   }
   get harvestMult() {
     return CFG.harvest.upgrade[this.harvestLv - 1].mult;
+  }
+  get hasPickaxe() {
+    return !!this.tools.pickaxe;
+  }
+  // 기본 공격치에 제작한 무기 효과를 더한 값
+  get attackStats() {
+    const base = CFG.player.attack;
+    const out = { dmg: base.dmg, range: base.range, arc: base.arc, cd: base.cd };
+    for (const key of Object.keys(this.tools)) {
+      if (!this.tools[key]) continue;
+      const eff = CFG.craft[key]?.effect;
+      if (!eff) continue;
+      for (const k2 of Object.keys(eff)) out[k2] += eff[k2];
+    }
+    return out;
   }
   damage(amount) {
     if (!this.alive) return false;
@@ -220,7 +235,7 @@ export var LocalPlayer = class extends Player {
   }
   tryAttack() {
     if (!this.alive || this.attackCd > 0) return false;
-    this.attackCd = CFG.player.attack.cd;
+    this.attackCd = this.attackStats.cd;
     this.swing = 1;
     this.cancelHarvest();
     return true;

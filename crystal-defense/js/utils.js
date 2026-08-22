@@ -28,18 +28,19 @@ export function fmtTime(sec) {
   const s2 = Math.max(0, Math.ceil(sec));
   return `${String(Math.floor(s2 / 60)).padStart(2, "0")}:${String(s2 % 60).padStart(2, "0")}`;
 }
+// 자원 종류와 표시용 아이콘. 새 자원은 여기만 늘리면 비용 계산이 따라온다.
+export var RES_ICON = { wood: "🪵", stone: "🪨", iron: "⚙️", shard: "💠" };
+var COST_KEYS = ["wood", "stone", "iron"];
 export function canAfford(res, cost) {
   if (!cost) return false;
-  return (res.wood || 0) >= (cost.wood || 0) && (res.stone || 0) >= (cost.stone || 0);
+  return COST_KEYS.every((k2) => (res[k2] || 0) >= (cost[k2] || 0));
 }
 export function payCost(res, cost) {
-  res.wood -= cost.wood || 0;
-  res.stone -= cost.stone || 0;
+  for (const k2 of COST_KEYS) if (cost[k2]) res[k2] = (res[k2] || 0) - cost[k2];
 }
 export function costText(cost) {
   if (!cost) return "-";
   const parts = [];
-  if (cost.wood) parts.push(`\u{1FAB5}${cost.wood}`);
-  if (cost.stone) parts.push(`\u{1FAA8}${cost.stone}`);
+  for (const k2 of COST_KEYS) if (cost[k2]) parts.push(`${RES_ICON[k2]}${cost[k2]}`);
   return parts.join(" ");
 }

@@ -31,6 +31,8 @@ var MAT2 = {
   workbenchTop: new THREE.MeshStandardMaterial({ color: 12159565, roughness: 0.8 }),
   workbenchLeg: new THREE.MeshStandardMaterial({ color: 5979940, roughness: 0.9 }),
   workbenchTool: new THREE.MeshStandardMaterial({ color: 10137781, roughness: 0.5, metalness: 0.4 }),
+  furnaceBody: new THREE.MeshStandardMaterial({ color: 5723991, roughness: 0.9 }),
+  furnaceFire: new THREE.MeshStandardMaterial({ color: 16750899, emissive: 15693600, emissiveIntensity: 1.4, roughness: 0.4 }),
   ghostOk: new THREE.MeshStandardMaterial({ color: 5570463, transparent: true, opacity: 0.45, emissive: 2002770, emissiveIntensity: 0.6 }),
   ghostBad: new THREE.MeshStandardMaterial({ color: 16734826, transparent: true, opacity: 0.4, emissive: 9379372, emissiveIntensity: 0.6 }),
   barBg: new THREE.MeshBasicMaterial({ color: 1119519, transparent: true, opacity: 0.8, depthTest: false }),
@@ -73,8 +75,12 @@ var Building = class {
   get isWorkbench() {
     return this.key === "workbench";
   }
+  // 다가가서 클릭하면 작업창이 열리는 시설이면 그 종류("craft"/"smelt")
+  get stationKind() {
+    return this.def.station || null;
+  }
   get isTower() {
-    return this.key !== "wall" && !this.isSupport && !this.isWorkbench;
+    return this.key !== "wall" && !this.isSupport && !this.stationKind;
   }
   get nextCost() {
     const nxt = this.def.levels[this.level];
@@ -180,6 +186,22 @@ function buildMesh(key, level) {
     tool.rotation.set(0, Math.PI / 4, Math.PI * 0.15);
     tool.castShadow = true;
     g2.add(tool);
+    return g2;
+  }
+  if (key === "furnace") {
+    const body = new THREE.Mesh(new THREE.BoxGeometry(1.4, 1.2, 1.4), MAT2.furnaceBody);
+    body.position.y = 0.6;
+    body.castShadow = true;
+    body.receiveShadow = true;
+    g2.add(body);
+    const chimney = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.28, 0.9, 8), MAT2.furnaceBody);
+    chimney.position.set(0.38, 1.6, -0.38);
+    chimney.castShadow = true;
+    g2.add(chimney);
+    // 정면 아궁이 — 빛나는 재질이라 멀리서도 화로임을 알아본다
+    const mouth = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.5, 0.08), MAT2.furnaceFire);
+    mouth.position.set(0, 0.5, 0.71);
+    g2.add(mouth);
     return g2;
   }
   const base = new THREE.Mesh(GEO2.base, MAT2.base);
@@ -297,6 +319,11 @@ export var BuildManager = class {
     if (!this.mode || !pointer) {
       if (this.ghost) this.ghost.visible = false;
       this.rangeRing.visible = false;
+      // 건설 모드가 아닐 때도 제작대·화로는 가리키면 잡아둔다 (클릭해서 열 수 있게)
+      if (!this.mode && pointer) {
+        const b = this.grid.atWorld(pointer.x, pointer.z);
+        if (b && b.stationKind) this.hover = b;
+      }
       return;
     }
     if (this.mode === "upgrade" || this.mode === "sell" || this.mode === "repair") {
@@ -323,7 +350,7 @@ export var BuildManager = class {
     let why = res.why;
     if (ok && !canAfford(resources, CFG.builds[this.mode].cost)) {
       ok = false;
-      why = "\uC790\uC6D0\uC774 \uBD80\uC871\uD569\uB2C8\uB2E4";
+      why = "자원이 부족합니다";
     }
     this.ghostValid = ok;
     this.ghostReason = why;

@@ -276,6 +276,43 @@ button.ghost { background: transparent; color: var(--dim); }
 .tutorial span { font-size: 13px; line-height: 1.5; }
 .tutorial button { align-self: flex-end; }
 
+/* ---------- 제작대 / 화로 작업창 ---------- */
+.tools {
+  display: flex; gap: 6px; align-items: center; flex-wrap: wrap;
+  min-height: 20px; margin-top: 2px; font-size: 11px;
+}
+.tools .tool { font-size: 16px; line-height: 1.2; }
+.station {
+  left: 50%; top: 50%; transform: translate(-50%, -50%);
+  width: min(420px, 92vw); max-height: 76vh; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 10px;
+  padding: 16px 18px; z-index: 30; animation: pop 0.2s ease-out;
+}
+.station-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.station-head h3 { margin: 0; font-size: 17px; }
+.station > p { font-size: 12px; margin: 0; }
+.station-list { display: flex; flex-direction: column; gap: 8px; }
+.station-item {
+  display: flex; align-items: center; gap: 12px; width: 100%; text-align: left;
+  background: rgba(255,255,255,0.05); color: var(--text);
+  border: 1px solid var(--line); border-radius: 10px;
+  padding: 10px 12px; cursor: pointer; font: inherit;
+  transition: background 0.12s, border-color 0.12s;
+}
+.station-item:hover:not(:disabled) { background: rgba(95,212,255,0.16); border-color: var(--cyan); }
+.station-item:disabled { cursor: not-allowed; opacity: 0.75; }
+.station-item .si-icon { font-size: 22px; line-height: 1; flex: 0 0 auto; }
+.station-item .si-body { display: flex; flex-direction: column; gap: 2px; flex: 1 1 auto; min-width: 0; }
+.station-item .si-body b { font-size: 14px; }
+.station-item .si-desc { font-size: 11px; color: var(--dim); }
+.station-item .si-cost {
+  flex: 0 0 auto; font-size: 12px; font-variant-numeric: tabular-nums;
+  white-space: nowrap; color: var(--text);
+}
+.station-item.poor .si-cost { color: var(--bad); }
+.station-item.owned { border-color: rgba(124,230,160,0.45); }
+.station-item.owned .si-cost { color: var(--good); }
+
 /* ---------- 도움말 ---------- */
 button.corner {
   position: fixed; right: 14px; top: 50%; width: 34px; height: 34px; border-radius: 50%;
@@ -388,12 +425,14 @@ button.corner.mute.off { opacity: 0.5; }
   #res-panel button.mini { margin-top: 0; }
   #pool-mode { display: none; }
 
-  /* 곡괭이 버튼까지 더해지면 자원 패널이 줄바꿈되어 52px보다 커질 수 있어
+  /* 자원이 넷(목재·광물·철·정수)이라 패널이 줄바꿈되어 52px보다 커질 수 있어
      그 아래로 충분히 띄운다 (아래 웨이브 패널·튜토리얼·토스트도 함께 밀어낸다) */
   #wave-panel { top: 90px; width: 96vw; }
   button.corner.mute { top: 8px; right: 8px; }
 
   #toasts { top: 190px; }
+  .station { width: 94vw; padding: 12px 14px; }
+  .station-item .si-desc { display: none; }
   .tutorial { top: 178px; right: 8px; padding: 6px 8px; }
   .tutorial span { font-size: 11px; line-height: 1.35; }
   .tutorial button { font-size: 10px; padding: 3px 6px; }

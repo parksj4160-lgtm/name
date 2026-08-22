@@ -91,13 +91,13 @@ export var BuildGrid = class {
   }
   // 건설 가능 판정. 이유 문자열을 함께 돌려준다.
   canPlace(gx, gz, blockers) {
-    if (!this.inBounds(gx, gz)) return { ok: false, why: "\uB9F5 \uBC16\uC785\uB2C8\uB2E4" };
+    if (!this.inBounds(gx, gz)) return { ok: false, why: "맵 밖입니다" };
     const w2 = this.toWorld(gx, gz);
     const d2 = Math.hypot(w2.x, w2.z);
-    if (d2 > CFG.world.buildRadius) return { ok: false, why: "\uAC74\uC124 \uAC00\uB2A5 \uAD6C\uC5ED \uBC16\uC785\uB2C8\uB2E4" };
-    if (d2 < CFG.world.coreRadius) return { ok: false, why: "\uD06C\uB9AC\uC2A4\uD0C8\uC5D0 \uB108\uBB34 \uAC00\uAE5D\uC2B5\uB2C8\uB2E4" };
-    if (this.at(gx, gz)) return { ok: false, why: "\uC774\uBBF8 \uAC74\uBB3C\uC774 \uC788\uC2B5\uB2C8\uB2E4" };
-    if (blockers && blockers(w2.x, w2.z)) return { ok: false, why: "\uB2E4\uB978 \uC624\uBE0C\uC81D\uD2B8\uC640 \uACB9\uCE69\uB2C8\uB2E4" };
+    if (d2 > CFG.world.buildRadius) return { ok: false, why: "건설 가능 구역 밖입니다" };
+    if (d2 < CFG.world.coreRadius) return { ok: false, why: "크리스탈에 너무 가깝습니다" };
+    if (this.at(gx, gz)) return { ok: false, why: "이미 건물이 있습니다" };
+    if (blockers && blockers(w2.x, w2.z)) return { ok: false, why: "다른 오브젝트와 겹칩니다" };
     return { ok: true, why: "", x: w2.x, z: w2.z };
   }
   // 크리스탈(중앙)로 향하는 플로우 필드 재계산

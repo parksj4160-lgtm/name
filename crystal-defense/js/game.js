@@ -25,7 +25,7 @@ export var Game = class {
     this.ui = null;
     this.running = false;
     this.shared = true;
-    this.pools = { team: { wood: 60, stone: 30, shard: 0 }, byId: {} };
+    this.pools = { team: { wood: 60, stone: 30, iron: 0, shard: 0 }, byId: {} };
     this.players = /* @__PURE__ */ new Map();
     this.stats = { harvested: 0, built: 0, kills: 0 };
     this._accum = { snap: 0, pos: 0 };
@@ -44,7 +44,7 @@ export var Game = class {
     this.local = new LocalPlayer(this.net.selfId, this.net.name, this._colorIndex(this.net.selfId));
     this.sm.scene.add(this.local.mesh);
     this.players.set(this.local.id, this.local);
-    this.pools.team = { wood: 60, stone: 30, shard: 0 };
+    this.pools.team = { wood: 60, stone: 30, iron: 0, shard: 0 };
     this.pools.byId = {};
     this._poolOf(this.local.id);
     this._wireCallbacks();
@@ -97,7 +97,7 @@ export var Game = class {
   }
   _poolOf(id) {
     if (this.shared) return this.pools.team;
-    if (!this.pools.byId[id]) this.pools.byId[id] = { wood: 60, stone: 30, shard: 0 };
+    if (!this.pools.byId[id]) this.pools.byId[id] = { wood: 60, stone: 30, iron: 0, shard: 0 };
     return this.pools.byId[id];
   }
   get myPool() {
@@ -146,14 +146,14 @@ export var Game = class {
     };
     this.wave.onWaveStart = (w2, total) => {
       const hasBoss = waveComposition(w2).some((c2) => c2.type === "boss");
-      this.ui?.toast(hasBoss ? `\u26A0\uFE0F \uC6E8\uC774\uBE0C ${w2} \uC2DC\uC791! \uBCF4\uC2A4 \uB4F1\uC7A5! \uBAAC\uC2A4\uD130 ${total}\uB9C8\uB9AC` : `\uC6E8\uC774\uBE0C ${w2} \uC2DC\uC791! \uBAAC\uC2A4\uD130 ${total}\uB9C8\uB9AC`, "warn");
+      this.ui?.toast(hasBoss ? `⚠️ 웨이브 ${w2} 시작! 보스 등장! 몬스터 ${total}마리` : `웨이브 ${w2} 시작! 몬스터 ${total}마리`, "warn");
       this.fx.ring(0, 0, 16734834, 10);
       if (hasBoss) this.sfx.bossWaveStart();
       else this.sfx.waveStart();
     };
     this.wave.onWaveClear = (w2, reward, won) => {
       if (this.isHost) this._grantReward(reward);
-      this.ui?.toast(won ? "\uB9C8\uC9C0\uB9C9 \uC6E8\uC774\uBE0C \uACA9\uD1F4!" : `\uC6E8\uC774\uBE0C ${w2} \uD074\uB9AC\uC5B4! \uBCF4\uC0C1 \u{1FAB5}${reward.wood} \u{1FAA8}${reward.stone}${reward.shard ? " \u{1F4A0}1" : ""}`, "good");
+      this.ui?.toast(won ? "마지막 웨이브 격퇴!" : `웨이브 ${w2} 클리어! 보상 🪵${reward.wood} 🪨${reward.stone}${reward.shard ? " 💠1" : ""}`, "good");
       this.stats.waveLog.push({
         wave: w2,
         time: this.stats.time - this._waveMark.time,
@@ -198,7 +198,7 @@ export var Game = class {
     this.fx.float(`-${dmg}`, this.local.x, 2.2, this.local.z, "hurt");
     this.ui?.shake();
     if (down) {
-      this.ui?.toast("\uC4F0\uB7EC\uC84C\uB2E4! \uC7A0\uC2DC \uD6C4 \uD06C\uB9AC\uC2A4\uD0C8\uC5D0\uC11C \uBD80\uD65C\uD55C\uB2E4", "bad");
+      this.ui?.toast("쓰러졌다! 잠시 후 크리스탈에서 부활한다", "bad");
       this.sfx.playerDown();
     } else {
       this.sfx.playerHurt();
@@ -241,12 +241,12 @@ export var Game = class {
     if (!def) return;
     const pool = this._poolOf(playerId);
     if (!canAfford(pool, def.cost)) {
-      this._notify(playerId, "\uC790\uC6D0\uC774 \uBD80\uC871\uD569\uB2C8\uB2E4", "bad");
+      this._notify(playerId, "자원이 부족합니다", "bad");
       return;
     }
     const b = this.buildMgr.place(key, gx, gz, playerId);
     if (!b) {
-      this._notify(playerId, "\uADF8 \uC790\uB9AC\uC5D0\uB294 \uAC74\uC124\uD560 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4", "bad");
+      this._notify(playerId, "그 자리에는 건설할 수 없습니다", "bad");
       return;
     }
     payCost(pool, def.cost);
@@ -272,12 +272,12 @@ export var Game = class {
     if (!b) return;
     const cost = b.nextCost;
     if (!cost) {
-      this._notify(playerId, "\uC774\uBBF8 \uCD5C\uB300 \uB808\uBCA8\uC785\uB2C8\uB2E4", "bad");
+      this._notify(playerId, "이미 최대 레벨입니다", "bad");
       return;
     }
     const pool = this._poolOf(playerId);
     if (!canAfford(pool, cost)) {
-      this._notify(playerId, "\uC790\uC6D0\uC774 \uBD80\uC871\uD569\uB2C8\uB2E4", "bad");
+      this._notify(playerId, "자원이 부족합니다", "bad");
       return;
     }
     payCost(pool, cost);
@@ -308,12 +308,12 @@ export var Game = class {
     if (!b) return;
     const cost = this.buildMgr.repairCost(b);
     if (!cost) {
-      this._notify(playerId, "\uC774\uBBF8 \uC628\uC804\uD55C \uAC74\uBB3C\uC785\uB2C8\uB2E4", "bad");
+      this._notify(playerId, "이미 온전한 건물입니다", "bad");
       return;
     }
     const pool = this._poolOf(playerId);
     if (!canAfford(pool, cost)) {
-      this._notify(playerId, "\uC790\uC6D0\uC774 \uBD80\uC871\uD569\uB2C8\uB2E4", "bad");
+      this._notify(playerId, "자원이 부족합니다", "bad");
       return;
     }
     payCost(pool, cost);
@@ -360,7 +360,8 @@ export var Game = class {
     else this.net.send("attack", { x: this.local.x, z: this.local.z, rot: this.local.rot });
   }
   hostAttack(playerId, x2, z2, rot) {
-    const a = CFG.player.attack;
+    // 무기를 만든 플레이어는 사거리·공격력이 늘어난다
+    const a = this.players.get(playerId)?.attackStats ?? CFG.player.attack;
     for (const e of this.enemyMgr.list) {
       if (e.dead) continue;
       const d2 = dist(x2, z2, e.x, e.z);
@@ -385,49 +386,84 @@ export var Game = class {
     if (!p2) return;
     const next = CFG.harvest.upgrade[p2.harvestLv];
     if (!next) {
-      this._notify(playerId, "\uCC44\uC9D1 \uC18D\uB3C4\uAC00 \uCD5C\uB300\uC785\uB2C8\uB2E4", "bad");
+      this._notify(playerId, "채집 속도가 최대입니다", "bad");
       return;
     }
     const pool = this._poolOf(playerId);
     if (!canAfford(pool, next.cost)) {
-      this._notify(playerId, "\uC790\uC6D0\uC774 \uBD80\uC871\uD569\uB2C8\uB2E4", "bad");
+      this._notify(playerId, "자원이 부족합니다", "bad");
       return;
     }
     payCost(pool, next.cost);
     this._trackSpend(next.cost, "harvest");
     p2.harvestLv += 1;
-    this._notify(playerId, `\uCC44\uC9D1 \uC18D\uB3C4 Lv.${p2.harvestLv}`, "good");
+    this._notify(playerId, `채집 속도 Lv.${p2.harvestLv}`, "good");
     if (playerId === this.local.id) this.sfx.upgrade();
     else this.net.send("hupOk", { to: playerId, lv: p2.harvestLv });
   }
-  requestPickaxe() {
-    if (this.isHost) this.hostCraftPickaxe(this.local.id);
-    else this.net.send("pickaxe", {});
-  }
-  hostCraftPickaxe(playerId) {
-    const p2 = this.players.get(playerId);
-    if (!p2) return;
-    if (p2.hasPickaxe) {
-      this._notify(playerId, "\uC774\uBBF8 \uACE1\uAD2D\uC774\uAC00 \uC788\uC2B5\uB2C8\uB2E4", "bad");
+  // 시설을 클릭했을 때 — 너무 멀면 안내만 하고 열지 않는다
+  tryOpenStation(b) {
+    if (dist(this.local.x, this.local.z, b.x, b.z) > CFG.station.range) {
+      this.ui?.toast(`${b.def.name}에 더 가까이 가세요`, "warn");
       return;
     }
-    const hasWorkbench = [...this.buildMgr.buildings.values()].some((b) => b.key === "workbench");
-    if (!hasWorkbench) {
-      this._notify(playerId, "\uC81C\uC791\uB300\uAC00 \uC788\uC5B4\uC57C \uACE1\uAD2D\uC774\uB97C \uB9CC\uB4E4 \uC218 \uC788\uC2B5\uB2C8\uB2E4", "bad");
+    this.sfx.click();
+    this.ui?.openStation(b.stationKind);
+  }
+  // 팀에 해당 시설이 세워져 있는지
+  hasStation(key) {
+    return [...this.buildMgr.buildings.values()].some((b) => b.key === key && !b.dead);
+  }
+  requestCraft(key) {
+    if (this.isHost) this.hostCraft(this.local.id, key);
+    else this.net.send("craft", { key });
+  }
+  hostCraft(playerId, key) {
+    const recipe = CFG.craft[key];
+    const p2 = this.players.get(playerId);
+    if (!recipe || !p2) return;
+    if (p2.tools[key]) {
+      this._notify(playerId, `이미 ${recipe.name}이(가) 있습니다`, "bad");
+      return;
+    }
+    if (!this.hasStation("workbench")) {
+      this._notify(playerId, "제작대가 있어야 만들 수 있습니다", "bad");
       return;
     }
     const pool = this._poolOf(playerId);
-    const cost = CFG.craft.pickaxe.cost;
+    if (!canAfford(pool, recipe.cost)) {
+      this._notify(playerId, "자원이 부족합니다", "bad");
+      return;
+    }
+    payCost(pool, recipe.cost);
+    this._trackSpend(recipe.cost, "craft");
+    p2.tools[key] = true;
+    this._notify(playerId, `${recipe.name} 완성! ${recipe.desc}`, "good");
+    if (playerId === this.local.id) this.sfx.upgrade();
+    else this.net.send("craftOk", { to: playerId, key });
+  }
+  requestSmelt() {
+    if (this.isHost) this.hostSmelt(this.local.id);
+    else this.net.send("smelt", {});
+  }
+  hostSmelt(playerId) {
+    if (!this.players.get(playerId)) return;
+    if (!this.hasStation("furnace")) {
+      this._notify(playerId, "화로가 있어야 제련할 수 있습니다", "bad");
+      return;
+    }
+    const pool = this._poolOf(playerId);
+    const cost = CFG.smelt.cost;
     if (!canAfford(pool, cost)) {
-      this._notify(playerId, "\uC790\uC6D0\uC774 \uBD80\uC871\uD569\uB2C8\uB2E4", "bad");
+      this._notify(playerId, "광물이 부족합니다", "bad");
       return;
     }
     payCost(pool, cost);
     this._trackSpend(cost, "craft");
-    p2.hasPickaxe = true;
-    this._notify(playerId, "\uACE1\uAD2D\uC774\uB97C \uB9CC\uB4E4\uC5C8\uB2E4! \uC774\uC81C \uC815\uC218\uC11D\uC744 \uCE98 \uC218 \uC788\uB2E4", "good");
+    pool.iron = (pool.iron || 0) + CFG.smelt.yield;
+    this._notify(playerId, `철 ${CFG.smelt.yield}개를 얻었다`, "good");
     if (playerId === this.local.id) this.sfx.upgrade();
-    else this.net.send("pickaxeOk", { to: playerId });
+    else this.net.send("smeltOk", { to: playerId });
   }
   requestShard() {
     this.sfx.shard();
@@ -437,11 +473,11 @@ export var Game = class {
   hostShard(playerId) {
     const pool = this._poolOf(playerId);
     if ((pool.shard || 0) <= 0) {
-      this._notify(playerId, "\uC218\uC815 \uC815\uC218\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4", "bad");
+      this._notify(playerId, "수정 정수가 없습니다", "bad");
       return;
     }
     if (this.world.crystal.hp >= this.world.crystal.maxHp) {
-      this._notify(playerId, "\uD06C\uB9AC\uC2A4\uD0C8\uC774 \uC774\uBBF8 \uC628\uC804\uD569\uB2C8\uB2E4", "bad");
+      this._notify(playerId, "크리스탈이 이미 온전합니다", "bad");
       return;
     }
     pool.shard -= 1;
@@ -463,7 +499,7 @@ export var Game = class {
     from.stone -= stone;
     to2.wood += wood;
     to2.stone += stone;
-    this._notify(toId, `\uC790\uC6D0\uC744 \uBC1B\uC558\uB2E4 \u{1FAB5}${wood} \u{1FAA8}${stone}`, "good");
+    this._notify(toId, `자원을 받았다 🪵${wood} 🪨${stone}`, "good");
   }
   _notify(playerId, text, kind) {
     if (playerId === this.local.id) {
@@ -472,7 +508,7 @@ export var Game = class {
     } else this.net.send("toast", { to: playerId, text, kind });
   }
   _notifyGain(playerId, type, amount, node) {
-    const label = type === "tree" ? `+${amount} \u{1FAB5}` : type === "gem" ? `+${amount} \u{1F4A0}` : `+${amount} \u{1FAA8}`;
+    const label = type === "tree" ? `+${amount} 🪵` : type === "gem" ? `+${amount} 💠` : `+${amount} 🪨`;
     if (playerId === this.local.id) {
       this.fx.float(label, node.x, 2.2, node.z, "good");
       if (type === "gem") this.sfx.shard();
@@ -493,7 +529,7 @@ export var Game = class {
       this.sm.scene.add(rp2.mesh);
       this.players.set(p2.id, rp2);
       this._poolOf(p2.id);
-      this.ui?.toast(`${p2.name} \uB2D8\uC774 \uD569\uB958\uD588\uB2E4`, "good");
+      this.ui?.toast(`${p2.name} 님이 합류했다`, "good");
       this.ui?.refreshLobby();
     });
     net.on("peerLeave", (p2) => {
@@ -502,7 +538,7 @@ export var Game = class {
         this.sm.scene.remove(rp2.mesh);
         this.players.delete(p2.id);
       }
-      this.ui?.toast(`${p2.name} \uB2D8\uC774 \uB098\uAC14\uB2E4`, "bad");
+      this.ui?.toast(`${p2.name} 님이 나갔다`, "bad");
       this.ui?.refreshLobby();
     });
     net.on("startGame", (d2) => {
@@ -513,7 +549,7 @@ export var Game = class {
     net.on("pos", (d2, from) => {
       let p2 = this.players.get(from);
       if (!p2) {
-        p2 = new RemotePlayer(from, net.peers.get(from)?.name || "\uD50C\uB808\uC774\uC5B4", this._colorIndex(from));
+        p2 = new RemotePlayer(from, net.peers.get(from)?.name || "플레이어", this._colorIndex(from));
         this.sm.scene.add(p2.mesh);
         this.players.set(from, p2);
         this._poolOf(from);
@@ -544,8 +580,11 @@ export var Game = class {
     net.on("hup", (d2, from) => {
       if (this.isHost) this.hostHarvestUpgrade(from);
     });
-    net.on("pickaxe", (d2, from) => {
-      if (this.isHost) this.hostCraftPickaxe(from);
+    net.on("craft", (d2, from) => {
+      if (this.isHost) this.hostCraft(from, d2.key);
+    });
+    net.on("smelt", (d2, from) => {
+      if (this.isHost) this.hostSmelt(from);
     });
     net.on("shard", (d2, from) => {
       if (this.isHost) this.hostShard(from);
@@ -570,15 +609,18 @@ export var Game = class {
         this.sfx.upgrade();
       }
     });
-    net.on("pickaxeOk", (d2) => {
+    net.on("craftOk", (d2) => {
       if (d2.to === net.selfId) {
-        this.local.hasPickaxe = true;
+        this.local.tools[d2.key] = true;
         this.sfx.upgrade();
       }
     });
+    net.on("smeltOk", (d2) => {
+      if (d2.to === net.selfId) this.sfx.upgrade();
+    });
     net.on("waveStarted", () => {
       if (!this.isHost) {
-        this.ui?.toast("\uC6E8\uC774\uBE0C \uC2DC\uC791!", "warn");
+        this.ui?.toast("웨이브 시작!", "warn");
         this.sfx.waveStart();
       }
     });
@@ -600,7 +642,7 @@ export var Game = class {
   _snapshot() {
     const players = {};
     for (const p2 of this.players.values()) {
-      players[p2.id] = { hv: p2.harvestLv, pk: p2.hasPickaxe };
+      players[p2.id] = { hv: p2.harvestLv, tl: Object.keys(p2.tools).filter((k2) => p2.tools[k2]) };
     }
     return {
       e: this.enemyMgr.snapshot(),
@@ -632,7 +674,8 @@ export var Game = class {
       const p2 = this.players.get(id);
       if (p2) {
         p2.harvestLv = pd2.hv;
-        p2.hasPickaxe = pd2.pk;
+        p2.tools = {};
+        for (const k2 of pd2.tl || []) p2.tools[k2] = true;
       }
     }
     if (this.wave.phase === PHASE.LOST && !this.result) {
@@ -701,7 +744,7 @@ export var Game = class {
           const cellKey = `${c2.gx},${c2.gz}`;
           if (inp.clickedByTouch && this._tapCell !== cellKey) {
             this._tapCell = cellKey;
-            this.ui?.toast("\uD55C \uBC88 \uB354 \uB20C\uB7EC \uC9D3\uAE30", "warn");
+            this.ui?.toast("한 번 더 눌러 짓기", "warn");
           } else {
             this._tapCell = null;
             this.requestBuild(this.buildMgr.mode, c2.gx, c2.gz);
@@ -716,6 +759,8 @@ export var Game = class {
         if (this.buildMgr.hover) this.requestRepair(this.buildMgr.hover.id);
       } else if (this.buildMgr.mode === "sell") {
         if (this.buildMgr.hover) this.requestSell(this.buildMgr.hover.id);
+      } else if (this.buildMgr.hover?.stationKind) {
+        this.tryOpenStation(this.buildMgr.hover);
       } else {
         this.requestAttack();
       }
@@ -731,7 +776,7 @@ export var Game = class {
   }
   togglePause() {
     if (this.net.online) {
-      this.ui?.toast("\uBA40\uD2F0\uD50C\uB808\uC774\uC5D0\uC11C\uB294 \uC77C\uC2DC\uC815\uC9C0\uD560 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4", "bad");
+      this.ui?.toast("멀티플레이에서는 일시정지할 수 없습니다", "bad");
       return;
     }
     this.paused = !this.paused;
