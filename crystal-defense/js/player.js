@@ -7,7 +7,19 @@ var GEO4 = {
   head: new THREE.SphereGeometry(0.3, 12, 10),
   arm: new THREE.CapsuleGeometry(0.12, 0.45, 3, 6),
   tool: new THREE.BoxGeometry(0.14, 0.9, 0.14),
+  sword: new THREE.BoxGeometry(0.1, 1.05, 0.24),
+  bow: new THREE.TorusGeometry(0.38, 0.035, 6, 12, Math.PI * 1.15),
   ring: new THREE.RingGeometry(0.62, 0.76, 20)
+};
+var WEAPON_MAT = {
+  default: new THREE.MeshStandardMaterial({ color: 12093775, roughness: 0.7 }),
+  sword: new THREE.MeshStandardMaterial({ color: 14406878, roughness: 0.28, metalness: 0.85 }),
+  bow: new THREE.MeshStandardMaterial({ color: 9068331, roughness: 0.6, metalness: 0.1 })
+};
+var WEAPON_LOOK = {
+  default: { geo: GEO4.tool, mat: WEAPON_MAT.default, ry: 0, rz: 0 },
+  sword: { geo: GEO4.sword, mat: WEAPON_MAT.sword, ry: 0, rz: 0.15 },
+  bow: { geo: GEO4.bow, mat: WEAPON_MAT.bow, ry: Math.PI / 2, rz: 0 }
 };
 var PALETTE = [6280447, 10354539, 16757599, 16739286, 14065919, 7077840];
 var Player = class {
@@ -49,12 +61,13 @@ var Player = class {
     arm.position.set(0.42, 1.05, 0.1);
     g2.add(arm);
     this.arm = arm;
-    const tool = new THREE.Mesh(GEO4.tool, new THREE.MeshStandardMaterial({ color: 12093775, roughness: 0.7 }));
+    const tool = new THREE.Mesh(GEO4.tool, WEAPON_MAT.default);
     tool.position.set(0.5, 1, 0.35);
     tool.rotation.x = -0.4;
     tool.castShadow = true;
     g2.add(tool);
     this.tool = tool;
+    this._weaponKey = "default";
     const ring = new THREE.Mesh(GEO4.ring, new THREE.MeshBasicMaterial({
       color: this.color,
       transparent: true,
@@ -109,8 +122,20 @@ var Player = class {
   cancelHarvest() {
     this.harvesting = null;
   }
+  // 제작한 무기에 맞춰 손에 든 도구의 모양을 바꾼다 (칼 > 활 > 기본 순으로 우선)
+  _updateWeapon() {
+    const key = this.tools.sword ? "sword" : this.tools.bow ? "bow" : "default";
+    if (key === this._weaponKey) return;
+    this._weaponKey = key;
+    const look = WEAPON_LOOK[key];
+    this.tool.geometry = look.geo;
+    this.tool.material = look.mat;
+    this.tool.rotation.y = look.ry;
+    this.tool.rotation.z = look.rz;
+  }
   // 애니메이션 (모든 플레이어 공통)
   animate(dt2, moving) {
+    this._updateWeapon();
     const t2 = performance.now() / 1e3;
     if (this.swing > 0) {
       this.swing -= dt2 * 3.4;

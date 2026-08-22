@@ -174,6 +174,11 @@ export var SoundManager = class {
     if (!this._throttle("hurt", 150)) return;
     this._tone({ freq: 160, endFreq: 80, type: "square", dur: 0.16, peak: 0.22 });
   }
+  // 크리스탈 체력이 위험 수준(30% 미만)으로 처음 떨어졌을 때 한 번 울리는 경보음
+  crystalDanger() {
+    this._tone({ freq: 480, endFreq: 260, type: "square", dur: 0.18, peak: 0.32 });
+    this._tone({ freq: 480, endFreq: 260, type: "square", dur: 0.18, peak: 0.28, delay: 0.24 });
+  }
   playerDown() {
     this._tone({ freq: 300, endFreq: 60, type: "sawtooth", dur: 0.5, peak: 0.3 });
   }

@@ -9,6 +9,7 @@
 <body>
 <canvas id="scene"></canvas>
 <div id="fx-layer"></div>
+<div id="crystal-warning" class="hidden"></div>
 
 <!-- ================= HUD ================= -->
 <div id="hud" class="hidden">
@@ -122,6 +123,20 @@
     <div class="row">
       <label>닉네임</label>
       <input id="in-name" maxlength="10" placeholder="플레이어" />
+    </div>
+
+    <div class="row">
+      <label>난이도</label>
+      <div class="diff-seg" id="diff-seg">
+        <button type="button" class="diff-opt" data-diff="normal">보통</button>
+        <button type="button" class="diff-opt" data-diff="easy">쉬움</button>
+      </div>
+    </div>
+    <p class="dim diff-desc" id="diff-desc"></p>
+
+    <div class="btns hidden" id="resume-row">
+      <button id="btn-resume" class="primary">이어하기</button>
+      <button id="btn-resume-discard" class="ghost">삭제</button>
     </div>
 
     <div class="btns">

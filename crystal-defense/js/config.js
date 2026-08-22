@@ -54,7 +54,7 @@ export var CFG = {
       levels: [
         { hp: 260 },
         { hp: 520, cost: { wood: 20, stone: 20 } },
-        { hp: 980, cost: { wood: 40, stone: 55 } }
+        { hp: 980, cost: { wood: 40, stone: 55, iron: 4 } }
       ]
     },
     arrow: {
@@ -68,7 +68,7 @@ export var CFG = {
       levels: [
         { hp: 180, dmg: 11, range: 13, rate: 1.15 },
         { hp: 280, dmg: 18, range: 14.5, rate: 1.35, cost: { wood: 40, stone: 30 } },
-        { hp: 420, dmg: 29, range: 16, rate: 1.6, cost: { wood: 80, stone: 70 } }
+        { hp: 420, dmg: 29, range: 16, rate: 1.6, cost: { wood: 80, stone: 70, iron: 6 } }
       ]
     },
     frost: {
@@ -82,7 +82,7 @@ export var CFG = {
       levels: [
         { hp: 200, dmg: 5, range: 10, rate: 0.9, slow: 0.45, slowTime: 1.6 },
         { hp: 320, dmg: 9, range: 11.5, rate: 1, slow: 0.55, slowTime: 2, cost: { wood: 30, stone: 55 } },
-        { hp: 480, dmg: 14, range: 13, rate: 1.1, slow: 0.65, slowTime: 2.4, cost: { wood: 60, stone: 110 } }
+        { hp: 480, dmg: 14, range: 13, rate: 1.1, slow: 0.65, slowTime: 2.4, cost: { wood: 60, stone: 110, iron: 5 } }
       ]
     },
     cannon: {
@@ -96,7 +96,7 @@ export var CFG = {
       levels: [
         { hp: 240, dmg: 26, range: 15, rate: 0.55, splash: 3.2 },
         { hp: 380, dmg: 42, range: 16.5, rate: 0.62, splash: 3.6, cost: { wood: 60, stone: 80 } },
-        { hp: 560, dmg: 66, range: 18, rate: 0.7, splash: 4.2, cost: { wood: 120, stone: 160 } }
+        { hp: 560, dmg: 66, range: 18, rate: 0.7, splash: 4.2, cost: { wood: 120, stone: 160, iron: 8 } }
       ]
     },
     poison: {
@@ -110,7 +110,7 @@ export var CFG = {
       levels: [
         { hp: 190, dmg: 4, range: 11, rate: 0.8, poisonDps: 6, poisonTime: 3 },
         { hp: 300, dmg: 6, range: 12.5, rate: 0.9, poisonDps: 10, poisonTime: 3.5, cost: { wood: 40, stone: 70 } },
-        { hp: 460, dmg: 9, range: 14, rate: 1, poisonDps: 16, poisonTime: 4, cost: { wood: 80, stone: 140 } }
+        { hp: 460, dmg: 9, range: 14, rate: 1, poisonDps: 16, poisonTime: 4, cost: { wood: 80, stone: 140, iron: 6 } }
       ]
     },
     support: {
@@ -124,7 +124,7 @@ export var CFG = {
       levels: [
         { hp: 150, buffRadius: 6, buffMult: 0.2 },
         { hp: 220, buffRadius: 7, buffMult: 0.3, cost: { wood: 50, stone: 90 } },
-        { hp: 300, buffRadius: 8, buffMult: 0.42, cost: { wood: 90, stone: 160 } }
+        { hp: 300, buffRadius: 8, buffMult: 0.42, cost: { wood: 90, stone: 160, iron: 5 } }
       ]
     },
     workbench: {
@@ -178,7 +178,7 @@ export var CFG = {
       icon: "🏹",
       cost: { wood: 20, iron: 3 },
       effect: { range: 2.4, arc: 0.5 },
-      desc: "공격 사거리 +2.4 · 범위도 넓어진다."
+      desc: "공격 사거리 +2.4 \xB7 범위도 넓어진다."
     }
   },
   // 몬스터 종류 (일반형 / 빠른형 / 탱커형 / 원거리형 / 건물추적형 / 보스)
@@ -238,6 +238,18 @@ export function enemyStats(type, wave) {
     dmg: Math.round(base.dmg * dmgMul),
     speed: base.speed * (1 + Math.min(0.25, (wave - 1) * 0.02))
   };
+}
+export var DIFFICULTIES = {
+  normal: { key: "normal", label: "보통", desc: "기본 난이도", startWood: 60, startStone: 30, prepBonus: 0 },
+  easy: { key: "easy", label: "쉬움", desc: "시작 자원 +50% \xB7 준비 시간 +20초", startWood: 90, startStone: 45, prepBonus: 20 }
+};
+var BASE_PREP_TIME = CFG.wave.prepTime;
+var BASE_FIRST_PREP_TIME = CFG.wave.firstPrepTime;
+export function applyDifficulty(key) {
+  const d2 = DIFFICULTIES[key] || DIFFICULTIES.normal;
+  CFG.wave.prepTime = BASE_PREP_TIME + d2.prepBonus;
+  CFG.wave.firstPrepTime = BASE_FIRST_PREP_TIME + d2.prepBonus;
+  return d2;
 }
 export function waveReward(w2) {
   const r = CFG.wave.reward;

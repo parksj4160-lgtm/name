@@ -198,7 +198,6 @@ function buildMesh(key, level) {
     chimney.position.set(0.38, 1.6, -0.38);
     chimney.castShadow = true;
     g2.add(chimney);
-    // 정면 아궁이 — 빛나는 재질이라 멀리서도 화로임을 알아본다
     const mouth = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.5, 0.08), MAT2.furnaceFire);
     mouth.position.set(0, 0.5, 0.71);
     g2.add(mouth);
@@ -319,7 +318,6 @@ export var BuildManager = class {
     if (!this.mode || !pointer) {
       if (this.ghost) this.ghost.visible = false;
       this.rangeRing.visible = false;
-      // 건설 모드가 아닐 때도 제작대·화로는 가리키면 잡아둔다 (클릭해서 열 수 있게)
       if (!this.mode && pointer) {
         const b = this.grid.atWorld(pointer.x, pointer.z);
         if (b && b.stationKind) this.hover = b;
@@ -396,24 +394,27 @@ export var BuildManager = class {
   }
   // 현재 레벨까지 투입된 총 자원 (레벨 1 기본 비용 + 업그레이드 비용 누적)
   investedCost(b) {
-    const total = { wood: 0, stone: 0 };
+    const total = { wood: 0, stone: 0, iron: 0 };
     for (let i = 0; i < b.level; i++) {
       const c2 = i === 0 ? b.def.cost : b.def.levels[i].cost;
       total.wood += c2?.wood || 0;
       total.stone += c2?.stone || 0;
+      total.iron += c2?.iron || 0;
     }
     return total;
   }
   refund(b) {
     const inv = this.investedCost(b);
-    return { wood: Math.floor(inv.wood * 0.5), stone: Math.floor(inv.stone * 0.5) };
+    return { wood: Math.floor(inv.wood * 0.5), stone: Math.floor(inv.stone * 0.5), iron: Math.floor(inv.iron * 0.5) };
   }
   // 손상 비율에 비례한 수리 비용 (완전 파괴 상태를 100% 재건축하는 것보다 저렴하게)
   repairCost(b) {
     const ratio = 1 - b.hp / b.maxHp;
     if (ratio <= 1e-3) return null;
     const inv = this.investedCost(b);
-    return { wood: Math.ceil(inv.wood * ratio * 0.4), stone: Math.ceil(inv.stone * ratio * 0.4) };
+    const cost = { wood: Math.ceil(inv.wood * ratio * 0.4), stone: Math.ceil(inv.stone * ratio * 0.4) };
+    if (inv.iron) cost.iron = Math.ceil(inv.iron * ratio * 0.4);
+    return cost;
   }
   repair(b) {
     b.hp = b.maxHp;

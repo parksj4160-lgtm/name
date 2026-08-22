@@ -1,6 +1,6 @@
 import { SoundManager } from './audio.js';
 import { BuildManager } from './buildings.js';
-import { CFG, waveComposition } from './config.js';
+import { CFG, DIFFICULTIES, applyDifficulty, waveComposition } from './config.js';
 import { EnemyManager } from './enemy.js';
 import { Fx, ProjectilePool } from './fx.js';
 import { BuildGrid } from './grid.js';
@@ -13,6 +13,7 @@ import { canAfford, dist, payCost } from './utils.js';
 import { PHASE, WaveDirector } from './wave.js';
 import { World } from './world.js';
 
+var SAVE_KEY = "cd.save";
 export var Game = class {
   constructor(canvas2, fxLayer2) {
     this.sm = new SceneManager(canvas2);
@@ -28,14 +29,16 @@ export var Game = class {
     this.pools = { team: { wood: 60, stone: 30, iron: 0, shard: 0 }, byId: {} };
     this.players = /* @__PURE__ */ new Map();
     this.stats = { harvested: 0, built: 0, kills: 0 };
-    this._accum = { snap: 0, pos: 0 };
+    this._accum = { snap: 0, pos: 0, save: 0 };
     this._bindNet();
   }
   // ---------------------------------------------------------------- 시작/정리
-  begin({ seed = 20260818, shared = true } = {}) {
+  begin({ seed = 20260818, shared = true, difficulty = "normal", resumed = false } = {}) {
     this.dispose();
     this.seed = seed;
     this.shared = shared;
+    this.difficulty = DIFFICULTIES[difficulty] ? difficulty : "normal";
+    this.difficultyPreset = applyDifficulty(this.difficulty);
     this.grid = new BuildGrid();
     this.world = new World(this.sm, seed);
     this.buildMgr = new BuildManager(this.sm, this.grid, this.world, this.fx, this.projectiles);
@@ -44,7 +47,7 @@ export var Game = class {
     this.local = new LocalPlayer(this.net.selfId, this.net.name, this._colorIndex(this.net.selfId));
     this.sm.scene.add(this.local.mesh);
     this.players.set(this.local.id, this.local);
-    this.pools.team = { wood: 60, stone: 30, iron: 0, shard: 0 };
+    this.pools.team = { wood: this.difficultyPreset.startWood, stone: this.difficultyPreset.startStone, iron: 0, shard: 0 };
     this.pools.byId = {};
     this._poolOf(this.local.id);
     this._wireCallbacks();
@@ -54,12 +57,13 @@ export var Game = class {
       kills: 0,
       spentWood: 0,
       spentStone: 0,
+      spentIron: 0,
       spentBy: {
-        build: { wood: 0, stone: 0 },
-        upgrade: { wood: 0, stone: 0 },
-        repair: { wood: 0, stone: 0 },
-        harvest: { wood: 0, stone: 0 },
-        craft: { wood: 0, stone: 0 }
+        build: { wood: 0, stone: 0, iron: 0 },
+        upgrade: { wood: 0, stone: 0, iron: 0 },
+        repair: { wood: 0, stone: 0, iron: 0 },
+        harvest: { wood: 0, stone: 0, iron: 0 },
+        craft: { wood: 0, stone: 0, iron: 0 }
       },
       time: 0,
       waveLog: []
@@ -70,7 +74,7 @@ export var Game = class {
     this.running = true;
     this.result = null;
     this.sm.focus.set(this.local.x, 0, this.local.z);
-    this.ui?.onGameStart();
+    this.ui?.onGameStart(resumed);
   }
   dispose() {
     if (!this.grid) return;
@@ -97,7 +101,7 @@ export var Game = class {
   }
   _poolOf(id) {
     if (this.shared) return this.pools.team;
-    if (!this.pools.byId[id]) this.pools.byId[id] = { wood: 60, stone: 30, iron: 0, shard: 0 };
+    if (!this.pools.byId[id]) this.pools.byId[id] = { wood: this.difficultyPreset.startWood, stone: this.difficultyPreset.startStone, iron: 0, shard: 0 };
     return this.pools.byId[id];
   }
   get myPool() {
@@ -222,12 +226,14 @@ export var Game = class {
     this.wave.phase = PHASE.WON;
     this.result = "win";
     this.sfx.win();
+    if (!this.net.online) Game.clearLocalSave();
     this.ui?.showResult(true, this.stats, this.wave.wave);
   }
   _lose() {
     this.wave.lose();
     this.result = "lose";
     this.sfx.lose();
+    if (!this.net.online) Game.clearLocalSave();
     this.ui?.showResult(false, this.stats, this.wave.wave);
   }
   // ---------------------------------------------------------------- 행동 (요청 → 호스트 처리)
@@ -256,10 +262,12 @@ export var Game = class {
   _trackSpend(cost, kind) {
     this.stats.spentWood += cost.wood || 0;
     this.stats.spentStone += cost.stone || 0;
+    this.stats.spentIron += cost.iron || 0;
     const by = this.stats.spentBy[kind];
     if (by) {
       by.wood += cost.wood || 0;
       by.stone += cost.stone || 0;
+      by.iron += cost.iron || 0;
     }
   }
   requestUpgrade(id) {
@@ -296,6 +304,7 @@ export var Game = class {
     const pool = this._poolOf(playerId);
     pool.wood += back.wood;
     pool.stone += back.stone;
+    pool.iron = (pool.iron || 0) + back.iron;
     this.fx.burst(b.x, 1.2, b.z, 12558682, 10, 4);
     this.buildMgr.remove(id);
   }
@@ -360,7 +369,6 @@ export var Game = class {
     else this.net.send("attack", { x: this.local.x, z: this.local.z, rot: this.local.rot });
   }
   hostAttack(playerId, x2, z2, rot) {
-    // 무기를 만든 플레이어는 사거리·공격력이 늘어난다
     const a = this.players.get(playerId)?.attackStats ?? CFG.player.attack;
     for (const e of this.enemyMgr.list) {
       if (e.dead) continue;
@@ -543,7 +551,7 @@ export var Game = class {
     });
     net.on("startGame", (d2) => {
       if (this.running && !this.result) return;
-      this.begin({ seed: d2.seed, shared: d2.shared });
+      this.begin({ seed: d2.seed, shared: d2.shared, difficulty: d2.difficulty });
       this._syncRosterIntoGame();
     });
     net.on("pos", (d2, from) => {
@@ -719,6 +727,7 @@ export var Game = class {
     this.enemyMgr.updateVisual(dt2, this.sm.camera);
     this.sm.follow(this.local.mesh.position, dt2);
     this._netTick(dt2);
+    this._autosaveTick(dt2, over);
     this.ui?.update(dt2);
     this.input.endFrame();
   }
@@ -812,6 +821,67 @@ export var Game = class {
         this.net.send("snap", this._snapshot());
       }
     }
+  }
+  // ---------------------------------------------------------------- 저장/이어하기 (싱글 플레이 전용)
+  _autosaveTick(dt2, over) {
+    if (this.net.online || over) return;
+    this._accum.save += dt2;
+    if (this._accum.save < 4) return;
+    this._accum.save = 0;
+    this.saveLocal();
+  }
+  saveLocal() {
+    if (this.net.online || !this.running || !this.wave) return;
+    if (this.wave.phase === PHASE.WON || this.wave.phase === PHASE.LOST) return;
+    const save = {
+      v: 1,
+      ts: Date.now(),
+      seed: this.seed,
+      shared: this.shared,
+      difficulty: this.difficulty || "normal",
+      snap: this._snapshot(),
+      stats: this.stats
+    };
+    try {
+      localStorage.setItem(SAVE_KEY, JSON.stringify(save));
+    } catch {
+    }
+  }
+  static loadLocal() {
+    try {
+      const raw = localStorage.getItem(SAVE_KEY);
+      if (!raw) return null;
+      const save = JSON.parse(raw);
+      if (!save || save.v !== 1 || !save.snap) return null;
+      return save;
+    } catch {
+      return null;
+    }
+  }
+  static clearLocalSave() {
+    try {
+      localStorage.removeItem(SAVE_KEY);
+    } catch {
+    }
+  }
+  resumeLocal(save) {
+    this.begin({ seed: save.seed, shared: save.shared, difficulty: save.difficulty, resumed: true });
+    const s2 = save.snap;
+    this.enemyMgr.applySnapshot(s2.e, s2.w.wave + 1);
+    this.buildMgr.applySnapshot(s2.b);
+    this.world.applyNodeSnapshot(s2.n);
+    this.wave.applySnapshot(s2.w);
+    this.world.crystal.hp = s2.c;
+    if (s2.r.team) this.pools.team = s2.r.team;
+    if (s2.r.byId) this.pools.byId = s2.r.byId;
+    const savedPlayer = Object.values(s2.p || {})[0];
+    if (savedPlayer) {
+      this.local.harvestLv = savedPlayer.hv;
+      this.local.tools = {};
+      for (const k2 of savedPlayer.tl || []) this.local.tools[k2] = true;
+    }
+    if (save.stats) this.stats = save.stats;
+    this.ui?.toast(`이어하기 — 웨이브 ${this.wave.displayWave}`, "good");
   }
   render() {
     this.sm.render();

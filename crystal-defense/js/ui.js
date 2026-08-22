@@ -1,4 +1,5 @@
-import { CFG, waveComposition } from './config.js';
+import { CFG, DIFFICULTIES, waveComposition } from './config.js';
+import { Game } from './game.js';
 import { keyLabel } from './keymap.js';
 import { canAfford, clamp, costText, dist, fmtTime, roomCode } from './utils.js';
 import { PHASE } from './wave.js';
@@ -34,6 +35,7 @@ export var UI = class {
       stationList: $2("station-list"),
       crystalFill: $2("crystal-fill"),
       crystalText: $2("crystal-text"),
+      crystalWarning: $2("crystal-warning"),
       waveLabel: $2("wave-label"),
       waveState: $2("wave-state"),
       waveBtn: $2("btn-wave"),
@@ -202,6 +204,42 @@ export var UI = class {
       g2.net.name = n;
       return n;
     };
+    this.selectedDifficulty = localStorage.getItem("cd.difficulty") || "normal";
+    if (!DIFFICULTIES[this.selectedDifficulty]) this.selectedDifficulty = "normal";
+    const diffOpts = Array.from(document.querySelectorAll("#diff-seg .diff-opt"));
+    const paintDiff = () => {
+      for (const btn of diffOpts) btn.classList.toggle("active", btn.dataset.diff === this.selectedDifficulty);
+      $2("diff-desc").textContent = DIFFICULTIES[this.selectedDifficulty].desc;
+    };
+    for (const btn of diffOpts) {
+      btn.onclick = () => {
+        this.selectedDifficulty = btn.dataset.diff;
+        localStorage.setItem("cd.difficulty", this.selectedDifficulty);
+        paintDiff();
+      };
+    }
+    paintDiff();
+    const refreshResumeRow = () => {
+      const save = Game.loadLocal();
+      $2("resume-row").classList.toggle("hidden", !save);
+      if (save) $2("btn-resume").textContent = `이어하기 (웨이브 ${save.snap.w.wave + 1})`;
+    };
+    refreshResumeRow();
+    $2("btn-resume").onclick = () => {
+      const save = Game.loadLocal();
+      if (!save) {
+        refreshResumeRow();
+        return;
+      }
+      takeName();
+      g2.net.leave();
+      this.el.lobby.classList.add("hidden");
+      g2.resumeLocal(save);
+    };
+    $2("btn-resume-discard").onclick = () => {
+      Game.clearLocalSave();
+      refreshResumeRow();
+    };
     $2("in-server").value = g2.net.serverUrl;
     $2("btn-server").onclick = () => {
       g2.net.setServerUrl($2("in-server").value.trim());
@@ -210,8 +248,9 @@ export var UI = class {
     $2("btn-single").onclick = () => {
       takeName();
       g2.net.leave();
+      Game.clearLocalSave();
       this.el.lobby.classList.add("hidden");
-      g2.begin({ seed: Math.random() * 1e9 | 0, shared: true });
+      g2.begin({ seed: Math.random() * 1e9 | 0, shared: true, difficulty: this.selectedDifficulty });
     };
     $2("btn-create").onclick = () => {
       takeName();
@@ -243,9 +282,10 @@ export var UI = class {
       }
       const shared = $2("chk-shared").checked;
       const seed = this.seed || Math.random() * 1e9 | 0;
-      g2.net.send("startGame", { seed, shared });
+      const difficulty = this.selectedDifficulty;
+      g2.net.send("startGame", { seed, shared, difficulty });
       this.el.lobby.classList.add("hidden");
-      g2.begin({ seed, shared });
+      g2.begin({ seed, shared, difficulty });
       g2._syncRosterIntoGame();
     };
     $2("btn-again").onclick = () => {
@@ -256,8 +296,9 @@ export var UI = class {
       }
       this.el.result.classList.add("hidden");
       const seed = Math.random() * 1e9 | 0;
-      if (g22.net.online) g22.net.send("startGame", { seed, shared: g22.shared });
-      g22.begin({ seed, shared: g22.shared });
+      const difficulty = g22.difficulty || "normal";
+      if (g22.net.online) g22.net.send("startGame", { seed, shared: g22.shared, difficulty });
+      g22.begin({ seed, shared: g22.shared, difficulty });
       g22._syncRosterIntoGame();
     };
   }
@@ -456,17 +497,19 @@ export var UI = class {
     $2("tb-attack").addEventListener("pointerdown", () => this.game.requestAttack());
   }
   // ---------------------------------------------------------------- 라이프사이클
-  onGameStart() {
+  onGameStart(resumed = false) {
     this.el.hud.classList.remove("hidden");
     this.el.lobby.classList.add("hidden");
     this.el.result.classList.add("hidden");
     this.el.pauseOverlay.classList.add("hidden");
     this._station = null;
     this._stationRows = null;
+    this._crystalWarned = false;
+    this.el.crystalWarning.classList.add("hidden");
     this.el.station.classList.add("hidden");
     this.refreshBuildBar();
-    this.toast("크리스탈을 지켜라! F로 채집, 1~8로 건설", "good");
-    if (localStorage.getItem("cd.tutorialDone")) {
+    if (!resumed) this.toast("크리스탈을 지켜라! F로 채집, 1~8로 건설", "good");
+    if (resumed || localStorage.getItem("cd.tutorialDone")) {
       this.el.tutorial.classList.add("hidden");
       this._tutStep = -1;
     } else {
@@ -522,13 +565,12 @@ export var UI = class {
         key: "smelt",
         icon: "⚙️",
         name: `철 ${y2}개 제련`,
-        desc: "제작대에서 칼·활을 만들 때 쓴다.",
+        desc: "제작대에서 칼\xB7활을 만들 때 쓴다.",
         cost: CFG.smelt.cost,
         owned: false,
         action: () => g2.requestSmelt()
       });
     }
-    // 이미 그려둔 행은 상태만 갱신해서 클릭 도중에 DOM 이 날아가지 않게 한다
     if (this._stationRows !== this._station) {
       this.el.stationList.innerHTML = "";
       this._rowEls = {};
@@ -578,11 +620,11 @@ export var UI = class {
     $2("result-title").textContent = win ? "승리! 🎉" : "크리스탈 파괴… 💥";
     $2("result-sub").textContent = win ? `${CFG.wave.goal}웨이브를 모두 막아냈다.` : `${wave}웨이브까지 버텼다.`;
     $2("result-stats").innerHTML = `
-  <li>생존 시간 <b>${fmtTime(stats.time)}</b></li>
-  <li>처치한 몬스터 <b>${stats.kills}</b></li>
-  <li>채집한 자원 <b>${stats.harvested}</b></li>
-  <li>소모한 자원 <b>🪵${stats.spentWood} 🪨${stats.spentStone}</b>${this._spendBreakdown(stats)}</li>
-  <li>건설한 구조물 <b>${stats.built}</b></li>`;
+<li>생존 시간 <b>${fmtTime(stats.time)}</b></li>
+<li>처치한 몬스터 <b>${stats.kills}</b></li>
+<li>채집한 자원 <b>${stats.harvested}</b></li>
+<li>소모한 자원 <b>🪵${stats.spentWood} 🪨${stats.spentStone}${stats.spentIron ? ` ⚙️${stats.spentIron}` : ""}</b>${this._spendBreakdown(stats)}</li>
+<li>건설한 구조물 <b>${stats.built}</b></li>`;
     const log = $2("result-wavelog");
     if (stats.waveLog && stats.waveLog.length) {
       log.innerHTML = stats.waveLog.map(
@@ -594,18 +636,19 @@ export var UI = class {
     }
     const rec = this._recordStats(win, stats, win ? CFG.wave.goal : wave);
     $2("result-record").innerHTML = `
-  <li class="${rec.isNewBest ? "new-best" : ""}">🏆 역대 최고 웨이브 <b>${rec.bestWave}</b>${rec.isNewBest ? " — 신기록!" : ""}</li>
-  <li>⚔️ 누적 처치 <b>${rec.totalKills}</b></li>
-  <li>🎮 플레이 횟수 <b>${rec.plays}</b> (승리 ${rec.wins}회)</li>`;
+<li class="${rec.isNewBest ? "new-best" : ""}">🏆 역대 최고 웨이브 <b>${rec.bestWave}</b>${rec.isNewBest ? " — 신기록!" : ""}</li>
+<li>⚔️ 누적 처치 <b>${rec.totalKills}</b></li>
+<li>🎮 플레이 횟수 <b>${rec.plays}</b> (승리 ${rec.wins}회)</li>`;
   }
   // 자원을 어디에 썼는지 항목별로 쪼개 보여준다 (쓴 곳만)
   _spendBreakdown(stats) {
     const LABELS2 = { build: "건설", upgrade: "업그레이드", repair: "수리", harvest: "채집속도", craft: "제작" };
     const by = stats.spentBy || {};
-    const rows = Object.entries(LABELS2).map(([key, label]) => [label, by[key] || { wood: 0, stone: 0 }]).filter(([, c2]) => c2.wood || c2.stone).map(([label, c2]) => {
+    const rows = Object.entries(LABELS2).map(([key, label]) => [label, by[key] || { wood: 0, stone: 0, iron: 0 }]).filter(([, c2]) => c2.wood || c2.stone || c2.iron).map(([label, c2]) => {
       const parts = [];
       if (c2.wood) parts.push(`🪵${c2.wood}`);
       if (c2.stone) parts.push(`🪨${c2.stone}`);
+      if (c2.iron) parts.push(`⚙️${c2.iron}`);
       return `<span>${label} ${parts.join(" ")}</span>`;
     });
     return rows.length ? `<div class="breakdown">${rows.join("")}</div>` : "";
@@ -663,17 +706,25 @@ export var UI = class {
     this.el.iron.textContent = Math.floor(pool.iron || 0);
     this._refreshTools();
     if (this._station) {
-      // 시설에서 멀어지면 창을 닫는다
-      const near = [...g2.buildMgr.buildings.values()].some(
+      const near2 = [...g2.buildMgr.buildings.values()].some(
         (b) => b.stationKind === this._station && !b.dead && dist(g2.local.x, g2.local.z, b.x, b.z) <= CFG.station.range
       );
-      if (near) this._renderStation();
+      if (near2) this._renderStation();
       else this.closeStation();
     }
     const c2 = g2.world.crystal;
     const ratio = clamp(c2.hp / c2.maxHp, 0, 1);
     this.el.crystalFill.style.transform = `scaleX(${ratio})`;
     this.el.crystalText.textContent = `${Math.ceil(c2.hp)} / ${c2.maxHp}`;
+    const danger = ratio < 0.3 && ratio > 0;
+    this.el.crystalWarning.classList.toggle("hidden", !danger);
+    if (danger && !this._crystalWarned) {
+      this._crystalWarned = true;
+      this.toast("💎 크리스탈이 위험하다! 수정 정수(R)로 회복하거나 방어선을 지켜라", "bad");
+      g2.sfx.crystalDanger();
+    } else if (!danger) {
+      this._crystalWarned = false;
+    }
     const w2 = g2.wave;
     this.el.waveLabel.textContent = `웨이브 ${Math.min(CFG.wave.goal, w2.wave + 1)} / ${CFG.wave.goal}`;
     if (w2.phase === PHASE.PREP) {

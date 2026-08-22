@@ -178,6 +178,14 @@ button.go:disabled { opacity: 0.4; cursor: not-allowed; }
 .toast.warn { border-color: rgba(255,204,85,0.6); color: var(--warn); }
 @keyframes pop { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } }
 
+/* ---------- 크리스탈 위험 경고 (체력 낮을 때 화면 가장자리가 붉게 맥동) ---------- */
+#crystal-warning {
+  position: fixed; inset: 0; pointer-events: none; z-index: 3;
+  box-shadow: inset 0 0 120px 20px rgba(255, 60, 70, 0.55);
+  animation: crystalPulse 1.1s ease-in-out infinite;
+}
+@keyframes crystalPulse { 0%, 100% { opacity: 0.35; } 50% { opacity: 0.9; } }
+
 /* ---------- 3D 위에 뜨는 텍스트 ---------- */
 #fx-layer { position: fixed; inset: 0; pointer-events: none; overflow: hidden; z-index: 4; }
 .float {
@@ -243,6 +251,17 @@ button.primary {
 }
 button.ghost { background: transparent; color: var(--dim); }
 .btns button:hover, .row button:hover, .room button:hover { filter: brightness(1.15); }
+.diff-seg { display: flex; gap: 6px; flex: 1; }
+.diff-seg .diff-opt {
+  flex: 1; padding: 8px 10px; border-radius: 8px; cursor: pointer; font-size: 13px;
+  background: rgba(255,255,255,0.06); color: var(--dim); border: 1px solid var(--line); font-family: inherit;
+}
+.diff-seg .diff-opt:hover { filter: brightness(1.15); }
+.diff-seg .diff-opt.active {
+  background: linear-gradient(180deg, #3aa0ff, #1d6ed6); border-color: rgba(150,210,255,0.5);
+  color: #f2f8ff; font-weight: 700;
+}
+.diff-desc { margin: -4px 0 12px; font-size: 12px; }
 .join input { text-transform: uppercase; letter-spacing: 3px; text-align: center; }
 .room { border-top: 1px solid var(--line); margin-top: 12px; padding-top: 12px; }
 .room .code-row { font-size: 14px; margin-bottom: 8px; }
@@ -450,6 +469,7 @@ button.corner.mute.off { opacity: 0.5; }
 <body>
 <canvas id="scene"></canvas>
 <div id="fx-layer"></div>
+<div id="crystal-warning" class="hidden"></div>
 
 <!-- ================= HUD ================= -->
 <div id="hud" class="hidden">
@@ -563,6 +583,20 @@ button.corner.mute.off { opacity: 0.5; }
     <div class="row">
       <label>닉네임</label>
       <input id="in-name" maxlength="10" placeholder="플레이어" />
+    </div>
+
+    <div class="row">
+      <label>난이도</label>
+      <div class="diff-seg" id="diff-seg">
+        <button type="button" class="diff-opt" data-diff="normal">보통</button>
+        <button type="button" class="diff-opt" data-diff="easy">쉬움</button>
+      </div>
+    </div>
+    <p class="dim diff-desc" id="diff-desc"></p>
+
+    <div class="btns hidden" id="resume-row">
+      <button id="btn-resume" class="primary">이어하기</button>
+      <button id="btn-resume-discard" class="ghost">삭제</button>
     </div>
 
     <div class="btns">
@@ -797,6 +831,11 @@ button.corner.mute.off { opacity: 0.5; }
     playerHurt() {
       if (!this._throttle("hurt", 150)) return;
       this._tone({ freq: 160, endFreq: 80, type: "square", dur: 0.16, peak: 0.22 });
+    }
+    // 크리스탈 체력이 위험 수준(30% 미만)으로 처음 떨어졌을 때 한 번 울리는 경보음
+    crystalDanger() {
+      this._tone({ freq: 480, endFreq: 260, type: "square", dur: 0.18, peak: 0.32 });
+      this._tone({ freq: 480, endFreq: 260, type: "square", dur: 0.18, peak: 0.28, delay: 0.24 });
     }
     playerDown() {
       this._tone({ freq: 300, endFreq: 60, type: "sawtooth", dur: 0.5, peak: 0.3 });
@@ -10296,7 +10335,7 @@ button.corner.mute.off { opacity: 0.5; }
         levels: [
           { hp: 260 },
           { hp: 520, cost: { wood: 20, stone: 20 } },
-          { hp: 980, cost: { wood: 40, stone: 55 } }
+          { hp: 980, cost: { wood: 40, stone: 55, iron: 4 } }
         ]
       },
       arrow: {
@@ -10310,7 +10349,7 @@ button.corner.mute.off { opacity: 0.5; }
         levels: [
           { hp: 180, dmg: 11, range: 13, rate: 1.15 },
           { hp: 280, dmg: 18, range: 14.5, rate: 1.35, cost: { wood: 40, stone: 30 } },
-          { hp: 420, dmg: 29, range: 16, rate: 1.6, cost: { wood: 80, stone: 70 } }
+          { hp: 420, dmg: 29, range: 16, rate: 1.6, cost: { wood: 80, stone: 70, iron: 6 } }
         ]
       },
       frost: {
@@ -10324,7 +10363,7 @@ button.corner.mute.off { opacity: 0.5; }
         levels: [
           { hp: 200, dmg: 5, range: 10, rate: 0.9, slow: 0.45, slowTime: 1.6 },
           { hp: 320, dmg: 9, range: 11.5, rate: 1, slow: 0.55, slowTime: 2, cost: { wood: 30, stone: 55 } },
-          { hp: 480, dmg: 14, range: 13, rate: 1.1, slow: 0.65, slowTime: 2.4, cost: { wood: 60, stone: 110 } }
+          { hp: 480, dmg: 14, range: 13, rate: 1.1, slow: 0.65, slowTime: 2.4, cost: { wood: 60, stone: 110, iron: 5 } }
         ]
       },
       cannon: {
@@ -10338,7 +10377,7 @@ button.corner.mute.off { opacity: 0.5; }
         levels: [
           { hp: 240, dmg: 26, range: 15, rate: 0.55, splash: 3.2 },
           { hp: 380, dmg: 42, range: 16.5, rate: 0.62, splash: 3.6, cost: { wood: 60, stone: 80 } },
-          { hp: 560, dmg: 66, range: 18, rate: 0.7, splash: 4.2, cost: { wood: 120, stone: 160 } }
+          { hp: 560, dmg: 66, range: 18, rate: 0.7, splash: 4.2, cost: { wood: 120, stone: 160, iron: 8 } }
         ]
       },
       poison: {
@@ -10352,7 +10391,7 @@ button.corner.mute.off { opacity: 0.5; }
         levels: [
           { hp: 190, dmg: 4, range: 11, rate: 0.8, poisonDps: 6, poisonTime: 3 },
           { hp: 300, dmg: 6, range: 12.5, rate: 0.9, poisonDps: 10, poisonTime: 3.5, cost: { wood: 40, stone: 70 } },
-          { hp: 460, dmg: 9, range: 14, rate: 1, poisonDps: 16, poisonTime: 4, cost: { wood: 80, stone: 140 } }
+          { hp: 460, dmg: 9, range: 14, rate: 1, poisonDps: 16, poisonTime: 4, cost: { wood: 80, stone: 140, iron: 6 } }
         ]
       },
       support: {
@@ -10366,7 +10405,7 @@ button.corner.mute.off { opacity: 0.5; }
         levels: [
           { hp: 150, buffRadius: 6, buffMult: 0.2 },
           { hp: 220, buffRadius: 7, buffMult: 0.3, cost: { wood: 50, stone: 90 } },
-          { hp: 300, buffRadius: 8, buffMult: 0.42, cost: { wood: 90, stone: 160 } }
+          { hp: 300, buffRadius: 8, buffMult: 0.42, cost: { wood: 90, stone: 160, iron: 5 } }
         ]
       },
       workbench: {
@@ -10480,6 +10519,18 @@ button.corner.mute.off { opacity: 0.5; }
       dmg: Math.round(base.dmg * dmgMul),
       speed: base.speed * (1 + Math.min(0.25, (wave - 1) * 0.02))
     };
+  }
+  var DIFFICULTIES = {
+    normal: { key: "normal", label: "\uBCF4\uD1B5", desc: "\uAE30\uBCF8 \uB09C\uC774\uB3C4", startWood: 60, startStone: 30, prepBonus: 0 },
+    easy: { key: "easy", label: "\uC26C\uC6C0", desc: "\uC2DC\uC791 \uC790\uC6D0 +50% \xB7 \uC900\uBE44 \uC2DC\uAC04 +20\uCD08", startWood: 90, startStone: 45, prepBonus: 20 }
+  };
+  var BASE_PREP_TIME = CFG.wave.prepTime;
+  var BASE_FIRST_PREP_TIME = CFG.wave.firstPrepTime;
+  function applyDifficulty(key) {
+    const d2 = DIFFICULTIES[key] || DIFFICULTIES.normal;
+    CFG.wave.prepTime = BASE_PREP_TIME + d2.prepBonus;
+    CFG.wave.firstPrepTime = BASE_FIRST_PREP_TIME + d2.prepBonus;
+    return d2;
   }
   function waveReward(w2) {
     const r = CFG.wave.reward;
@@ -10930,24 +10981,27 @@ button.corner.mute.off { opacity: 0.5; }
     }
     // 현재 레벨까지 투입된 총 자원 (레벨 1 기본 비용 + 업그레이드 비용 누적)
     investedCost(b) {
-      const total = { wood: 0, stone: 0 };
+      const total = { wood: 0, stone: 0, iron: 0 };
       for (let i = 0; i < b.level; i++) {
         const c2 = i === 0 ? b.def.cost : b.def.levels[i].cost;
         total.wood += c2?.wood || 0;
         total.stone += c2?.stone || 0;
+        total.iron += c2?.iron || 0;
       }
       return total;
     }
     refund(b) {
       const inv = this.investedCost(b);
-      return { wood: Math.floor(inv.wood * 0.5), stone: Math.floor(inv.stone * 0.5) };
+      return { wood: Math.floor(inv.wood * 0.5), stone: Math.floor(inv.stone * 0.5), iron: Math.floor(inv.iron * 0.5) };
     }
     // 손상 비율에 비례한 수리 비용 (완전 파괴 상태를 100% 재건축하는 것보다 저렴하게)
     repairCost(b) {
       const ratio = 1 - b.hp / b.maxHp;
       if (ratio <= 1e-3) return null;
       const inv = this.investedCost(b);
-      return { wood: Math.ceil(inv.wood * ratio * 0.4), stone: Math.ceil(inv.stone * ratio * 0.4) };
+      const cost = { wood: Math.ceil(inv.wood * ratio * 0.4), stone: Math.ceil(inv.stone * ratio * 0.4) };
+      if (inv.iron) cost.iron = Math.ceil(inv.iron * ratio * 0.4);
+      return cost;
     }
     repair(b) {
       b.hp = b.maxHp;
@@ -12241,7 +12295,19 @@ button.corner.mute.off { opacity: 0.5; }
     head: new Zu(0.3, 12, 10),
     arm: new iu(0.12, 0.45, 3, 6),
     tool: new qs(0.14, 0.9, 0.14),
+    sword: new qs(0.1, 1.05, 0.24),
+    bow: new Ku(0.38, 0.035, 6, 12, Math.PI * 1.15),
     ring: new qu(0.62, 0.76, 20)
+  };
+  var WEAPON_MAT = {
+    default: new sd({ color: 12093775, roughness: 0.7 }),
+    sword: new sd({ color: 14406878, roughness: 0.28, metalness: 0.85 }),
+    bow: new sd({ color: 9068331, roughness: 0.6, metalness: 0.1 })
+  };
+  var WEAPON_LOOK = {
+    default: { geo: GEO4.tool, mat: WEAPON_MAT.default, ry: 0, rz: 0 },
+    sword: { geo: GEO4.sword, mat: WEAPON_MAT.sword, ry: 0, rz: 0.15 },
+    bow: { geo: GEO4.bow, mat: WEAPON_MAT.bow, ry: Math.PI / 2, rz: 0 }
   };
   var PALETTE = [6280447, 10354539, 16757599, 16739286, 14065919, 7077840];
   var Player = class {
@@ -12283,12 +12349,13 @@ button.corner.mute.off { opacity: 0.5; }
       arm.position.set(0.42, 1.05, 0.1);
       g2.add(arm);
       this.arm = arm;
-      const tool = new Xs(GEO4.tool, new sd({ color: 12093775, roughness: 0.7 }));
+      const tool = new Xs(GEO4.tool, WEAPON_MAT.default);
       tool.position.set(0.5, 1, 0.35);
       tool.rotation.x = -0.4;
       tool.castShadow = true;
       g2.add(tool);
       this.tool = tool;
+      this._weaponKey = "default";
       const ring = new Xs(GEO4.ring, new es({
         color: this.color,
         transparent: true,
@@ -12343,8 +12410,20 @@ button.corner.mute.off { opacity: 0.5; }
     cancelHarvest() {
       this.harvesting = null;
     }
+    // 제작한 무기에 맞춰 손에 든 도구의 모양을 바꾼다 (칼 > 활 > 기본 순으로 우선)
+    _updateWeapon() {
+      const key = this.tools.sword ? "sword" : this.tools.bow ? "bow" : "default";
+      if (key === this._weaponKey) return;
+      this._weaponKey = key;
+      const look = WEAPON_LOOK[key];
+      this.tool.geometry = look.geo;
+      this.tool.material = look.mat;
+      this.tool.rotation.y = look.ry;
+      this.tool.rotation.z = look.rz;
+    }
     // 애니메이션 (모든 플레이어 공통)
     animate(dt2, moving) {
+      this._updateWeapon();
       const t2 = performance.now() / 1e3;
       if (this.swing > 0) {
         this.swing -= dt2 * 3.4;
@@ -13083,6 +13162,7 @@ button.corner.mute.off { opacity: 0.5; }
   };
 
   // js/game.js
+  var SAVE_KEY = "cd.save";
   var Game = class {
     constructor(canvas2, fxLayer2) {
       this.sm = new SceneManager(canvas2);
@@ -13098,14 +13178,16 @@ button.corner.mute.off { opacity: 0.5; }
       this.pools = { team: { wood: 60, stone: 30, iron: 0, shard: 0 }, byId: {} };
       this.players = /* @__PURE__ */ new Map();
       this.stats = { harvested: 0, built: 0, kills: 0 };
-      this._accum = { snap: 0, pos: 0 };
+      this._accum = { snap: 0, pos: 0, save: 0 };
       this._bindNet();
     }
     // ---------------------------------------------------------------- 시작/정리
-    begin({ seed = 20260818, shared = true } = {}) {
+    begin({ seed = 20260818, shared = true, difficulty = "normal", resumed = false } = {}) {
       this.dispose();
       this.seed = seed;
       this.shared = shared;
+      this.difficulty = DIFFICULTIES[difficulty] ? difficulty : "normal";
+      this.difficultyPreset = applyDifficulty(this.difficulty);
       this.grid = new BuildGrid();
       this.world = new World(this.sm, seed);
       this.buildMgr = new BuildManager(this.sm, this.grid, this.world, this.fx, this.projectiles);
@@ -13114,7 +13196,7 @@ button.corner.mute.off { opacity: 0.5; }
       this.local = new LocalPlayer(this.net.selfId, this.net.name, this._colorIndex(this.net.selfId));
       this.sm.scene.add(this.local.mesh);
       this.players.set(this.local.id, this.local);
-      this.pools.team = { wood: 60, stone: 30, iron: 0, shard: 0 };
+      this.pools.team = { wood: this.difficultyPreset.startWood, stone: this.difficultyPreset.startStone, iron: 0, shard: 0 };
       this.pools.byId = {};
       this._poolOf(this.local.id);
       this._wireCallbacks();
@@ -13124,12 +13206,13 @@ button.corner.mute.off { opacity: 0.5; }
         kills: 0,
         spentWood: 0,
         spentStone: 0,
+        spentIron: 0,
         spentBy: {
-          build: { wood: 0, stone: 0 },
-          upgrade: { wood: 0, stone: 0 },
-          repair: { wood: 0, stone: 0 },
-          harvest: { wood: 0, stone: 0 },
-          craft: { wood: 0, stone: 0 }
+          build: { wood: 0, stone: 0, iron: 0 },
+          upgrade: { wood: 0, stone: 0, iron: 0 },
+          repair: { wood: 0, stone: 0, iron: 0 },
+          harvest: { wood: 0, stone: 0, iron: 0 },
+          craft: { wood: 0, stone: 0, iron: 0 }
         },
         time: 0,
         waveLog: []
@@ -13140,7 +13223,7 @@ button.corner.mute.off { opacity: 0.5; }
       this.running = true;
       this.result = null;
       this.sm.focus.set(this.local.x, 0, this.local.z);
-      this.ui?.onGameStart();
+      this.ui?.onGameStart(resumed);
     }
     dispose() {
       if (!this.grid) return;
@@ -13167,7 +13250,7 @@ button.corner.mute.off { opacity: 0.5; }
     }
     _poolOf(id) {
       if (this.shared) return this.pools.team;
-      if (!this.pools.byId[id]) this.pools.byId[id] = { wood: 60, stone: 30, iron: 0, shard: 0 };
+      if (!this.pools.byId[id]) this.pools.byId[id] = { wood: this.difficultyPreset.startWood, stone: this.difficultyPreset.startStone, iron: 0, shard: 0 };
       return this.pools.byId[id];
     }
     get myPool() {
@@ -13292,12 +13375,14 @@ button.corner.mute.off { opacity: 0.5; }
       this.wave.phase = PHASE.WON;
       this.result = "win";
       this.sfx.win();
+      if (!this.net.online) Game.clearLocalSave();
       this.ui?.showResult(true, this.stats, this.wave.wave);
     }
     _lose() {
       this.wave.lose();
       this.result = "lose";
       this.sfx.lose();
+      if (!this.net.online) Game.clearLocalSave();
       this.ui?.showResult(false, this.stats, this.wave.wave);
     }
     // ---------------------------------------------------------------- 행동 (요청 → 호스트 처리)
@@ -13326,10 +13411,12 @@ button.corner.mute.off { opacity: 0.5; }
     _trackSpend(cost, kind) {
       this.stats.spentWood += cost.wood || 0;
       this.stats.spentStone += cost.stone || 0;
+      this.stats.spentIron += cost.iron || 0;
       const by = this.stats.spentBy[kind];
       if (by) {
         by.wood += cost.wood || 0;
         by.stone += cost.stone || 0;
+        by.iron += cost.iron || 0;
       }
     }
     requestUpgrade(id) {
@@ -13366,6 +13453,7 @@ button.corner.mute.off { opacity: 0.5; }
       const pool = this._poolOf(playerId);
       pool.wood += back.wood;
       pool.stone += back.stone;
+      pool.iron = (pool.iron || 0) + back.iron;
       this.fx.burst(b.x, 1.2, b.z, 12558682, 10, 4);
       this.buildMgr.remove(id);
     }
@@ -13612,7 +13700,7 @@ button.corner.mute.off { opacity: 0.5; }
       });
       net.on("startGame", (d2) => {
         if (this.running && !this.result) return;
-        this.begin({ seed: d2.seed, shared: d2.shared });
+        this.begin({ seed: d2.seed, shared: d2.shared, difficulty: d2.difficulty });
         this._syncRosterIntoGame();
       });
       net.on("pos", (d2, from) => {
@@ -13788,6 +13876,7 @@ button.corner.mute.off { opacity: 0.5; }
       this.enemyMgr.updateVisual(dt2, this.sm.camera);
       this.sm.follow(this.local.mesh.position, dt2);
       this._netTick(dt2);
+      this._autosaveTick(dt2, over);
       this.ui?.update(dt2);
       this.input.endFrame();
     }
@@ -13882,6 +13971,67 @@ button.corner.mute.off { opacity: 0.5; }
         }
       }
     }
+    // ---------------------------------------------------------------- 저장/이어하기 (싱글 플레이 전용)
+    _autosaveTick(dt2, over) {
+      if (this.net.online || over) return;
+      this._accum.save += dt2;
+      if (this._accum.save < 4) return;
+      this._accum.save = 0;
+      this.saveLocal();
+    }
+    saveLocal() {
+      if (this.net.online || !this.running || !this.wave) return;
+      if (this.wave.phase === PHASE.WON || this.wave.phase === PHASE.LOST) return;
+      const save = {
+        v: 1,
+        ts: Date.now(),
+        seed: this.seed,
+        shared: this.shared,
+        difficulty: this.difficulty || "normal",
+        snap: this._snapshot(),
+        stats: this.stats
+      };
+      try {
+        localStorage.setItem(SAVE_KEY, JSON.stringify(save));
+      } catch {
+      }
+    }
+    static loadLocal() {
+      try {
+        const raw = localStorage.getItem(SAVE_KEY);
+        if (!raw) return null;
+        const save = JSON.parse(raw);
+        if (!save || save.v !== 1 || !save.snap) return null;
+        return save;
+      } catch {
+        return null;
+      }
+    }
+    static clearLocalSave() {
+      try {
+        localStorage.removeItem(SAVE_KEY);
+      } catch {
+      }
+    }
+    resumeLocal(save) {
+      this.begin({ seed: save.seed, shared: save.shared, difficulty: save.difficulty, resumed: true });
+      const s2 = save.snap;
+      this.enemyMgr.applySnapshot(s2.e, s2.w.wave + 1);
+      this.buildMgr.applySnapshot(s2.b);
+      this.world.applyNodeSnapshot(s2.n);
+      this.wave.applySnapshot(s2.w);
+      this.world.crystal.hp = s2.c;
+      if (s2.r.team) this.pools.team = s2.r.team;
+      if (s2.r.byId) this.pools.byId = s2.r.byId;
+      const savedPlayer = Object.values(s2.p || {})[0];
+      if (savedPlayer) {
+        this.local.harvestLv = savedPlayer.hv;
+        this.local.tools = {};
+        for (const k2 of savedPlayer.tl || []) this.local.tools[k2] = true;
+      }
+      if (save.stats) this.stats = save.stats;
+      this.ui?.toast(`\uC774\uC5B4\uD558\uAE30 \u2014 \uC6E8\uC774\uBE0C ${this.wave.displayWave}`, "good");
+    }
     render() {
       this.sm.render();
     }
@@ -13919,6 +14069,7 @@ button.corner.mute.off { opacity: 0.5; }
         stationList: $2("station-list"),
         crystalFill: $2("crystal-fill"),
         crystalText: $2("crystal-text"),
+        crystalWarning: $2("crystal-warning"),
         waveLabel: $2("wave-label"),
         waveState: $2("wave-state"),
         waveBtn: $2("btn-wave"),
@@ -14087,6 +14238,42 @@ button.corner.mute.off { opacity: 0.5; }
         g2.net.name = n;
         return n;
       };
+      this.selectedDifficulty = localStorage.getItem("cd.difficulty") || "normal";
+      if (!DIFFICULTIES[this.selectedDifficulty]) this.selectedDifficulty = "normal";
+      const diffOpts = Array.from(document.querySelectorAll("#diff-seg .diff-opt"));
+      const paintDiff = () => {
+        for (const btn of diffOpts) btn.classList.toggle("active", btn.dataset.diff === this.selectedDifficulty);
+        $2("diff-desc").textContent = DIFFICULTIES[this.selectedDifficulty].desc;
+      };
+      for (const btn of diffOpts) {
+        btn.onclick = () => {
+          this.selectedDifficulty = btn.dataset.diff;
+          localStorage.setItem("cd.difficulty", this.selectedDifficulty);
+          paintDiff();
+        };
+      }
+      paintDiff();
+      const refreshResumeRow = () => {
+        const save = Game.loadLocal();
+        $2("resume-row").classList.toggle("hidden", !save);
+        if (save) $2("btn-resume").textContent = `\uC774\uC5B4\uD558\uAE30 (\uC6E8\uC774\uBE0C ${save.snap.w.wave + 1})`;
+      };
+      refreshResumeRow();
+      $2("btn-resume").onclick = () => {
+        const save = Game.loadLocal();
+        if (!save) {
+          refreshResumeRow();
+          return;
+        }
+        takeName();
+        g2.net.leave();
+        this.el.lobby.classList.add("hidden");
+        g2.resumeLocal(save);
+      };
+      $2("btn-resume-discard").onclick = () => {
+        Game.clearLocalSave();
+        refreshResumeRow();
+      };
       $2("in-server").value = g2.net.serverUrl;
       $2("btn-server").onclick = () => {
         g2.net.setServerUrl($2("in-server").value.trim());
@@ -14095,8 +14282,9 @@ button.corner.mute.off { opacity: 0.5; }
       $2("btn-single").onclick = () => {
         takeName();
         g2.net.leave();
+        Game.clearLocalSave();
         this.el.lobby.classList.add("hidden");
-        g2.begin({ seed: Math.random() * 1e9 | 0, shared: true });
+        g2.begin({ seed: Math.random() * 1e9 | 0, shared: true, difficulty: this.selectedDifficulty });
       };
       $2("btn-create").onclick = () => {
         takeName();
@@ -14128,9 +14316,10 @@ button.corner.mute.off { opacity: 0.5; }
         }
         const shared = $2("chk-shared").checked;
         const seed = this.seed || Math.random() * 1e9 | 0;
-        g2.net.send("startGame", { seed, shared });
+        const difficulty = this.selectedDifficulty;
+        g2.net.send("startGame", { seed, shared, difficulty });
         this.el.lobby.classList.add("hidden");
-        g2.begin({ seed, shared });
+        g2.begin({ seed, shared, difficulty });
         g2._syncRosterIntoGame();
       };
       $2("btn-again").onclick = () => {
@@ -14141,8 +14330,9 @@ button.corner.mute.off { opacity: 0.5; }
         }
         this.el.result.classList.add("hidden");
         const seed = Math.random() * 1e9 | 0;
-        if (g22.net.online) g22.net.send("startGame", { seed, shared: g22.shared });
-        g22.begin({ seed, shared: g22.shared });
+        const difficulty = g22.difficulty || "normal";
+        if (g22.net.online) g22.net.send("startGame", { seed, shared: g22.shared, difficulty });
+        g22.begin({ seed, shared: g22.shared, difficulty });
         g22._syncRosterIntoGame();
       };
     }
@@ -14341,17 +14531,19 @@ button.corner.mute.off { opacity: 0.5; }
       $2("tb-attack").addEventListener("pointerdown", () => this.game.requestAttack());
     }
     // ---------------------------------------------------------------- 라이프사이클
-    onGameStart() {
+    onGameStart(resumed = false) {
       this.el.hud.classList.remove("hidden");
       this.el.lobby.classList.add("hidden");
       this.el.result.classList.add("hidden");
       this.el.pauseOverlay.classList.add("hidden");
       this._station = null;
       this._stationRows = null;
+      this._crystalWarned = false;
+      this.el.crystalWarning.classList.add("hidden");
       this.el.station.classList.add("hidden");
       this.refreshBuildBar();
-      this.toast("\uD06C\uB9AC\uC2A4\uD0C8\uC744 \uC9C0\uCF1C\uB77C! F\uB85C \uCC44\uC9D1, 1~8\uB85C \uAC74\uC124", "good");
-      if (localStorage.getItem("cd.tutorialDone")) {
+      if (!resumed) this.toast("\uD06C\uB9AC\uC2A4\uD0C8\uC744 \uC9C0\uCF1C\uB77C! F\uB85C \uCC44\uC9D1, 1~8\uB85C \uAC74\uC124", "good");
+      if (resumed || localStorage.getItem("cd.tutorialDone")) {
         this.el.tutorial.classList.add("hidden");
         this._tutStep = -1;
       } else {
@@ -14462,11 +14654,11 @@ button.corner.mute.off { opacity: 0.5; }
       $2("result-title").textContent = win ? "\uC2B9\uB9AC! \u{1F389}" : "\uD06C\uB9AC\uC2A4\uD0C8 \uD30C\uAD34\u2026 \u{1F4A5}";
       $2("result-sub").textContent = win ? `${CFG.wave.goal}\uC6E8\uC774\uBE0C\uB97C \uBAA8\uB450 \uB9C9\uC544\uB0C8\uB2E4.` : `${wave}\uC6E8\uC774\uBE0C\uAE4C\uC9C0 \uBC84\uD17C\uB2E4.`;
       $2("result-stats").innerHTML = `
-  <li>\uC0DD\uC874 \uC2DC\uAC04 <b>${fmtTime(stats.time)}</b></li>
-  <li>\uCC98\uCE58\uD55C \uBAAC\uC2A4\uD130 <b>${stats.kills}</b></li>
-  <li>\uCC44\uC9D1\uD55C \uC790\uC6D0 <b>${stats.harvested}</b></li>
-  <li>\uC18C\uBAA8\uD55C \uC790\uC6D0 <b>\u{1FAB5}${stats.spentWood} \u{1FAA8}${stats.spentStone}</b>${this._spendBreakdown(stats)}</li>
-  <li>\uAC74\uC124\uD55C \uAD6C\uC870\uBB3C <b>${stats.built}</b></li>`;
+<li>\uC0DD\uC874 \uC2DC\uAC04 <b>${fmtTime(stats.time)}</b></li>
+<li>\uCC98\uCE58\uD55C \uBAAC\uC2A4\uD130 <b>${stats.kills}</b></li>
+<li>\uCC44\uC9D1\uD55C \uC790\uC6D0 <b>${stats.harvested}</b></li>
+<li>\uC18C\uBAA8\uD55C \uC790\uC6D0 <b>\u{1FAB5}${stats.spentWood} \u{1FAA8}${stats.spentStone}${stats.spentIron ? ` \u2699\uFE0F${stats.spentIron}` : ""}</b>${this._spendBreakdown(stats)}</li>
+<li>\uAC74\uC124\uD55C \uAD6C\uC870\uBB3C <b>${stats.built}</b></li>`;
       const log = $2("result-wavelog");
       if (stats.waveLog && stats.waveLog.length) {
         log.innerHTML = stats.waveLog.map(
@@ -14478,18 +14670,19 @@ button.corner.mute.off { opacity: 0.5; }
       }
       const rec = this._recordStats(win, stats, win ? CFG.wave.goal : wave);
       $2("result-record").innerHTML = `
-  <li class="${rec.isNewBest ? "new-best" : ""}">\u{1F3C6} \uC5ED\uB300 \uCD5C\uACE0 \uC6E8\uC774\uBE0C <b>${rec.bestWave}</b>${rec.isNewBest ? " \u2014 \uC2E0\uAE30\uB85D!" : ""}</li>
-  <li>\u2694\uFE0F \uB204\uC801 \uCC98\uCE58 <b>${rec.totalKills}</b></li>
-  <li>\u{1F3AE} \uD50C\uB808\uC774 \uD69F\uC218 <b>${rec.plays}</b> (\uC2B9\uB9AC ${rec.wins}\uD68C)</li>`;
+<li class="${rec.isNewBest ? "new-best" : ""}">\u{1F3C6} \uC5ED\uB300 \uCD5C\uACE0 \uC6E8\uC774\uBE0C <b>${rec.bestWave}</b>${rec.isNewBest ? " \u2014 \uC2E0\uAE30\uB85D!" : ""}</li>
+<li>\u2694\uFE0F \uB204\uC801 \uCC98\uCE58 <b>${rec.totalKills}</b></li>
+<li>\u{1F3AE} \uD50C\uB808\uC774 \uD69F\uC218 <b>${rec.plays}</b> (\uC2B9\uB9AC ${rec.wins}\uD68C)</li>`;
     }
     // 자원을 어디에 썼는지 항목별로 쪼개 보여준다 (쓴 곳만)
     _spendBreakdown(stats) {
       const LABELS2 = { build: "\uAC74\uC124", upgrade: "\uC5C5\uADF8\uB808\uC774\uB4DC", repair: "\uC218\uB9AC", harvest: "\uCC44\uC9D1\uC18D\uB3C4", craft: "\uC81C\uC791" };
       const by = stats.spentBy || {};
-      const rows = Object.entries(LABELS2).map(([key, label]) => [label, by[key] || { wood: 0, stone: 0 }]).filter(([, c2]) => c2.wood || c2.stone).map(([label, c2]) => {
+      const rows = Object.entries(LABELS2).map(([key, label]) => [label, by[key] || { wood: 0, stone: 0, iron: 0 }]).filter(([, c2]) => c2.wood || c2.stone || c2.iron).map(([label, c2]) => {
         const parts = [];
         if (c2.wood) parts.push(`\u{1FAB5}${c2.wood}`);
         if (c2.stone) parts.push(`\u{1FAA8}${c2.stone}`);
+        if (c2.iron) parts.push(`\u2699\uFE0F${c2.iron}`);
         return `<span>${label} ${parts.join(" ")}</span>`;
       });
       return rows.length ? `<div class="breakdown">${rows.join("")}</div>` : "";
@@ -14557,6 +14750,15 @@ button.corner.mute.off { opacity: 0.5; }
       const ratio = clamp(c2.hp / c2.maxHp, 0, 1);
       this.el.crystalFill.style.transform = `scaleX(${ratio})`;
       this.el.crystalText.textContent = `${Math.ceil(c2.hp)} / ${c2.maxHp}`;
+      const danger = ratio < 0.3 && ratio > 0;
+      this.el.crystalWarning.classList.toggle("hidden", !danger);
+      if (danger && !this._crystalWarned) {
+        this._crystalWarned = true;
+        this.toast("\u{1F48E} \uD06C\uB9AC\uC2A4\uD0C8\uC774 \uC704\uD5D8\uD558\uB2E4! \uC218\uC815 \uC815\uC218(R)\uB85C \uD68C\uBCF5\uD558\uAC70\uB098 \uBC29\uC5B4\uC120\uC744 \uC9C0\uCF1C\uB77C", "bad");
+        g2.sfx.crystalDanger();
+      } else if (!danger) {
+        this._crystalWarned = false;
+      }
       const w2 = g2.wave;
       this.el.waveLabel.textContent = `\uC6E8\uC774\uBE0C ${Math.min(CFG.wave.goal, w2.wave + 1)} / ${CFG.wave.goal}`;
       if (w2.phase === PHASE.PREP) {
