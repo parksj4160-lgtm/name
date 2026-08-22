@@ -190,7 +190,23 @@ export var CFG = {
     shooter: { name: "주술사", icon: "🧙", hp: 45, speed: 2.4, dmg: 9, rate: 0.5, radius: 0.5, color: 3526479, bounty: { wood: 3, stone: 2 }, scale: 0.95, ranged: true, atkRange: 11 },
     // 경로상의 벽을 무시하고 가장 가까운 타워로 직행해 부순다 — 타워를 뒤에 숨기는 전략을 견제한다
     raider: { name: "약탈자", icon: "🪓", hp: 80, speed: 2.6, dmg: 10, rate: 0.8, radius: 0.55, color: 11887901, bounty: { wood: 3, stone: 2 }, scale: 1.05, seeksBuildings: true, buildingDmgMult: 1.8 },
-    boss: { name: "파괴자", icon: "💀", hp: 900, speed: 2.1, dmg: 70, rate: 0.7, radius: 1.4, color: 3092282, bounty: { wood: 30, stone: 30 }, scale: 2.3 }
+    boss: { name: "파괴자", icon: "💀", hp: 900, speed: 2.1, dmg: 70, rate: 0.7, radius: 1.4, color: 3092282, bounty: { wood: 30, stone: 30 }, scale: 2.3, boss: true }
+  },
+  // 보스 전용 패턴. 예고 시간을 반드시 두어서 플레이어가 반응할 수 있게 한다.
+  bossPattern: {
+    // 체력이 이 비율 아래로 떨어질 때마다 한 번씩 잡졸을 부른다
+    summonAt: [0.72, 0.46, 0.22],
+    summonCount: 3,
+    summonType: "grunt",
+    summonCast: 1.1,
+    // 크리스탈에서 이만큼 떨어져 있을 때, 쿨다운마다 돌진한다
+    chargeMinDist: 9,
+    chargeCd: 11,
+    chargeCast: 1.2,
+    chargeTime: 1.5,
+    chargeSpeed: 4.2,
+    // 돌진 중 스치는 건물에 주는 피해
+    chargeBuildingDmg: 55
   },
   wave: {
     goal: 10,

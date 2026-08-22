@@ -28,6 +28,7 @@ var Enemy = class {
     const st = enemyStats(type, wave);
     this.id = id || nextId2++;
     this.type = type;
+    this.wave = wave;
     this.st = st;
     this.instanced = INSTANCED_TYPES.has(type);
     this.bodyIdx = -1;
@@ -52,6 +53,21 @@ var Enemy = class {
     this._kox = 0;
     this._koz = 0;
     this._punch = 0;
+    // 보스 패턴 상태 — 소환은 체력 구간마다 한 번, 돌진은 쿨다운마다
+    if (st.boss) {
+      this.summonsDone = 0;
+      this.castKind = null;
+      this.castUntil = 0;
+      this.chargeUntil = 0;
+      this.chargeCd = CFG.bossPattern.chargeCd * 0.6;
+      this.chargeDir = { x: 0, z: 0 };
+    }
+  }
+  get isCasting() {
+    return this.castUntil > 0;
+  }
+  get isCharging() {
+    return this.chargeUntil > 0;
   }
   _makeMesh() {
     const g2 = new THREE.Group();
@@ -219,7 +235,12 @@ export var EnemyManager = class {
       } else if (e.poisonDps) {
         e.poisonDps = 0;
       }
-      const speed = e.st.speed * e.slowFactor;
+      // ---- 보스 패턴: 예고(캐스팅) → 실행. 예고 중에는 멈춰 서서 표시가 뜬다.
+      if (e.st.boss && this._bossTick(e, dt2, now)) {
+        this._applyPosition(e, dt2, now);
+        continue;
+      }
+      const speed = e.st.speed * e.slowFactor * (e.isCharging ? CFG.bossPattern.chargeSpeed / e.st.speed : 1);
       e.attackCd -= dt2;
       const dc2 = Math.hypot(e.x, e.z);
       const atkRange = e.st.ranged ? e.st.atkRange : CFG.crystal.hitRange;
@@ -298,6 +319,77 @@ export var EnemyManager = class {
       this._face(e, e.x + mx, e.z + mz, dt2);
       this._applyPosition(e, dt2, now);
     }
+  }
+  // 보스 전용 갱신. 이번 프레임을 보스 패턴이 가져갔으면 true (일반 이동을 건너뛴다).
+  _bossTick(e, dt2, now) {
+    const P = CFG.bossPattern;
+    // 1) 예고 중 — 제자리에 서서 기다린다
+    if (e.castUntil > 0) {
+      e.castUntil -= dt2;
+      if (e.castUntil > 0) {
+        e.vx = 0;
+        e.vz = 0;
+        return true;
+      }
+      const kind = e.castKind;
+      e.castKind = null;
+      if (kind === "summon") this._bossSummon(e);
+      else this._bossBeginCharge(e);
+      return true;
+    }
+    // 2) 돌진 중 — 정해진 방향으로 밀고 나가며 스치는 건물을 부순다
+    if (e.chargeUntil > 0) {
+      e.chargeUntil -= dt2;
+      const sp = P.chargeSpeed;
+      e.x += e.chargeDir.x * sp * dt2;
+      e.z += e.chargeDir.z * sp * dt2;
+      this.onBossCharge?.(e);
+      if (e.chargeUntil <= 0) e.chargeCd = P.chargeCd;
+      return true;
+    }
+    // 3) 체력이 구간을 넘어서면 소환 예고
+    const ratio = e.hp / e.maxHp;
+    if (e.summonsDone < P.summonAt.length && ratio <= P.summonAt[e.summonsDone]) {
+      e.summonsDone++;
+      e.castKind = "summon";
+      e.castUntil = P.summonCast;
+      this.fx.ring(e.x, e.z, 16733525, 5);
+      this.onBossTelegraph?.(e, "summon");
+      return true;
+    }
+    // 4) 크리스탈에서 멀면 쿨다운마다 돌진 예고
+    e.chargeCd -= dt2;
+    if (e.chargeCd <= 0 && Math.hypot(e.x, e.z) > P.chargeMinDist) {
+      e.castKind = "charge";
+      e.castUntil = P.chargeCast;
+      this.fx.ring(e.x, e.z, 16755302, 4);
+      this.onBossTelegraph?.(e, "charge");
+      return true;
+    }
+    return false;
+  }
+  _bossSummon(e) {
+    const P = CFG.bossPattern;
+    for (let i = 0; i < P.summonCount; i++) {
+      const a = Math.PI * 2 * i / P.summonCount + Math.random();
+      const r = e.st.radius + 1.6;
+      this.spawn(P.summonType, this.waveOf(e), e.x + Math.cos(a) * r, e.z + Math.sin(a) * r);
+    }
+    this.fx.ring(e.x, e.z, 16733525, 7);
+    this.onBossSummon?.(e, P.summonCount);
+  }
+  _bossBeginCharge(e) {
+    const P = CFG.bossPattern;
+    const len = Math.hypot(e.x, e.z) || 1;
+    // 크리스탈 쪽으로 직선 돌진
+    e.chargeDir.x = -e.x / len;
+    e.chargeDir.z = -e.z / len;
+    e.chargeUntil = P.chargeTime;
+    this.onBossTelegraph?.(e, "chargeGo");
+  }
+  // 소환된 잡졸의 웨이브 스케일은 보스가 속한 웨이브를 따른다
+  waveOf(e) {
+    return e.wave || this.currentWave || 1;
   }
   _separation(e) {
     let sx = 0, sz = 0;
@@ -413,14 +505,16 @@ export var EnemyManager = class {
         Math.round(e.x * 20) / 20,
         Math.round(e.z * 20) / 20,
         Math.round(e.hp),
-        Math.round(e.mesh.rotation.y * 100) / 100
+        Math.round(e.mesh.rotation.y * 100) / 100,
+        // 보스 예고/돌진 상태 — 참가자도 경고를 보고 피할 수 있어야 한다
+        e.castKind ? 1 : e.isCharging ? 2 : 0
       ]);
     }
     return out;
   }
   applySnapshot(list, wave) {
     const seen = /* @__PURE__ */ new Set();
-    for (const [id, type, x2, z2, hp, rot] of list) {
+    for (const [id, type, x2, z2, hp, rot, boss] of list) {
       seen.add(id);
       let e = this.byId(id);
       if (!e) {
@@ -430,6 +524,16 @@ export var EnemyManager = class {
       e.netTarget = { x: x2, z: z2, rot };
       e.hp = hp;
       e.refreshBar();
+      // 호스트가 보낸 보스 상태를 그대로 연출한다 (0 없음 / 1 예고 / 2 돌진)
+      if (boss !== e._netBoss) {
+        e._netBoss = boss;
+        if (boss === 1) {
+          this.fx.ring(x2, z2, 16755302, 5);
+          this.onBossTelegraph?.(e, "netCast");
+        } else if (boss === 2) {
+          this.onBossTelegraph?.(e, "netCharge");
+        }
+      }
     }
     for (let i = this.list.length - 1; i >= 0; i--) {
       const e = this.list[i];

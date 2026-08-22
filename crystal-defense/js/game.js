@@ -124,6 +124,46 @@ export var Game = class {
       }
       this.sfx.towerHit(b.key);
     };
+    // ---- 보스 패턴 연출 + 결과 처리 (호스트에서만 돈다)
+    this.enemyMgr.onBossTelegraph = (e, kind) => {
+      if (kind === "summon") {
+        this.ui?.toast("💀 파괴자가 무언가를 부른다!", "warn");
+        this.sfx.bossWaveStart();
+      } else if (kind === "charge") {
+        this.ui?.toast("💀 파괴자가 돌진 자세를 잡는다 — 길을 비켜라!", "warn");
+        this.sfx.bossWaveStart();
+      } else if (kind === "netCast") {
+        this.ui?.toast("💀 파괴자가 무언가를 준비한다 — 조심!", "warn");
+        this.sfx.bossWaveStart();
+      } else {
+        this.ui?.shake();
+      }
+    };
+    this.enemyMgr.onBossSummon = (e, n) => {
+      this.ui?.toast(`잡졸 ${n}마리가 튀어나왔다`, "bad");
+      this.fx.burst(e.x, 1.6, e.z, 16733525, 18, 6);
+    };
+    // 돌진 중 스치는 건물을 부순다 — 벽으로 둘러싸도 보스는 밀고 들어온다
+    this.enemyMgr.onBossCharge = (e) => {
+      const reach = e.st.radius + 1.4;
+      let hit = null;
+      for (const b of this.buildMgr.buildings.values()) {
+        if (dist(b.x, b.z, e.x, e.z) <= reach) {
+          hit = b;
+          break;
+        }
+      }
+      if (!hit || hit === e._lastCrushed) return;
+      e._lastCrushed = hit;
+      const destroyed = hit.damage(CFG.bossPattern.chargeBuildingDmg);
+      this.fx.burst(hit.x, 1.4, hit.z, 12303291, 10, 5);
+      this.sfx.buildingHit();
+      this.ui?.shake();
+      if (destroyed) {
+        this.fx.burst(hit.x, 1.2, hit.z, 8947848, 16, 6);
+        this.buildMgr.remove(hit.id);
+      }
+    };
     this.enemyMgr.onPoisonTick = (e, dmg) => {
       this._hurtEnemy(e, dmg, "poison");
     };

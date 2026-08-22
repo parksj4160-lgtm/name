@@ -546,7 +546,8 @@ button.corner.mute.off { opacity: 0.5; }
       <tr><td>건설</td><td>인벤토리 <b>건설</b> 탭에서 고르면 배치 모드가 된다 → 좌클릭으로 배치. 벽·타워는 <b>제작대를 먼저 지어야</b> 열린다</td></tr>
       <tr><td>제작</td><td><b>제작대</b>를 지으면 인벤토리 <b>제작</b> 탭에서 ⛏️ 곡괭이 · 🗡️ 칼 · 🏹 활을 만든다. <b>화로</b>를 지으면 광물을 녹여 ⚙️ 철을 얻는다</td></tr>
       <tr><td>장비</td><td>인벤토리 <b>장비</b> 탭에서 고르면 손에 든다. ⛏️ 곡괭이도 쥐어야 정수석을 캘 수 있다</td></tr>
-      <tr><td>몬스터</td><td>🧙 주술사는 벽을 무시하고 멀리서 크리스탈을 저격 · 🪓 약탈자는 가장 가까운 건물로 직행해 부순다 · 💀 보스는 5웨이브마다 등장</td></tr>
+      <tr><td>몬스터</td><td>🧙 주술사는 벽을 무시하고 멀리서 크리스탈을 저격 · 🪓 약탈자는 가장 가까운 건물로 직행해 부순다</td></tr>
+      <tr><td>💀 보스</td><td>5웨이브마다 등장. 체력이 깎일 때마다 <b>잡졸을 소환</b>하고, 멀리 있으면 <b>크리스탈로 돌진</b>해 지나는 건물을 부순다. 둘 다 <b>예고가 먼저 뜨니</b> 그때 대응할 것</td></tr>
       <tr><td>업그레이드</td><td><kbd class="rebind" data-action="upgrade">U</kbd> 후 건물 클릭</td></tr>
       <tr><td>수리</td><td><kbd class="rebind" data-action="repair">G</kbd> 후 건물 클릭 (손상 비례 자원 소모)</td></tr>
       <tr><td>철거(50% 환급)</td><td><kbd class="rebind" data-action="sell">X</kbd> 후 건물 클릭</td></tr>
@@ -10460,7 +10461,23 @@ button.corner.mute.off { opacity: 0.5; }
       shooter: { name: "\uC8FC\uC220\uC0AC", icon: "\u{1F9D9}", hp: 45, speed: 2.4, dmg: 9, rate: 0.5, radius: 0.5, color: 3526479, bounty: { wood: 3, stone: 2 }, scale: 0.95, ranged: true, atkRange: 11 },
       // 경로상의 벽을 무시하고 가장 가까운 타워로 직행해 부순다 — 타워를 뒤에 숨기는 전략을 견제한다
       raider: { name: "\uC57D\uD0C8\uC790", icon: "\u{1FA93}", hp: 80, speed: 2.6, dmg: 10, rate: 0.8, radius: 0.55, color: 11887901, bounty: { wood: 3, stone: 2 }, scale: 1.05, seeksBuildings: true, buildingDmgMult: 1.8 },
-      boss: { name: "\uD30C\uAD34\uC790", icon: "\u{1F480}", hp: 900, speed: 2.1, dmg: 70, rate: 0.7, radius: 1.4, color: 3092282, bounty: { wood: 30, stone: 30 }, scale: 2.3 }
+      boss: { name: "\uD30C\uAD34\uC790", icon: "\u{1F480}", hp: 900, speed: 2.1, dmg: 70, rate: 0.7, radius: 1.4, color: 3092282, bounty: { wood: 30, stone: 30 }, scale: 2.3, boss: true }
+    },
+    // 보스 전용 패턴. 예고 시간을 반드시 두어서 플레이어가 반응할 수 있게 한다.
+    bossPattern: {
+      // 체력이 이 비율 아래로 떨어질 때마다 한 번씩 잡졸을 부른다
+      summonAt: [0.72, 0.46, 0.22],
+      summonCount: 3,
+      summonType: "grunt",
+      summonCast: 1.1,
+      // 크리스탈에서 이만큼 떨어져 있을 때, 쿨다운마다 돌진한다
+      chargeMinDist: 9,
+      chargeCd: 11,
+      chargeCast: 1.2,
+      chargeTime: 1.5,
+      chargeSpeed: 4.2,
+      // 돌진 중 스치는 건물에 주는 피해
+      chargeBuildingDmg: 55
     },
     wave: {
       goal: 10,
@@ -11137,6 +11154,7 @@ button.corner.mute.off { opacity: 0.5; }
       const st = enemyStats(type, wave);
       this.id = id || nextId2++;
       this.type = type;
+      this.wave = wave;
       this.st = st;
       this.instanced = INSTANCED_TYPES.has(type);
       this.bodyIdx = -1;
@@ -11161,6 +11179,20 @@ button.corner.mute.off { opacity: 0.5; }
       this._kox = 0;
       this._koz = 0;
       this._punch = 0;
+      if (st.boss) {
+        this.summonsDone = 0;
+        this.castKind = null;
+        this.castUntil = 0;
+        this.chargeUntil = 0;
+        this.chargeCd = CFG.bossPattern.chargeCd * 0.6;
+        this.chargeDir = { x: 0, z: 0 };
+      }
+    }
+    get isCasting() {
+      return this.castUntil > 0;
+    }
+    get isCharging() {
+      return this.chargeUntil > 0;
     }
     _makeMesh() {
       const g2 = new Wl();
@@ -11328,7 +11360,11 @@ button.corner.mute.off { opacity: 0.5; }
         } else if (e.poisonDps) {
           e.poisonDps = 0;
         }
-        const speed = e.st.speed * e.slowFactor;
+        if (e.st.boss && this._bossTick(e, dt2, now)) {
+          this._applyPosition(e, dt2, now);
+          continue;
+        }
+        const speed = e.st.speed * e.slowFactor * (e.isCharging ? CFG.bossPattern.chargeSpeed / e.st.speed : 1);
         e.attackCd -= dt2;
         const dc2 = Math.hypot(e.x, e.z);
         const atkRange = e.st.ranged ? e.st.atkRange : CFG.crystal.hitRange;
@@ -11407,6 +11443,72 @@ button.corner.mute.off { opacity: 0.5; }
         this._face(e, e.x + mx, e.z + mz, dt2);
         this._applyPosition(e, dt2, now);
       }
+    }
+    // 보스 전용 갱신. 이번 프레임을 보스 패턴이 가져갔으면 true (일반 이동을 건너뛴다).
+    _bossTick(e, dt2, now) {
+      const P2 = CFG.bossPattern;
+      if (e.castUntil > 0) {
+        e.castUntil -= dt2;
+        if (e.castUntil > 0) {
+          e.vx = 0;
+          e.vz = 0;
+          return true;
+        }
+        const kind = e.castKind;
+        e.castKind = null;
+        if (kind === "summon") this._bossSummon(e);
+        else this._bossBeginCharge(e);
+        return true;
+      }
+      if (e.chargeUntil > 0) {
+        e.chargeUntil -= dt2;
+        const sp2 = P2.chargeSpeed;
+        e.x += e.chargeDir.x * sp2 * dt2;
+        e.z += e.chargeDir.z * sp2 * dt2;
+        this.onBossCharge?.(e);
+        if (e.chargeUntil <= 0) e.chargeCd = P2.chargeCd;
+        return true;
+      }
+      const ratio = e.hp / e.maxHp;
+      if (e.summonsDone < P2.summonAt.length && ratio <= P2.summonAt[e.summonsDone]) {
+        e.summonsDone++;
+        e.castKind = "summon";
+        e.castUntil = P2.summonCast;
+        this.fx.ring(e.x, e.z, 16733525, 5);
+        this.onBossTelegraph?.(e, "summon");
+        return true;
+      }
+      e.chargeCd -= dt2;
+      if (e.chargeCd <= 0 && Math.hypot(e.x, e.z) > P2.chargeMinDist) {
+        e.castKind = "charge";
+        e.castUntil = P2.chargeCast;
+        this.fx.ring(e.x, e.z, 16755302, 4);
+        this.onBossTelegraph?.(e, "charge");
+        return true;
+      }
+      return false;
+    }
+    _bossSummon(e) {
+      const P2 = CFG.bossPattern;
+      for (let i = 0; i < P2.summonCount; i++) {
+        const a = Math.PI * 2 * i / P2.summonCount + Math.random();
+        const r = e.st.radius + 1.6;
+        this.spawn(P2.summonType, this.waveOf(e), e.x + Math.cos(a) * r, e.z + Math.sin(a) * r);
+      }
+      this.fx.ring(e.x, e.z, 16733525, 7);
+      this.onBossSummon?.(e, P2.summonCount);
+    }
+    _bossBeginCharge(e) {
+      const P2 = CFG.bossPattern;
+      const len = Math.hypot(e.x, e.z) || 1;
+      e.chargeDir.x = -e.x / len;
+      e.chargeDir.z = -e.z / len;
+      e.chargeUntil = P2.chargeTime;
+      this.onBossTelegraph?.(e, "chargeGo");
+    }
+    // 소환된 잡졸의 웨이브 스케일은 보스가 속한 웨이브를 따른다
+    waveOf(e) {
+      return e.wave || this.currentWave || 1;
     }
     _separation(e) {
       let sx = 0, sz = 0;
@@ -11522,14 +11624,16 @@ button.corner.mute.off { opacity: 0.5; }
           Math.round(e.x * 20) / 20,
           Math.round(e.z * 20) / 20,
           Math.round(e.hp),
-          Math.round(e.mesh.rotation.y * 100) / 100
+          Math.round(e.mesh.rotation.y * 100) / 100,
+          // 보스 예고/돌진 상태 — 참가자도 경고를 보고 피할 수 있어야 한다
+          e.castKind ? 1 : e.isCharging ? 2 : 0
         ]);
       }
       return out;
     }
     applySnapshot(list, wave) {
       const seen = /* @__PURE__ */ new Set();
-      for (const [id, type, x2, z2, hp, rot] of list) {
+      for (const [id, type, x2, z2, hp, rot, boss] of list) {
         seen.add(id);
         let e = this.byId(id);
         if (!e) {
@@ -11539,6 +11643,15 @@ button.corner.mute.off { opacity: 0.5; }
         e.netTarget = { x: x2, z: z2, rot };
         e.hp = hp;
         e.refreshBar();
+        if (boss !== e._netBoss) {
+          e._netBoss = boss;
+          if (boss === 1) {
+            this.fx.ring(x2, z2, 16755302, 5);
+            this.onBossTelegraph?.(e, "netCast");
+          } else if (boss === 2) {
+            this.onBossTelegraph?.(e, "netCharge");
+          }
+        }
       }
       for (let i = this.list.length - 1; i >= 0; i--) {
         const e = this.list[i];
@@ -13305,6 +13418,44 @@ button.corner.mute.off { opacity: 0.5; }
           this._hurtEnemy(e, st.dmg, b.key === "frost" ? "frost" : "tower", b.x, b.z);
         }
         this.sfx.towerHit(b.key);
+      };
+      this.enemyMgr.onBossTelegraph = (e, kind) => {
+        if (kind === "summon") {
+          this.ui?.toast("\u{1F480} \uD30C\uAD34\uC790\uAC00 \uBB34\uC5B8\uAC00\uB97C \uBD80\uB978\uB2E4!", "warn");
+          this.sfx.bossWaveStart();
+        } else if (kind === "charge") {
+          this.ui?.toast("\u{1F480} \uD30C\uAD34\uC790\uAC00 \uB3CC\uC9C4 \uC790\uC138\uB97C \uC7A1\uB294\uB2E4 \u2014 \uAE38\uC744 \uBE44\uCF1C\uB77C!", "warn");
+          this.sfx.bossWaveStart();
+        } else if (kind === "netCast") {
+          this.ui?.toast("\u{1F480} \uD30C\uAD34\uC790\uAC00 \uBB34\uC5B8\uAC00\uB97C \uC900\uBE44\uD55C\uB2E4 \u2014 \uC870\uC2EC!", "warn");
+          this.sfx.bossWaveStart();
+        } else {
+          this.ui?.shake();
+        }
+      };
+      this.enemyMgr.onBossSummon = (e, n) => {
+        this.ui?.toast(`\uC7A1\uC878 ${n}\uB9C8\uB9AC\uAC00 \uD280\uC5B4\uB098\uC654\uB2E4`, "bad");
+        this.fx.burst(e.x, 1.6, e.z, 16733525, 18, 6);
+      };
+      this.enemyMgr.onBossCharge = (e) => {
+        const reach = e.st.radius + 1.4;
+        let hit = null;
+        for (const b of this.buildMgr.buildings.values()) {
+          if (dist(b.x, b.z, e.x, e.z) <= reach) {
+            hit = b;
+            break;
+          }
+        }
+        if (!hit || hit === e._lastCrushed) return;
+        e._lastCrushed = hit;
+        const destroyed = hit.damage(CFG.bossPattern.chargeBuildingDmg);
+        this.fx.burst(hit.x, 1.4, hit.z, 12303291, 10, 5);
+        this.sfx.buildingHit();
+        this.ui?.shake();
+        if (destroyed) {
+          this.fx.burst(hit.x, 1.2, hit.z, 8947848, 16, 6);
+          this.buildMgr.remove(hit.id);
+        }
       };
       this.enemyMgr.onPoisonTick = (e, dmg) => {
         this._hurtEnemy(e, dmg, "poison");
