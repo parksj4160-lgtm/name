@@ -7,7 +7,7 @@ import { PHASE } from './wave.js';
 var $2 = (id) => document.getElementById(id);
 var TUTORIAL_STEPS = [
   "🌳 근처 나무에 다가가 <kbd>F</kbd> 를 꾹 눌러 채집하세요 (바위는 제작대에서 곡괭이를 만들어야 캘 수 있어요)",
-  "<kbd>1</kbd>~<kbd>8</kbd> 로 크리스탈 주변에 벽\xB7타워를 지으세요",
+  "🎒 <kbd>I</kbd> 로 인벤토리를 열어 벽\xB7타워를 골라 크리스탈 주변에 지으세요",
   "준비가 되면 <kbd>Enter</kbd> 로 첫 웨이브를 시작하세요!"
 ];
 export var UI = class {
@@ -29,10 +29,6 @@ export var UI = class {
       poolMode: $2("pool-mode"),
       iron: $2("res-iron"),
       toolRow: $2("tool-row"),
-      station: $2("station"),
-      stationTitle: $2("station-title"),
-      stationDesc: $2("station-desc"),
-      stationList: $2("station-list"),
       crystalFill: $2("crystal-fill"),
       crystalText: $2("crystal-text"),
       crystalWarning: $2("crystal-warning"),
@@ -46,8 +42,13 @@ export var UI = class {
       harvestWrap: $2("harvest-wrap"),
       harvestFill: $2("harvest-fill"),
       prompt: $2("prompt"),
-      buildBar: $2("build-bar"),
       buildHint: $2("build-hint"),
+      invBtn: $2("btn-inv"),
+      invBadge: $2("inv-badge"),
+      inv: $2("inventory"),
+      invTabs: $2("inv-tabs"),
+      invDesc: $2("inv-desc"),
+      invList: $2("inv-list"),
       minimap: $2("minimap"),
       toasts: $2("toasts"),
       fxLayer: $2("fx-layer"),
@@ -60,87 +61,185 @@ export var UI = class {
       tutorialText: $2("tutorial-text")
     };
     this.mm = this.el.minimap.getContext("2d");
-    this._buildSlots();
     this._bindLobby();
     this._bindHud();
     this._bindTouch();
     this._toastTimers = [];
   }
-  // ---------------------------------------------------------------- 건설 바
-  _buildSlots() {
-    const bar = this.el.buildBar;
-    bar.innerHTML = "";
-    this.slots = {};
-    const km = this.game.km;
-    const add = (key, icon, name, sub, action) => {
-      const b = document.createElement("button");
-      b.className = "slot";
-      b.innerHTML = `<span class="hk">${keyLabel(km.get(action))}</span><span class="em">${icon}</span><span class="nm">${name}</span><span class="cs">${sub}</span>`;
-      b.onclick = () => {
-        this.game.sfx.click();
-        this.game.setBuildMode(key);
-      };
-      b.onmouseenter = () => {
-        this.hoverKey = key;
-      };
-      b.onmouseleave = () => {
-        this.hoverKey = null;
-      };
-      bar.appendChild(b);
-      this.slots[key] = b;
-      this.slots[key]._action = action;
+  // ------------------------------------------------------------- 인벤토리
+  // 건설 · 제작 · 장비를 한 창에서 고른다. 예전 하단 단축키 바를 대체한다.
+  openInventory(tab) {
+    if (tab) this._invTab = tab;
+    if (!this._invTab) this._invTab = "build";
+    this.el.inv.classList.remove("hidden");
+    this._invRendered = null;
+    this.refreshInventory();
+  }
+  closeInventory() {
+    this.el.inv.classList.add("hidden");
+  }
+  toggleInventory() {
+    if (this.inventoryOpen) this.closeInventory();
+    else this.openInventory();
+  }
+  get inventoryOpen() {
+    return !this.el.inv.classList.contains("hidden");
+  }
+  // 탭별 항목 목록. 각 항목은 {key, icon, name, desc, cost, state, action}
+  _invRows() {
+    const g2 = this.game;
+    const tab = this._invTab;
+    if (tab === "build") {
+      const rows = Object.entries(CFG.builds).map(([key, def]) => ({
+        key,
+        icon: def.icon,
+        name: def.name,
+        desc: def.desc,
+        cost: def.cost,
+        hotkey: g2.km.get("build:" + key),
+        state: g2.buildMgr?.mode === key ? "active" : canAfford(g2.myPool, def.cost) ? "" : "poor",
+        action: () => {
+          g2.setBuildMode(key);
+          this.closeInventory();
+        }
+      }));
+      for (const [key, icon, name, desc] of [
+        ["upgrade", "⬆️", "업그레이드", "건물을 클릭해 레벨을 올린다"],
+        ["repair", "🔧", "수리", "손상된 만큼만 자원을 쓴다"],
+        ["sell", "🔨", "철거", "투자한 자원의 50%를 돌려받는다"]
+      ]) {
+        rows.push({
+          key,
+          icon,
+          name,
+          desc,
+          cost: null,
+          hotkey: g2.km.get(key),
+          state: g2.buildMgr?.mode === key ? "active" : "",
+          action: () => {
+            g2.setBuildMode(key);
+            this.closeInventory();
+          }
+        });
+      }
+      return rows;
+    }
+    if (tab === "craft") {
+      const rows = Object.entries(CFG.craft).map(([key, r]) => ({
+        key,
+        icon: r.icon,
+        name: r.name,
+        desc: r.desc,
+        cost: r.cost,
+        state: g2.local.tools[key] ? "owned" : !g2.hasStation("workbench") ? "locked" : canAfford(g2.myPool, r.cost) ? "" : "poor",
+        note: g2.local.tools[key] ? "보유 중" : !g2.hasStation("workbench") ? "제작대 필요" : null,
+        action: () => g2.requestCraft(key)
+      }));
+      rows.push({
+        key: "smelt",
+        icon: "⚙️",
+        name: `철 ${CFG.smelt.yield}개 제련`,
+        desc: "광물을 녹인다. 칼\xB7활과 3레벨 업그레이드의 재료.",
+        cost: CFG.smelt.cost,
+        state: !g2.hasStation("furnace") ? "locked" : canAfford(g2.myPool, CFG.smelt.cost) ? "" : "poor",
+        note: !g2.hasStation("furnace") ? "화로 필요" : null,
+        action: () => g2.requestSmelt()
+      });
+      return rows;
+    }
+    // 장비 — 만든 무기를 손에 든다
+    const held = g2.local.heldWeapon;
+    const rows = [{
+      key: "none",
+      icon: "✋",
+      name: "맨손",
+      desc: "무기를 내려놓는다",
+      cost: null,
+      state: held === "default" ? "active" : "",
+      action: () => g2.requestEquip(null)
+    }];
+    for (const [key, r] of Object.entries(CFG.craft)) {
+      if (!r.effect) continue;
+      const owned = !!g2.local.tools[key];
+      rows.push({
+        key,
+        icon: r.icon,
+        name: r.name,
+        desc: r.desc,
+        cost: null,
+        state: !owned ? "locked" : held === key ? "active" : "",
+        note: !owned ? "제작 필요" : held === key ? "손에 든 무기" : null,
+        action: () => g2.requestEquip(key)
+      });
+    }
+    return rows;
+  }
+  refreshInventory() {
+    if (!this.inventoryOpen) return;
+    const rows = this._invRows();
+    const DESC = {
+      build: "지을 것을 고르면 배치 모드가 된다. 좌클릭으로 놓고, 우클릭\xB7Esc 로 취소한다.",
+      craft: "제작대를 지으면 도구와 무기를, 화로를 지으면 철을 만들 수 있다.",
+      gear: "손에 들 무기를 고른다. 든 무기의 효과만 적용된다."
     };
-    for (const [key, def] of Object.entries(CFG.builds)) {
-      add(key, def.icon, def.name, costText(def.cost), "build:" + key);
+    this.el.invDesc.textContent = DESC[this._invTab];
+    for (const t2 of this.el.invTabs.querySelectorAll(".inv-tab")) {
+      t2.classList.toggle("on", t2.dataset.tab === this._invTab);
     }
-    add("upgrade", "⬆️", "업그레이드", "건물 클릭", "upgrade");
-    add("repair", "🔧", "수리", "손상 비례", "repair");
-    add("sell", "🔨", "철거", "50% 환급", "sell");
-    this.repairBadge = document.createElement("span");
-    this.repairBadge.className = "badge hidden";
-    this.slots.repair.appendChild(this.repairBadge);
-  }
-  // 키를 재지정한 뒤 건설 바의 단축키 표시를 갱신한다
-  _refreshSlotHotkeys() {
-    const km = this.game.km;
-    for (const el2 of Object.values(this.slots)) {
-      const hk = el2.querySelector(".hk");
-      if (hk && el2._action) hk.textContent = keyLabel(km.get(el2._action));
+    // 탭이 바뀔 때만 다시 그리고, 그 외에는 상태만 갱신한다
+    if (this._invRendered !== this._invTab) {
+      this.el.invList.innerHTML = "";
+      this._invEls = {};
+      for (const r of rows) {
+        const btn = document.createElement("button");
+        btn.className = "inv-item";
+        btn.innerHTML = `<span class="ii-icon">${r.icon}</span>
+<span class="ii-body"><b>${r.name}</b><span class="ii-desc">${r.desc || ""}</span></span>
+<span class="ii-right"></span>`;
+        btn.onclick = () => {
+          r.action();
+          this.refreshInventory();
+        };
+        this.el.invList.appendChild(btn);
+        this._invEls[r.key] = btn;
+      }
+      this._invRendered = this._invTab;
+    }
+    for (const r of rows) {
+      const btn = this._invEls[r.key];
+      if (!btn) continue;
+      const right = r.note || (r.cost ? costText(r.cost) : r.hotkey ? keyLabel(r.hotkey) : "");
+      btn.querySelector(".ii-right").textContent = right;
+      btn.className = "inv-item" + (r.state ? " " + r.state : "");
+      btn.disabled = r.state === "owned" || r.state === "locked" || r.state === "poor";
     }
   }
+  // 하단 안내문 + 인벤토리 버튼 배지 (예전 건설 바가 하던 일)
   refreshBuildBar() {
     const g2 = this.game;
-    const pool = g2.myPool;
-    for (const [key, el2] of Object.entries(this.slots)) {
-      const active = g2.buildMgr?.mode === key;
-      el2.classList.toggle("active", active);
-      const def = CFG.builds[key];
-      el2.classList.toggle("poor", !!def && !canAfford(pool, def.cost));
-    }
     const damaged = [...g2.buildMgr?.buildings.values() || []].filter((b) => b.hp < b.maxHp).length;
-    this.repairBadge.textContent = String(damaged);
-    this.repairBadge.classList.toggle("hidden", damaged === 0);
+    this.el.invBadge.textContent = String(damaged);
+    this.el.invBadge.classList.toggle("hidden", damaged === 0);
+    this.refreshInventory();
     const mode = g2.buildMgr?.mode;
-    if (this.hoverKey && CFG.builds[this.hoverKey]) {
-      this.el.buildHint.innerHTML = this._buildSpec(this.hoverKey);
-      return;
-    }
     if (!mode) {
       this.el.buildHint.textContent = "";
-    } else if (CFG.builds[mode]) {
-      this.el.buildHint.textContent = `${CFG.builds[mode].name}: ${CFG.builds[mode].desc} — 좌클릭 배치 / 우클릭\xB7Esc 취소`;
+      return;
+    }
+    if (CFG.builds[mode]) {
+      this.el.buildHint.innerHTML = `${this._buildSpec(mode)} — 좌클릭 배치 / 우클릭\xB7Esc 취소`;
+      return;
+    }
+    const hovered = g2.buildMgr?.hover;
+    const detail = hovered ? this._hoverDetail(mode, hovered) : null;
+    if (detail) {
+      this.el.buildHint.innerHTML = detail;
+    } else if (mode === "upgrade") {
+      this.el.buildHint.textContent = "업그레이드할 건물을 클릭하세요 (벽은 내구도, 타워는 공격력\xB7사거리 상승)";
+    } else if (mode === "repair") {
+      this.el.buildHint.textContent = "수리할 건물을 클릭하세요 (손상된 비율만큼 자원 소모, 완전 파괴 재건축보다 저렴)";
     } else {
-      const hovered = g2.buildMgr?.hover;
-      const detail = hovered ? this._hoverDetail(mode, hovered) : null;
-      if (detail) {
-        this.el.buildHint.innerHTML = detail;
-      } else if (mode === "upgrade") {
-        this.el.buildHint.textContent = "업그레이드할 건물을 클릭하세요 (벽은 내구도, 타워는 공격력\xB7사거리 상승)";
-      } else if (mode === "repair") {
-        this.el.buildHint.textContent = "수리할 건물을 클릭하세요 (손상된 비율만큼 자원 소모, 완전 파괴 재건축보다 저렴)";
-      } else {
-        this.el.buildHint.textContent = "철거할 건물을 클릭하세요 (투자 자원의 50% 환급)";
-      }
+      this.el.buildHint.textContent = "철거할 건물을 클릭하세요 (투자 자원의 50% 환급)";
     }
   }
   // 건설 바에서 가리킨 건물의 Lv.1 성능을 한 줄로 만든다
@@ -326,15 +425,30 @@ export var UI = class {
     const g2 = this.game;
     this.el.waveBtn.onclick = () => g2.requestStartWave();
     this.el.hupBtn.onclick = () => g2.requestHarvestUpgrade();
-    $2("station-close").onclick = () => this.closeStation();
+    this.el.invBtn.onclick = () => {
+      g2.sfx.click();
+      this.toggleInventory();
+    };
+    $2("inv-close").onclick = () => this.closeInventory();
+    for (const t2 of this.el.invTabs.querySelectorAll(".inv-tab")) {
+      t2.onclick = () => {
+        g2.sfx.click();
+        this.openInventory(t2.dataset.tab);
+      };
+    }
     $2("btn-help").onclick = () => this.el.help.classList.toggle("hidden");
     $2("tutorial-skip").onclick = () => this._endTutorial();
     addEventListener("keydown", (e) => {
       if (e.target.closest("input")) return;
       if (this._listeningFor) return;
       const k2 = e.key.toLowerCase();
-      if (k2 === "escape" && this.stationOpen) {
-        this.closeStation();
+      if (k2 === "escape" && this.inventoryOpen) {
+        this.closeInventory();
+        return;
+      }
+      if (k2 === g2.km.get("inventory")) {
+        g2.sfx.click();
+        this.toggleInventory();
         return;
       }
       if (k2 === g2.km.get("help")) this.el.help.classList.toggle("hidden");
@@ -355,7 +469,8 @@ export var UI = class {
     $2("keybind-reset").onclick = () => {
       this.game.km.reset();
       this._refreshRebindLabels();
-      this._refreshSlotHotkeys();
+      this._invRendered = null;
+      this.refreshInventory();
       this.toast("키를 기본값으로 되돌렸다", "good");
     };
     const cbBox = $2("chk-colorblind");
@@ -414,7 +529,8 @@ export var UI = class {
       }
       finish();
       this._refreshRebindLabels();
-      this._refreshSlotHotkeys();
+      this._invRendered = null;
+      this.refreshInventory();
     };
     addEventListener("keydown", onKey, true);
   }
@@ -502,13 +618,13 @@ export var UI = class {
     this.el.lobby.classList.add("hidden");
     this.el.result.classList.add("hidden");
     this.el.pauseOverlay.classList.add("hidden");
-    this._station = null;
-    this._stationRows = null;
+    this._invTab = "build";
+    this._invRendered = null;
     this._crystalWarned = false;
     this.el.crystalWarning.classList.add("hidden");
-    this.el.station.classList.add("hidden");
+    this.closeInventory();
     this.refreshBuildBar();
-    if (!resumed) this.toast("크리스탈을 지켜라! F로 채집, 1~8로 건설", "good");
+    if (!resumed) this.toast("크리스탈을 지켜라! F로 채집, I로 인벤토리", "good");
     if (resumed || localStorage.getItem("cd.tutorialDone")) {
       this.el.tutorial.classList.add("hidden");
       this._tutStep = -1;
@@ -526,80 +642,10 @@ export var UI = class {
     this.el.tutorial.classList.add("hidden");
     localStorage.setItem("cd.tutorialDone", "1");
   }
-  // ------------------------------------------------ 제작대 / 화로 작업창
-  openStation(kind) {
-    this._station = kind;
-    this.el.station.classList.remove("hidden");
-    this._renderStation();
-  }
-  closeStation() {
-    this._station = null;
-    this.el.station.classList.add("hidden");
-  }
-  get stationOpen() {
-    return !!this._station;
-  }
-  _renderStation() {
-    const g2 = this.game;
-    const pool = g2.myPool;
-    const rows = [];
-    if (this._station === "craft") {
-      this.el.stationTitle.textContent = "🪚 제작대";
-      this.el.stationDesc.textContent = "도구와 무기를 만든다. 하나씩만 가질 수 있다.";
-      for (const [key, r] of Object.entries(CFG.craft)) {
-        rows.push({
-          key,
-          icon: r.icon,
-          name: r.name,
-          desc: r.desc,
-          cost: r.cost,
-          owned: !!g2.local.tools[key],
-          action: () => g2.requestCraft(key)
-        });
-      }
-    } else {
-      const y2 = CFG.smelt.yield;
-      this.el.stationTitle.textContent = "🔥 화로";
-      this.el.stationDesc.textContent = "광물을 녹여 철을 만든다. 철은 무기 재료다.";
-      rows.push({
-        key: "smelt",
-        icon: "⚙️",
-        name: `철 ${y2}개 제련`,
-        desc: "제작대에서 칼\xB7활을 만들 때 쓴다.",
-        cost: CFG.smelt.cost,
-        owned: false,
-        action: () => g2.requestSmelt()
-      });
-    }
-    if (this._stationRows !== this._station) {
-      this.el.stationList.innerHTML = "";
-      this._rowEls = {};
-      for (const r of rows) {
-        const btn = document.createElement("button");
-        btn.className = "station-item";
-        btn.innerHTML = `<span class="si-icon">${r.icon}</span>
-<span class="si-body"><b>${r.name}</b><span class="si-desc">${r.desc}</span></span>
-<span class="si-cost"></span>`;
-        btn.onclick = r.action;
-        this.el.stationList.appendChild(btn);
-        this._rowEls[r.key] = btn;
-      }
-      this._stationRows = this._station;
-    }
-    for (const r of rows) {
-      const btn = this._rowEls[r.key];
-      if (!btn) continue;
-      const afford = canAfford(pool, r.cost);
-      btn.querySelector(".si-cost").textContent = r.owned ? "보유 중" : costText(r.cost);
-      btn.classList.toggle("owned", r.owned);
-      btn.classList.toggle("poor", !r.owned && !afford);
-      btn.disabled = r.owned || !afford;
-    }
-  }
   _refreshTools() {
     const t2 = this.game.local.tools;
     const owned = Object.keys(CFG.craft).filter((k2) => t2[k2]);
-    this.el.toolRow.innerHTML = owned.length ? owned.map((k2) => `<span class="tool" title="${CFG.craft[k2].name}">${CFG.craft[k2].icon}</span>`).join("") : `<span class="dim">제작대에서 도구를 만드세요</span>`;
+    this.el.toolRow.innerHTML = owned.length ? owned.map((k2) => `<span class="tool" title="${CFG.craft[k2].name}">${CFG.craft[k2].icon}</span>`).join("") : `<span class="dim">제작대를 짓고 인벤토리에서 제작</span>`;
   }
   // 채집 → 건설 → 웨이브 시작 진행에 맞춰 튜토리얼 단계를 넘긴다
   _updateTutorial() {
@@ -705,13 +751,6 @@ export var UI = class {
     this.el.hupBtn.disabled = !nextUp || !canAfford(pool, nextUp.cost);
     this.el.iron.textContent = Math.floor(pool.iron || 0);
     this._refreshTools();
-    if (this._station) {
-      const near2 = [...g2.buildMgr.buildings.values()].some(
-        (b) => b.stationKind === this._station && !b.dead && dist(g2.local.x, g2.local.z, b.x, b.z) <= CFG.station.range
-      );
-      if (near2) this._renderStation();
-      else this.closeStation();
-    }
     const c2 = g2.world.crystal;
     const ratio = clamp(c2.hp / c2.maxHp, 0, 1);
     this.el.crystalFill.style.transform = `scaleX(${ratio})`;

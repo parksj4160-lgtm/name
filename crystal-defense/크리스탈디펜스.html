@@ -123,31 +123,22 @@ button.go:disabled { opacity: 0.4; cursor: not-allowed; }
 #player-panel { left: 14px; bottom: 92px; width: 220px; display: flex; flex-direction: column; gap: 6px; }
 .prompt { font-size: 12px; color: var(--warn); }
 
-/* ---------- 건설 바 ---------- */
-#build-bar {
+/* ---------- 인벤토리 열기 버튼 ---------- */
+.inv-open {
   position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%);
-  display: flex; gap: 8px; z-index: 5;
+  display: flex; align-items: center; gap: 8px; z-index: 5;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+  padding: 10px 18px; cursor: pointer; color: var(--text); font: inherit; font-size: 14px;
+  backdrop-filter: blur(8px); box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+  transition: transform 0.08s, border-color 0.12s;
 }
-.slot {
-  position: relative; width: 96px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
-  padding: 8px 6px; cursor: pointer; text-align: center; color: var(--text);
-  backdrop-filter: blur(8px); transition: transform 0.08s, border-color 0.12s;
-  font-family: inherit;
-}
-.slot:hover { transform: translateY(-2px); }
-.slot.active { border-color: var(--cyan); box-shadow: 0 0 0 1px var(--cyan), 0 0 22px rgba(95,212,255,0.35); }
-.slot.poor { opacity: 0.5; }
-.slot .em { font-size: 20px; display: block; }
-.slot .nm { font-size: 12px; font-weight: 700; display: block; }
-.slot .cs { font-size: 11px; color: var(--dim); display: block; margin-top: 2px; }
-.slot .hk {
-  position: absolute; top: 4px; right: 6px; font-size: 10px; color: var(--dim);
-  background: rgba(255,255,255,0.1); border-radius: 4px; padding: 0 4px;
-}
-.slot .badge {
-  position: absolute; top: 4px; left: 6px; min-width: 15px; height: 15px; line-height: 15px;
-  border-radius: 8px; background: var(--bad); color: #fff; font-size: 10px; font-weight: 700;
-  text-align: center; padding: 0 3px;
+.inv-open:hover { transform: translateX(-50%) translateY(-2px); border-color: var(--cyan); }
+.inv-open .ico { font-size: 20px; line-height: 1; }
+.inv-open .lbl { font-weight: 700; }
+.inv-open .badge {
+  min-width: 17px; height: 17px; line-height: 17px; border-radius: 9px;
+  background: var(--bad); color: #fff; font-size: 11px; font-weight: 700;
+  text-align: center; padding: 0 4px;
 }
 .hint {
   position: fixed; left: 50%; bottom: 104px; transform: translateX(-50%);
@@ -308,36 +299,47 @@ button.ghost { background: transparent; color: var(--dim); }
   min-height: 20px; margin-top: 2px; font-size: 11px;
 }
 .tools .tool { font-size: 16px; line-height: 1.2; }
-.station {
+.inv {
   left: 50%; top: 50%; transform: translate(-50%, -50%);
-  width: min(420px, 92vw); max-height: 76vh; overflow-y: auto;
+  width: min(460px, 94vw); max-height: 78vh;
   display: flex; flex-direction: column; gap: 10px;
   padding: 16px 18px; z-index: 30; animation: pop 0.2s ease-out;
 }
-.station-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.station-head h3 { margin: 0; font-size: 17px; }
-.station > p { font-size: 12px; margin: 0; }
-.station-list { display: flex; flex-direction: column; gap: 8px; }
-.station-item {
+.inv-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.inv-head h3 { margin: 0; font-size: 17px; flex: 0 0 auto; }
+.inv-head .mini { margin-top: 0; margin-left: auto; }
+.inv-tabs { display: flex; gap: 4px; }
+.inv-tab {
+  background: rgba(255,255,255,0.06); border: 1px solid var(--line); color: var(--dim);
+  border-radius: 8px; padding: 5px 12px; cursor: pointer; font: inherit; font-size: 12px;
+}
+.inv-tab:hover { color: var(--text); }
+.inv-tab.on { background: rgba(95,212,255,0.18); border-color: var(--cyan); color: var(--text); font-weight: 700; }
+.inv > p { font-size: 12px; margin: 0; }
+.inv-list { display: flex; flex-direction: column; gap: 8px; overflow-y: auto; padding-right: 2px; }
+.inv-item {
   display: flex; align-items: center; gap: 12px; width: 100%; text-align: left;
   background: rgba(255,255,255,0.05); color: var(--text);
   border: 1px solid var(--line); border-radius: 10px;
   padding: 10px 12px; cursor: pointer; font: inherit;
   transition: background 0.12s, border-color 0.12s;
 }
-.station-item:hover:not(:disabled) { background: rgba(95,212,255,0.16); border-color: var(--cyan); }
-.station-item:disabled { cursor: not-allowed; opacity: 0.75; }
-.station-item .si-icon { font-size: 22px; line-height: 1; flex: 0 0 auto; }
-.station-item .si-body { display: flex; flex-direction: column; gap: 2px; flex: 1 1 auto; min-width: 0; }
-.station-item .si-body b { font-size: 14px; }
-.station-item .si-desc { font-size: 11px; color: var(--dim); }
-.station-item .si-cost {
+.inv-item:hover:not(:disabled) { background: rgba(95,212,255,0.16); border-color: var(--cyan); }
+.inv-item:disabled { cursor: not-allowed; opacity: 0.65; }
+.inv-item .ii-icon { font-size: 22px; line-height: 1; flex: 0 0 auto; width: 26px; text-align: center; }
+.inv-item .ii-body { display: flex; flex-direction: column; gap: 2px; flex: 1 1 auto; min-width: 0; }
+.inv-item .ii-body b { font-size: 14px; }
+.inv-item .ii-desc { font-size: 11px; color: var(--dim); }
+.inv-item .ii-right {
   flex: 0 0 auto; font-size: 12px; font-variant-numeric: tabular-nums;
   white-space: nowrap; color: var(--text);
 }
-.station-item.poor .si-cost { color: var(--bad); }
-.station-item.owned { border-color: rgba(124,230,160,0.45); }
-.station-item.owned .si-cost { color: var(--good); }
+.inv-item.poor .ii-right { color: var(--bad); }
+.inv-item.locked .ii-right { color: var(--warn); }
+.inv-item.owned { border-color: rgba(124,230,160,0.45); }
+.inv-item.owned .ii-right { color: var(--good); }
+.inv-item.active { border-color: var(--cyan); box-shadow: 0 0 0 1px var(--cyan) inset; }
+.inv-item.active .ii-right { color: var(--cyan); }
 
 /* ---------- 도움말 ---------- */
 button.corner {
@@ -381,21 +383,6 @@ button.corner.mute.off { opacity: 0.5; }
   75% { transform: translate(3px, 5px); }
 }
 
-/* ---------- 건설 바가 화면보다 넓어지는 폭 (슬롯 10개 ≈ 1032px) ----------
-   가로 스크롤로 바꿔 주지 않으면 양 끝 슬롯이 화면 밖으로 잘려 누를 수 없다.
-   가로 모드 휴대폰이나 창을 줄인 데스크톱이 여기에 걸린다. */
-@media (max-width: 1060px) {
-  #build-bar {
-    left: 10px; right: 10px; transform: none;
-    justify-content: flex-start;
-    justify-content: safe center;   /* 다 들어가면 가운데, 넘치면 왼쪽부터 */
-    overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none;
-    padding-bottom: 2px;
-  }
-  #build-bar::-webkit-scrollbar { display: none; }
-  #build-bar .slot { flex: 0 0 auto; }
-}
-
 @media (max-width: 780px) {
   #party-panel, #help, button.corner:not(.mute) { display: none; }
   /* 파티 패널이 사라진 우상단 자리를 음소거 버튼이 대신 쓴다 (터치에는 M 단축키가 없다) */
@@ -420,19 +407,9 @@ button.corner.mute.off { opacity: 0.5; }
   #player-panel { left: 10px; bottom: 236px; width: 42vw; gap: 4px; }
   .prompt { font-size: 11px; }
 
-  /* 건설 바: 슬롯이 화면보다 넓으므로 가로 스크롤로 전부 닿게 한다 */
-  #build-bar {
-    left: 8px; right: 8px; bottom: 116px; transform: none;
-    justify-content: flex-start; max-width: none;
-    overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none;
-    padding-bottom: 2px; gap: 6px;
-  }
-  #build-bar::-webkit-scrollbar { display: none; }
-  .slot { width: 62px; flex: 0 0 auto; padding: 6px 3px; }
-  .slot .em { font-size: 17px; }
-  .slot .nm { font-size: 10px; }
-  .slot .cs { font-size: 9px; }
-  .hint { bottom: 186px; max-width: 92vw; font-size: 11px; }
+  /* 인벤토리 버튼은 터치 조작 위로 올린다 */
+  .inv-open { bottom: 116px; padding: 8px 14px; font-size: 13px; }
+  .hint { bottom: 168px; max-width: 92vw; font-size: 11px; }
 
   /* 좁은 화면에서는 튜토리얼이 시야를 크게 가리므로 한 단계 작게 만든다 */
   .tutorial { left: 8px; right: 108px; top: 300px; bottom: auto; width: auto; max-width: none; padding: 7px 9px; gap: 5px; }
@@ -457,8 +434,9 @@ button.corner.mute.off { opacity: 0.5; }
   button.corner.mute { top: 8px; right: 8px; }
 
   #toasts { top: 190px; }
-  .station { width: 94vw; padding: 12px 14px; }
-  .station-item .si-desc { display: none; }
+  .inv { width: 94vw; padding: 12px 14px; max-height: 72vh; }
+  .inv-item .ii-desc { display: none; }
+  .inv-head h3 { font-size: 15px; }
   .tutorial { top: 178px; right: 8px; padding: 6px 8px; }
   .tutorial span { font-size: 11px; line-height: 1.35; }
   .tutorial button { font-size: 10px; padding: 3px 6px; }
@@ -511,9 +489,14 @@ button.corner.mute.off { opacity: 0.5; }
     <div id="prompt" class="prompt hidden"></div>
   </div>
 
-  <!-- 하단 중앙: 건설 바 -->
-  <div id="build-bar"></div>
+  <!-- 하단 중앙: 배치/모드 안내 -->
   <div id="build-hint" class="hint"></div>
+
+  <!-- 인벤토리 열기 -->
+  <button id="btn-inv" class="inv-open">
+    <span class="ico">🎒</span><span class="lbl">인벤토리 <kbd>I</kbd></span>
+    <span id="inv-badge" class="badge hidden"></span>
+  </button>
 
   <!-- 우하단: 미니맵 -->
   <canvas id="minimap" width="200" height="200"></canvas>
@@ -526,14 +509,19 @@ button.corner.mute.off { opacity: 0.5; }
     <button id="tutorial-skip" class="mini">건너뛰기</button>
   </div>
 
-  <!-- 제작대 / 화로 작업창 (시설을 클릭하면 열린다) -->
-  <div id="station" class="panel station hidden">
-    <div class="station-head">
-      <h3 id="station-title">제작대</h3>
-      <button id="station-close" class="mini">닫기 <kbd>Esc</kbd></button>
+  <!-- 인벤토리 — 건설 · 제작 · 장비를 한곳에서 (I 키 또는 시설 클릭) -->
+  <div id="inventory" class="panel inv hidden">
+    <div class="inv-head">
+      <h3>🎒 인벤토리</h3>
+      <div class="inv-tabs" id="inv-tabs">
+        <button type="button" class="inv-tab" data-tab="build">건설</button>
+        <button type="button" class="inv-tab" data-tab="craft">제작</button>
+        <button type="button" class="inv-tab" data-tab="gear">장비</button>
+      </div>
+      <button id="inv-close" class="mini">닫기 <kbd>Esc</kbd></button>
     </div>
-    <p id="station-desc" class="dim"></p>
-    <div id="station-list" class="station-list"></div>
+    <p id="inv-desc" class="dim"></p>
+    <div id="inv-list" class="inv-list"></div>
   </div>
 
   <!-- 모바일 컨트롤 -->
@@ -554,9 +542,10 @@ button.corner.mute.off { opacity: 0.5; }
       <tr><td>이동</td><td><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> / 방향키 (<kbd>Shift</kbd> 달리기)</td></tr>
       <tr><td>채집</td><td>나무 근처에서 <kbd class="rebind" data-action="harvest">F</kbd> 꾹 누르기 (바위는 곡괭이 필요)</td></tr>
       <tr><td>공격</td><td>좌클릭 또는 <kbd class="rebind" data-action="attack">Space</kbd></td></tr>
-      <tr><td>건설</td><td><kbd class="rebind" data-action="build:wall">1</kbd> 벽 · <kbd class="rebind" data-action="build:arrow">2</kbd> 화살탑 · <kbd class="rebind" data-action="build:frost">3</kbd> 서리탑 · <kbd class="rebind" data-action="build:cannon">4</kbd> 대포탑 · <kbd class="rebind" data-action="build:poison">5</kbd> 독탑 · <kbd class="rebind" data-action="build:support">6</kbd> 보루 · <kbd class="rebind" data-action="build:workbench">7</kbd> 제작대 · <kbd class="rebind" data-action="build:furnace">8</kbd> 화로 → 좌클릭 배치</td></tr>
-      <tr><td>제작대 🪚</td><td>가까이 다가가 <b>클릭</b>하면 제작창이 열린다 — ⛏️ 곡괭이(정수석 채집) · 🗡️ 칼(공격력 +12) · 🏹 활(사거리 +2.4)</td></tr>
-      <tr><td>화로 🔥</td><td>가까이 다가가 <b>클릭</b>하면 광물을 녹여 ⚙️ 철을 얻는다. 철은 칼·활의 재료다.</td></tr>
+      <tr><td>인벤토리</td><td><kbd class="rebind" data-action="inventory">I</kbd> — 건설 · 제작 · 장비를 여기서 전부 고른다</td></tr>
+      <tr><td>건설</td><td>인벤토리 <b>건설</b> 탭에서 고르면 배치 모드가 된다 → 좌클릭으로 배치</td></tr>
+      <tr><td>제작</td><td><b>제작대</b>를 지으면 인벤토리 <b>제작</b> 탭에서 ⛏️ 곡괭이 · 🗡️ 칼 · 🏹 활을 만든다. <b>화로</b>를 지으면 광물을 녹여 ⚙️ 철을 얻는다</td></tr>
+      <tr><td>무기 장착</td><td>인벤토리 <b>장비</b> 탭에서 고르면 그 무기를 손에 든다 (다시 누르면 맨손)</td></tr>
       <tr><td>몬스터</td><td>🧙 주술사는 벽을 무시하고 멀리서 크리스탈을 저격 · 🪓 약탈자는 가장 가까운 건물로 직행해 부순다 · 💀 보스는 5웨이브마다 등장</td></tr>
       <tr><td>업그레이드</td><td><kbd class="rebind" data-action="upgrade">U</kbd> 후 건물 클릭</td></tr>
       <tr><td>수리</td><td><kbd class="rebind" data-action="repair">G</kbd> 후 건물 클릭 (손상 비례 자원 소모)</td></tr>
@@ -12015,6 +12004,7 @@ button.corner.mute.off { opacity: 0.5; }
 
   // js/keymap.js
   var DEFAULTS = {
+    inventory: "i",
     harvest: "f",
     attack: " ",
     upgrade: "u",
@@ -12028,6 +12018,7 @@ button.corner.mute.off { opacity: 0.5; }
     mute: "m"
   };
   var LABELS = {
+    inventory: "\uC778\uBCA4\uD1A0\uB9AC",
     harvest: "\uCC44\uC9D1",
     attack: "\uACF5\uACA9",
     upgrade: "\uC5C5\uADF8\uB808\uC774\uB4DC \uBAA8\uB4DC",
@@ -12326,6 +12317,7 @@ button.corner.mute.off { opacity: 0.5; }
       this.res = { wood: 40, stone: 20 };
       this.shards = 0;
       this.tools = {};
+      this.equipped = null;
       this.harvestLv = 1;
       this.harvesting = null;
       this.attackCd = 0;
@@ -12374,16 +12366,12 @@ button.corner.mute.off { opacity: 0.5; }
     get hasPickaxe() {
       return !!this.tools.pickaxe;
     }
-    // 기본 공격치에 제작한 무기 효과를 더한 값
+    // 기본 공격치에 지금 손에 든 무기의 효과만 더한다 (여러 자루를 동시에 들 수는 없다)
     get attackStats() {
       const base = CFG.player.attack;
       const out = { dmg: base.dmg, range: base.range, arc: base.arc, cd: base.cd };
-      for (const key of Object.keys(this.tools)) {
-        if (!this.tools[key]) continue;
-        const eff = CFG.craft[key]?.effect;
-        if (!eff) continue;
-        for (const k2 of Object.keys(eff)) out[k2] += eff[k2];
-      }
+      const eff = CFG.craft[this.heldWeapon]?.effect;
+      if (eff) for (const k2 of Object.keys(eff)) out[k2] += eff[k2];
       return out;
     }
     damage(amount) {
@@ -12410,9 +12398,15 @@ button.corner.mute.off { opacity: 0.5; }
     cancelHarvest() {
       this.harvesting = null;
     }
-    // 제작한 무기에 맞춰 손에 든 도구의 모양을 바꾼다 (칼 > 활 > 기본 순으로 우선)
+    // 인벤토리에서 고른 무기를 손에 든다.
+    // "none" 은 맨손을 직접 고른 것이고, 아무것도 고르지 않았으면 칼 > 활 순으로 자동
+    get heldWeapon() {
+      if (this.equipped === "none") return "default";
+      if (this.equipped && this.tools[this.equipped]) return this.equipped;
+      return this.tools.sword ? "sword" : this.tools.bow ? "bow" : "default";
+    }
     _updateWeapon() {
-      const key = this.tools.sword ? "sword" : this.tools.bow ? "bow" : "default";
+      const key = WEAPON_LOOK[this.heldWeapon] ? this.heldWeapon : "default";
       if (key === this._weaponKey) return;
       this._weaponKey = key;
       const look = WEAPON_LOOK[key];
@@ -12564,6 +12558,12 @@ button.corner.mute.off { opacity: 0.5; }
       this.hp = s2.hp;
       this.alive = s2.alive;
       this.harvesting = s2.harvesting ? { t: 0, need: 1 } : null;
+      if (s2.held) {
+        this.tools[s2.held] = true;
+        this.equipped = s2.held;
+      } else {
+        this.equipped = null;
+      }
       if (s2.swing) this.swing = 1;
       this.mesh.rotation.z = s2.alive ? 0 : Math.PI / 2;
     }
@@ -13558,18 +13558,27 @@ button.corner.mute.off { opacity: 0.5; }
       if (playerId === this.local.id) this.sfx.upgrade();
       else this.net.send("hupOk", { to: playerId, lv: p2.harvestLv });
     }
-    // 시설을 클릭했을 때 — 너무 멀면 안내만 하고 열지 않는다
+    // 제작대·화로를 클릭하면 인벤토리의 제작 탭이 열린다 (인벤토리에서 바로 열어도 된다)
     tryOpenStation(b) {
-      if (dist(this.local.x, this.local.z, b.x, b.z) > CFG.station.range) {
-        this.ui?.toast(`${b.def.name}\uC5D0 \uB354 \uAC00\uAE4C\uC774 \uAC00\uC138\uC694`, "warn");
-        return;
-      }
       this.sfx.click();
-      this.ui?.openStation(b.stationKind);
+      this.ui?.openInventory("craft");
     }
     // 팀에 해당 시설이 세워져 있는지
     hasStation(key) {
       return [...this.buildMgr.buildings.values()].some((b) => b.key === key && !b.dead);
+    }
+    // 인벤토리에서 무기를 손에 든다. 순전히 내 캐릭터 상태라 호스트 승인이 필요 없다.
+    // key 가 null 이면 맨손을 직접 고른 것 — 칼이 있어도 도로 들지 않는다.
+    requestEquip(key) {
+      const p2 = this.local;
+      if (key && !p2.tools[key]) {
+        this.ui?.toast("\uC544\uC9C1 \uB9CC\uB4E4\uC9C0 \uC54A\uC740 \uBB34\uAE30\uC785\uB2C8\uB2E4", "bad");
+        return;
+      }
+      p2.equipped = key || "none";
+      this.sfx.click();
+      const held = CFG.craft[p2.heldWeapon];
+      this.ui?.toast(held ? `${held.name}\uC744(\uB97C) \uB4E4\uC5C8\uB2E4` : "\uB9E8\uC190\uC774 \uB418\uC5C8\uB2E4", "good");
     }
     requestCraft(key) {
       if (this.isHost) this.hostCraft(this.local.id, key);
@@ -13799,7 +13808,7 @@ button.corner.mute.off { opacity: 0.5; }
     _snapshot() {
       const players = {};
       for (const p2 of this.players.values()) {
-        players[p2.id] = { hv: p2.harvestLv, tl: Object.keys(p2.tools).filter((k2) => p2.tools[k2]) };
+        players[p2.id] = { hv: p2.harvestLv, tl: Object.keys(p2.tools).filter((k2) => p2.tools[k2]), eq: p2.equipped || null };
       }
       return {
         e: this.enemyMgr.snapshot(),
@@ -13833,6 +13842,7 @@ button.corner.mute.off { opacity: 0.5; }
           p2.harvestLv = pd2.hv;
           p2.tools = {};
           for (const k2 of pd2.tl || []) p2.tools[k2] = true;
+          if (p2 !== this.local) p2.equipped = pd2.eq || null;
         }
       }
       if (this.wave.phase === PHASE.LOST && !this.result) {
@@ -13960,6 +13970,7 @@ button.corner.mute.off { opacity: 0.5; }
           hp: Math.round(l2.hp),
           alive: l2.alive,
           harvesting: !!l2.harvesting,
+          held: l2.heldWeapon === "default" ? null : l2.heldWeapon,
           swing: l2.swing > 0.7
         });
       }
@@ -14028,6 +14039,7 @@ button.corner.mute.off { opacity: 0.5; }
         this.local.harvestLv = savedPlayer.hv;
         this.local.tools = {};
         for (const k2 of savedPlayer.tl || []) this.local.tools[k2] = true;
+        this.local.equipped = savedPlayer.eq || null;
       }
       if (save.stats) this.stats = save.stats;
       this.ui?.toast(`\uC774\uC5B4\uD558\uAE30 \u2014 \uC6E8\uC774\uBE0C ${this.wave.displayWave}`, "good");
@@ -14041,7 +14053,7 @@ button.corner.mute.off { opacity: 0.5; }
   var $2 = (id) => document.getElementById(id);
   var TUTORIAL_STEPS = [
     "\u{1F333} \uADFC\uCC98 \uB098\uBB34\uC5D0 \uB2E4\uAC00\uAC00 <kbd>F</kbd> \uB97C \uAFB9 \uB20C\uB7EC \uCC44\uC9D1\uD558\uC138\uC694 (\uBC14\uC704\uB294 \uC81C\uC791\uB300\uC5D0\uC11C \uACE1\uAD2D\uC774\uB97C \uB9CC\uB4E4\uC5B4\uC57C \uCE98 \uC218 \uC788\uC5B4\uC694)",
-    "<kbd>1</kbd>~<kbd>8</kbd> \uB85C \uD06C\uB9AC\uC2A4\uD0C8 \uC8FC\uBCC0\uC5D0 \uBCBD\xB7\uD0C0\uC6CC\uB97C \uC9C0\uC73C\uC138\uC694",
+    "\u{1F392} <kbd>I</kbd> \uB85C \uC778\uBCA4\uD1A0\uB9AC\uB97C \uC5F4\uC5B4 \uBCBD\xB7\uD0C0\uC6CC\uB97C \uACE8\uB77C \uD06C\uB9AC\uC2A4\uD0C8 \uC8FC\uBCC0\uC5D0 \uC9C0\uC73C\uC138\uC694",
     "\uC900\uBE44\uAC00 \uB418\uBA74 <kbd>Enter</kbd> \uB85C \uCCAB \uC6E8\uC774\uBE0C\uB97C \uC2DC\uC791\uD558\uC138\uC694!"
   ];
   var UI = class {
@@ -14063,10 +14075,6 @@ button.corner.mute.off { opacity: 0.5; }
         poolMode: $2("pool-mode"),
         iron: $2("res-iron"),
         toolRow: $2("tool-row"),
-        station: $2("station"),
-        stationTitle: $2("station-title"),
-        stationDesc: $2("station-desc"),
-        stationList: $2("station-list"),
         crystalFill: $2("crystal-fill"),
         crystalText: $2("crystal-text"),
         crystalWarning: $2("crystal-warning"),
@@ -14080,8 +14088,13 @@ button.corner.mute.off { opacity: 0.5; }
         harvestWrap: $2("harvest-wrap"),
         harvestFill: $2("harvest-fill"),
         prompt: $2("prompt"),
-        buildBar: $2("build-bar"),
         buildHint: $2("build-hint"),
+        invBtn: $2("btn-inv"),
+        invBadge: $2("inv-badge"),
+        inv: $2("inventory"),
+        invTabs: $2("inv-tabs"),
+        invDesc: $2("inv-desc"),
+        invList: $2("inv-list"),
         minimap: $2("minimap"),
         toasts: $2("toasts"),
         fxLayer: $2("fx-layer"),
@@ -14094,87 +14107,183 @@ button.corner.mute.off { opacity: 0.5; }
         tutorialText: $2("tutorial-text")
       };
       this.mm = this.el.minimap.getContext("2d");
-      this._buildSlots();
       this._bindLobby();
       this._bindHud();
       this._bindTouch();
       this._toastTimers = [];
     }
-    // ---------------------------------------------------------------- 건설 바
-    _buildSlots() {
-      const bar = this.el.buildBar;
-      bar.innerHTML = "";
-      this.slots = {};
-      const km = this.game.km;
-      const add = (key, icon, name, sub, action) => {
-        const b = document.createElement("button");
-        b.className = "slot";
-        b.innerHTML = `<span class="hk">${keyLabel(km.get(action))}</span><span class="em">${icon}</span><span class="nm">${name}</span><span class="cs">${sub}</span>`;
-        b.onclick = () => {
-          this.game.sfx.click();
-          this.game.setBuildMode(key);
-        };
-        b.onmouseenter = () => {
-          this.hoverKey = key;
-        };
-        b.onmouseleave = () => {
-          this.hoverKey = null;
-        };
-        bar.appendChild(b);
-        this.slots[key] = b;
-        this.slots[key]._action = action;
+    // ------------------------------------------------------------- 인벤토리
+    // 건설 · 제작 · 장비를 한 창에서 고른다. 예전 하단 단축키 바를 대체한다.
+    openInventory(tab) {
+      if (tab) this._invTab = tab;
+      if (!this._invTab) this._invTab = "build";
+      this.el.inv.classList.remove("hidden");
+      this._invRendered = null;
+      this.refreshInventory();
+    }
+    closeInventory() {
+      this.el.inv.classList.add("hidden");
+    }
+    toggleInventory() {
+      if (this.inventoryOpen) this.closeInventory();
+      else this.openInventory();
+    }
+    get inventoryOpen() {
+      return !this.el.inv.classList.contains("hidden");
+    }
+    // 탭별 항목 목록. 각 항목은 {key, icon, name, desc, cost, state, action}
+    _invRows() {
+      const g2 = this.game;
+      const tab = this._invTab;
+      if (tab === "build") {
+        const rows2 = Object.entries(CFG.builds).map(([key, def]) => ({
+          key,
+          icon: def.icon,
+          name: def.name,
+          desc: def.desc,
+          cost: def.cost,
+          hotkey: g2.km.get("build:" + key),
+          state: g2.buildMgr?.mode === key ? "active" : canAfford(g2.myPool, def.cost) ? "" : "poor",
+          action: () => {
+            g2.setBuildMode(key);
+            this.closeInventory();
+          }
+        }));
+        for (const [key, icon, name, desc] of [
+          ["upgrade", "\u2B06\uFE0F", "\uC5C5\uADF8\uB808\uC774\uB4DC", "\uAC74\uBB3C\uC744 \uD074\uB9AD\uD574 \uB808\uBCA8\uC744 \uC62C\uB9B0\uB2E4"],
+          ["repair", "\u{1F527}", "\uC218\uB9AC", "\uC190\uC0C1\uB41C \uB9CC\uD07C\uB9CC \uC790\uC6D0\uC744 \uC4F4\uB2E4"],
+          ["sell", "\u{1F528}", "\uCCA0\uAC70", "\uD22C\uC790\uD55C \uC790\uC6D0\uC758 50%\uB97C \uB3CC\uB824\uBC1B\uB294\uB2E4"]
+        ]) {
+          rows2.push({
+            key,
+            icon,
+            name,
+            desc,
+            cost: null,
+            hotkey: g2.km.get(key),
+            state: g2.buildMgr?.mode === key ? "active" : "",
+            action: () => {
+              g2.setBuildMode(key);
+              this.closeInventory();
+            }
+          });
+        }
+        return rows2;
+      }
+      if (tab === "craft") {
+        const rows2 = Object.entries(CFG.craft).map(([key, r]) => ({
+          key,
+          icon: r.icon,
+          name: r.name,
+          desc: r.desc,
+          cost: r.cost,
+          state: g2.local.tools[key] ? "owned" : !g2.hasStation("workbench") ? "locked" : canAfford(g2.myPool, r.cost) ? "" : "poor",
+          note: g2.local.tools[key] ? "\uBCF4\uC720 \uC911" : !g2.hasStation("workbench") ? "\uC81C\uC791\uB300 \uD544\uC694" : null,
+          action: () => g2.requestCraft(key)
+        }));
+        rows2.push({
+          key: "smelt",
+          icon: "\u2699\uFE0F",
+          name: `\uCCA0 ${CFG.smelt.yield}\uAC1C \uC81C\uB828`,
+          desc: "\uAD11\uBB3C\uC744 \uB179\uC778\uB2E4. \uCE7C\xB7\uD65C\uACFC 3\uB808\uBCA8 \uC5C5\uADF8\uB808\uC774\uB4DC\uC758 \uC7AC\uB8CC.",
+          cost: CFG.smelt.cost,
+          state: !g2.hasStation("furnace") ? "locked" : canAfford(g2.myPool, CFG.smelt.cost) ? "" : "poor",
+          note: !g2.hasStation("furnace") ? "\uD654\uB85C \uD544\uC694" : null,
+          action: () => g2.requestSmelt()
+        });
+        return rows2;
+      }
+      const held = g2.local.heldWeapon;
+      const rows = [{
+        key: "none",
+        icon: "\u270B",
+        name: "\uB9E8\uC190",
+        desc: "\uBB34\uAE30\uB97C \uB0B4\uB824\uB193\uB294\uB2E4",
+        cost: null,
+        state: held === "default" ? "active" : "",
+        action: () => g2.requestEquip(null)
+      }];
+      for (const [key, r] of Object.entries(CFG.craft)) {
+        if (!r.effect) continue;
+        const owned = !!g2.local.tools[key];
+        rows.push({
+          key,
+          icon: r.icon,
+          name: r.name,
+          desc: r.desc,
+          cost: null,
+          state: !owned ? "locked" : held === key ? "active" : "",
+          note: !owned ? "\uC81C\uC791 \uD544\uC694" : held === key ? "\uC190\uC5D0 \uB4E0 \uBB34\uAE30" : null,
+          action: () => g2.requestEquip(key)
+        });
+      }
+      return rows;
+    }
+    refreshInventory() {
+      if (!this.inventoryOpen) return;
+      const rows = this._invRows();
+      const DESC = {
+        build: "\uC9C0\uC744 \uAC83\uC744 \uACE0\uB974\uBA74 \uBC30\uCE58 \uBAA8\uB4DC\uAC00 \uB41C\uB2E4. \uC88C\uD074\uB9AD\uC73C\uB85C \uB193\uACE0, \uC6B0\uD074\uB9AD\xB7Esc \uB85C \uCDE8\uC18C\uD55C\uB2E4.",
+        craft: "\uC81C\uC791\uB300\uB97C \uC9C0\uC73C\uBA74 \uB3C4\uAD6C\uC640 \uBB34\uAE30\uB97C, \uD654\uB85C\uB97C \uC9C0\uC73C\uBA74 \uCCA0\uC744 \uB9CC\uB4E4 \uC218 \uC788\uB2E4.",
+        gear: "\uC190\uC5D0 \uB4E4 \uBB34\uAE30\uB97C \uACE0\uB978\uB2E4. \uB4E0 \uBB34\uAE30\uC758 \uD6A8\uACFC\uB9CC \uC801\uC6A9\uB41C\uB2E4."
       };
-      for (const [key, def] of Object.entries(CFG.builds)) {
-        add(key, def.icon, def.name, costText(def.cost), "build:" + key);
+      this.el.invDesc.textContent = DESC[this._invTab];
+      for (const t2 of this.el.invTabs.querySelectorAll(".inv-tab")) {
+        t2.classList.toggle("on", t2.dataset.tab === this._invTab);
       }
-      add("upgrade", "\u2B06\uFE0F", "\uC5C5\uADF8\uB808\uC774\uB4DC", "\uAC74\uBB3C \uD074\uB9AD", "upgrade");
-      add("repair", "\u{1F527}", "\uC218\uB9AC", "\uC190\uC0C1 \uBE44\uB840", "repair");
-      add("sell", "\u{1F528}", "\uCCA0\uAC70", "50% \uD658\uAE09", "sell");
-      this.repairBadge = document.createElement("span");
-      this.repairBadge.className = "badge hidden";
-      this.slots.repair.appendChild(this.repairBadge);
-    }
-    // 키를 재지정한 뒤 건설 바의 단축키 표시를 갱신한다
-    _refreshSlotHotkeys() {
-      const km = this.game.km;
-      for (const el2 of Object.values(this.slots)) {
-        const hk = el2.querySelector(".hk");
-        if (hk && el2._action) hk.textContent = keyLabel(km.get(el2._action));
+      if (this._invRendered !== this._invTab) {
+        this.el.invList.innerHTML = "";
+        this._invEls = {};
+        for (const r of rows) {
+          const btn = document.createElement("button");
+          btn.className = "inv-item";
+          btn.innerHTML = `<span class="ii-icon">${r.icon}</span>
+<span class="ii-body"><b>${r.name}</b><span class="ii-desc">${r.desc || ""}</span></span>
+<span class="ii-right"></span>`;
+          btn.onclick = () => {
+            r.action();
+            this.refreshInventory();
+          };
+          this.el.invList.appendChild(btn);
+          this._invEls[r.key] = btn;
+        }
+        this._invRendered = this._invTab;
+      }
+      for (const r of rows) {
+        const btn = this._invEls[r.key];
+        if (!btn) continue;
+        const right = r.note || (r.cost ? costText(r.cost) : r.hotkey ? keyLabel(r.hotkey) : "");
+        btn.querySelector(".ii-right").textContent = right;
+        btn.className = "inv-item" + (r.state ? " " + r.state : "");
+        btn.disabled = r.state === "owned" || r.state === "locked" || r.state === "poor";
       }
     }
+    // 하단 안내문 + 인벤토리 버튼 배지 (예전 건설 바가 하던 일)
     refreshBuildBar() {
       const g2 = this.game;
-      const pool = g2.myPool;
-      for (const [key, el2] of Object.entries(this.slots)) {
-        const active = g2.buildMgr?.mode === key;
-        el2.classList.toggle("active", active);
-        const def = CFG.builds[key];
-        el2.classList.toggle("poor", !!def && !canAfford(pool, def.cost));
-      }
       const damaged = [...g2.buildMgr?.buildings.values() || []].filter((b) => b.hp < b.maxHp).length;
-      this.repairBadge.textContent = String(damaged);
-      this.repairBadge.classList.toggle("hidden", damaged === 0);
+      this.el.invBadge.textContent = String(damaged);
+      this.el.invBadge.classList.toggle("hidden", damaged === 0);
+      this.refreshInventory();
       const mode = g2.buildMgr?.mode;
-      if (this.hoverKey && CFG.builds[this.hoverKey]) {
-        this.el.buildHint.innerHTML = this._buildSpec(this.hoverKey);
-        return;
-      }
       if (!mode) {
         this.el.buildHint.textContent = "";
-      } else if (CFG.builds[mode]) {
-        this.el.buildHint.textContent = `${CFG.builds[mode].name}: ${CFG.builds[mode].desc} \u2014 \uC88C\uD074\uB9AD \uBC30\uCE58 / \uC6B0\uD074\uB9AD\xB7Esc \uCDE8\uC18C`;
+        return;
+      }
+      if (CFG.builds[mode]) {
+        this.el.buildHint.innerHTML = `${this._buildSpec(mode)} \u2014 \uC88C\uD074\uB9AD \uBC30\uCE58 / \uC6B0\uD074\uB9AD\xB7Esc \uCDE8\uC18C`;
+        return;
+      }
+      const hovered = g2.buildMgr?.hover;
+      const detail = hovered ? this._hoverDetail(mode, hovered) : null;
+      if (detail) {
+        this.el.buildHint.innerHTML = detail;
+      } else if (mode === "upgrade") {
+        this.el.buildHint.textContent = "\uC5C5\uADF8\uB808\uC774\uB4DC\uD560 \uAC74\uBB3C\uC744 \uD074\uB9AD\uD558\uC138\uC694 (\uBCBD\uC740 \uB0B4\uAD6C\uB3C4, \uD0C0\uC6CC\uB294 \uACF5\uACA9\uB825\xB7\uC0AC\uAC70\uB9AC \uC0C1\uC2B9)";
+      } else if (mode === "repair") {
+        this.el.buildHint.textContent = "\uC218\uB9AC\uD560 \uAC74\uBB3C\uC744 \uD074\uB9AD\uD558\uC138\uC694 (\uC190\uC0C1\uB41C \uBE44\uC728\uB9CC\uD07C \uC790\uC6D0 \uC18C\uBAA8, \uC644\uC804 \uD30C\uAD34 \uC7AC\uAC74\uCD95\uBCF4\uB2E4 \uC800\uB834)";
       } else {
-        const hovered = g2.buildMgr?.hover;
-        const detail = hovered ? this._hoverDetail(mode, hovered) : null;
-        if (detail) {
-          this.el.buildHint.innerHTML = detail;
-        } else if (mode === "upgrade") {
-          this.el.buildHint.textContent = "\uC5C5\uADF8\uB808\uC774\uB4DC\uD560 \uAC74\uBB3C\uC744 \uD074\uB9AD\uD558\uC138\uC694 (\uBCBD\uC740 \uB0B4\uAD6C\uB3C4, \uD0C0\uC6CC\uB294 \uACF5\uACA9\uB825\xB7\uC0AC\uAC70\uB9AC \uC0C1\uC2B9)";
-        } else if (mode === "repair") {
-          this.el.buildHint.textContent = "\uC218\uB9AC\uD560 \uAC74\uBB3C\uC744 \uD074\uB9AD\uD558\uC138\uC694 (\uC190\uC0C1\uB41C \uBE44\uC728\uB9CC\uD07C \uC790\uC6D0 \uC18C\uBAA8, \uC644\uC804 \uD30C\uAD34 \uC7AC\uAC74\uCD95\uBCF4\uB2E4 \uC800\uB834)";
-        } else {
-          this.el.buildHint.textContent = "\uCCA0\uAC70\uD560 \uAC74\uBB3C\uC744 \uD074\uB9AD\uD558\uC138\uC694 (\uD22C\uC790 \uC790\uC6D0\uC758 50% \uD658\uAE09)";
-        }
+        this.el.buildHint.textContent = "\uCCA0\uAC70\uD560 \uAC74\uBB3C\uC744 \uD074\uB9AD\uD558\uC138\uC694 (\uD22C\uC790 \uC790\uC6D0\uC758 50% \uD658\uAE09)";
       }
     }
     // 건설 바에서 가리킨 건물의 Lv.1 성능을 한 줄로 만든다
@@ -14360,15 +14469,30 @@ button.corner.mute.off { opacity: 0.5; }
       const g2 = this.game;
       this.el.waveBtn.onclick = () => g2.requestStartWave();
       this.el.hupBtn.onclick = () => g2.requestHarvestUpgrade();
-      $2("station-close").onclick = () => this.closeStation();
+      this.el.invBtn.onclick = () => {
+        g2.sfx.click();
+        this.toggleInventory();
+      };
+      $2("inv-close").onclick = () => this.closeInventory();
+      for (const t2 of this.el.invTabs.querySelectorAll(".inv-tab")) {
+        t2.onclick = () => {
+          g2.sfx.click();
+          this.openInventory(t2.dataset.tab);
+        };
+      }
       $2("btn-help").onclick = () => this.el.help.classList.toggle("hidden");
       $2("tutorial-skip").onclick = () => this._endTutorial();
       addEventListener("keydown", (e) => {
         if (e.target.closest("input")) return;
         if (this._listeningFor) return;
         const k2 = e.key.toLowerCase();
-        if (k2 === "escape" && this.stationOpen) {
-          this.closeStation();
+        if (k2 === "escape" && this.inventoryOpen) {
+          this.closeInventory();
+          return;
+        }
+        if (k2 === g2.km.get("inventory")) {
+          g2.sfx.click();
+          this.toggleInventory();
           return;
         }
         if (k2 === g2.km.get("help")) this.el.help.classList.toggle("hidden");
@@ -14389,7 +14513,8 @@ button.corner.mute.off { opacity: 0.5; }
       $2("keybind-reset").onclick = () => {
         this.game.km.reset();
         this._refreshRebindLabels();
-        this._refreshSlotHotkeys();
+        this._invRendered = null;
+        this.refreshInventory();
         this.toast("\uD0A4\uB97C \uAE30\uBCF8\uAC12\uC73C\uB85C \uB418\uB3CC\uB838\uB2E4", "good");
       };
       const cbBox = $2("chk-colorblind");
@@ -14448,7 +14573,8 @@ button.corner.mute.off { opacity: 0.5; }
         }
         finish();
         this._refreshRebindLabels();
-        this._refreshSlotHotkeys();
+        this._invRendered = null;
+        this.refreshInventory();
       };
       addEventListener("keydown", onKey, true);
     }
@@ -14536,13 +14662,13 @@ button.corner.mute.off { opacity: 0.5; }
       this.el.lobby.classList.add("hidden");
       this.el.result.classList.add("hidden");
       this.el.pauseOverlay.classList.add("hidden");
-      this._station = null;
-      this._stationRows = null;
+      this._invTab = "build";
+      this._invRendered = null;
       this._crystalWarned = false;
       this.el.crystalWarning.classList.add("hidden");
-      this.el.station.classList.add("hidden");
+      this.closeInventory();
       this.refreshBuildBar();
-      if (!resumed) this.toast("\uD06C\uB9AC\uC2A4\uD0C8\uC744 \uC9C0\uCF1C\uB77C! F\uB85C \uCC44\uC9D1, 1~8\uB85C \uAC74\uC124", "good");
+      if (!resumed) this.toast("\uD06C\uB9AC\uC2A4\uD0C8\uC744 \uC9C0\uCF1C\uB77C! F\uB85C \uCC44\uC9D1, I\uB85C \uC778\uBCA4\uD1A0\uB9AC", "good");
       if (resumed || localStorage.getItem("cd.tutorialDone")) {
         this.el.tutorial.classList.add("hidden");
         this._tutStep = -1;
@@ -14560,80 +14686,10 @@ button.corner.mute.off { opacity: 0.5; }
       this.el.tutorial.classList.add("hidden");
       localStorage.setItem("cd.tutorialDone", "1");
     }
-    // ------------------------------------------------ 제작대 / 화로 작업창
-    openStation(kind) {
-      this._station = kind;
-      this.el.station.classList.remove("hidden");
-      this._renderStation();
-    }
-    closeStation() {
-      this._station = null;
-      this.el.station.classList.add("hidden");
-    }
-    get stationOpen() {
-      return !!this._station;
-    }
-    _renderStation() {
-      const g2 = this.game;
-      const pool = g2.myPool;
-      const rows = [];
-      if (this._station === "craft") {
-        this.el.stationTitle.textContent = "\u{1FA9A} \uC81C\uC791\uB300";
-        this.el.stationDesc.textContent = "\uB3C4\uAD6C\uC640 \uBB34\uAE30\uB97C \uB9CC\uB4E0\uB2E4. \uD558\uB098\uC529\uB9CC \uAC00\uC9C8 \uC218 \uC788\uB2E4.";
-        for (const [key, r] of Object.entries(CFG.craft)) {
-          rows.push({
-            key,
-            icon: r.icon,
-            name: r.name,
-            desc: r.desc,
-            cost: r.cost,
-            owned: !!g2.local.tools[key],
-            action: () => g2.requestCraft(key)
-          });
-        }
-      } else {
-        const y2 = CFG.smelt.yield;
-        this.el.stationTitle.textContent = "\u{1F525} \uD654\uB85C";
-        this.el.stationDesc.textContent = "\uAD11\uBB3C\uC744 \uB179\uC5EC \uCCA0\uC744 \uB9CC\uB4E0\uB2E4. \uCCA0\uC740 \uBB34\uAE30 \uC7AC\uB8CC\uB2E4.";
-        rows.push({
-          key: "smelt",
-          icon: "\u2699\uFE0F",
-          name: `\uCCA0 ${y2}\uAC1C \uC81C\uB828`,
-          desc: "\uC81C\uC791\uB300\uC5D0\uC11C \uCE7C\xB7\uD65C\uC744 \uB9CC\uB4E4 \uB54C \uC4F4\uB2E4.",
-          cost: CFG.smelt.cost,
-          owned: false,
-          action: () => g2.requestSmelt()
-        });
-      }
-      if (this._stationRows !== this._station) {
-        this.el.stationList.innerHTML = "";
-        this._rowEls = {};
-        for (const r of rows) {
-          const btn = document.createElement("button");
-          btn.className = "station-item";
-          btn.innerHTML = `<span class="si-icon">${r.icon}</span>
-<span class="si-body"><b>${r.name}</b><span class="si-desc">${r.desc}</span></span>
-<span class="si-cost"></span>`;
-          btn.onclick = r.action;
-          this.el.stationList.appendChild(btn);
-          this._rowEls[r.key] = btn;
-        }
-        this._stationRows = this._station;
-      }
-      for (const r of rows) {
-        const btn = this._rowEls[r.key];
-        if (!btn) continue;
-        const afford = canAfford(pool, r.cost);
-        btn.querySelector(".si-cost").textContent = r.owned ? "\uBCF4\uC720 \uC911" : costText(r.cost);
-        btn.classList.toggle("owned", r.owned);
-        btn.classList.toggle("poor", !r.owned && !afford);
-        btn.disabled = r.owned || !afford;
-      }
-    }
     _refreshTools() {
       const t2 = this.game.local.tools;
       const owned = Object.keys(CFG.craft).filter((k2) => t2[k2]);
-      this.el.toolRow.innerHTML = owned.length ? owned.map((k2) => `<span class="tool" title="${CFG.craft[k2].name}">${CFG.craft[k2].icon}</span>`).join("") : `<span class="dim">\uC81C\uC791\uB300\uC5D0\uC11C \uB3C4\uAD6C\uB97C \uB9CC\uB4DC\uC138\uC694</span>`;
+      this.el.toolRow.innerHTML = owned.length ? owned.map((k2) => `<span class="tool" title="${CFG.craft[k2].name}">${CFG.craft[k2].icon}</span>`).join("") : `<span class="dim">\uC81C\uC791\uB300\uB97C \uC9D3\uACE0 \uC778\uBCA4\uD1A0\uB9AC\uC5D0\uC11C \uC81C\uC791</span>`;
     }
     // 채집 → 건설 → 웨이브 시작 진행에 맞춰 튜토리얼 단계를 넘긴다
     _updateTutorial() {
@@ -14739,13 +14795,6 @@ button.corner.mute.off { opacity: 0.5; }
       this.el.hupBtn.disabled = !nextUp || !canAfford(pool, nextUp.cost);
       this.el.iron.textContent = Math.floor(pool.iron || 0);
       this._refreshTools();
-      if (this._station) {
-        const near2 = [...g2.buildMgr.buildings.values()].some(
-          (b) => b.stationKind === this._station && !b.dead && dist(g2.local.x, g2.local.z, b.x, b.z) <= CFG.station.range
-        );
-        if (near2) this._renderStation();
-        else this.closeStation();
-      }
       const c2 = g2.world.crystal;
       const ratio = clamp(c2.hp / c2.maxHp, 0, 1);
       this.el.crystalFill.style.transform = `scaleX(${ratio})`;

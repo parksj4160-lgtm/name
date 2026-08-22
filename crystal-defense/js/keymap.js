@@ -1,4 +1,5 @@
 var DEFAULTS = {
+  inventory: "i",
   harvest: "f",
   attack: " ",
   upgrade: "u",
@@ -12,6 +13,7 @@ var DEFAULTS = {
   mute: "m"
 };
 var LABELS = {
+  inventory: "인벤토리",
   harvest: "채집",
   attack: "공격",
   upgrade: "업그레이드 모드",

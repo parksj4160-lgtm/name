@@ -38,6 +38,7 @@ var Player = class {
     this.res = { wood: 40, stone: 20 };
     this.shards = 0;
     this.tools = {};
+    this.equipped = null;
     this.harvestLv = 1;
     this.harvesting = null;
     this.attackCd = 0;
@@ -86,16 +87,12 @@ var Player = class {
   get hasPickaxe() {
     return !!this.tools.pickaxe;
   }
-  // 기본 공격치에 제작한 무기 효과를 더한 값
+  // 기본 공격치에 지금 손에 든 무기의 효과만 더한다 (여러 자루를 동시에 들 수는 없다)
   get attackStats() {
     const base = CFG.player.attack;
     const out = { dmg: base.dmg, range: base.range, arc: base.arc, cd: base.cd };
-    for (const key of Object.keys(this.tools)) {
-      if (!this.tools[key]) continue;
-      const eff = CFG.craft[key]?.effect;
-      if (!eff) continue;
-      for (const k2 of Object.keys(eff)) out[k2] += eff[k2];
-    }
+    const eff = CFG.craft[this.heldWeapon]?.effect;
+    if (eff) for (const k2 of Object.keys(eff)) out[k2] += eff[k2];
     return out;
   }
   damage(amount) {
@@ -122,9 +119,15 @@ var Player = class {
   cancelHarvest() {
     this.harvesting = null;
   }
-  // 제작한 무기에 맞춰 손에 든 도구의 모양을 바꾼다 (칼 > 활 > 기본 순으로 우선)
+  // 인벤토리에서 고른 무기를 손에 든다.
+  // "none" 은 맨손을 직접 고른 것이고, 아무것도 고르지 않았으면 칼 > 활 순으로 자동
+  get heldWeapon() {
+    if (this.equipped === "none") return "default";
+    if (this.equipped && this.tools[this.equipped]) return this.equipped;
+    return this.tools.sword ? "sword" : this.tools.bow ? "bow" : "default";
+  }
   _updateWeapon() {
-    const key = this.tools.sword ? "sword" : this.tools.bow ? "bow" : "default";
+    const key = WEAPON_LOOK[this.heldWeapon] ? this.heldWeapon : "default";
     if (key === this._weaponKey) return;
     this._weaponKey = key;
     const look = WEAPON_LOOK[key];
@@ -276,6 +279,13 @@ export var RemotePlayer = class extends Player {
     this.hp = s2.hp;
     this.alive = s2.alive;
     this.harvesting = s2.harvesting ? { t: 0, need: 1 } : null;
+    // 상대가 손에 든 무기도 그대로 보이게 한다
+    if (s2.held) {
+      this.tools[s2.held] = true;
+      this.equipped = s2.held;
+    } else {
+      this.equipped = null;
+    }
     if (s2.swing) this.swing = 1;
     this.mesh.rotation.z = s2.alive ? 0 : Math.PI / 2;
   }

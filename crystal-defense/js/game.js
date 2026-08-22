@@ -409,18 +409,27 @@ export var Game = class {
     if (playerId === this.local.id) this.sfx.upgrade();
     else this.net.send("hupOk", { to: playerId, lv: p2.harvestLv });
   }
-  // 시설을 클릭했을 때 — 너무 멀면 안내만 하고 열지 않는다
+  // 제작대·화로를 클릭하면 인벤토리의 제작 탭이 열린다 (인벤토리에서 바로 열어도 된다)
   tryOpenStation(b) {
-    if (dist(this.local.x, this.local.z, b.x, b.z) > CFG.station.range) {
-      this.ui?.toast(`${b.def.name}에 더 가까이 가세요`, "warn");
-      return;
-    }
     this.sfx.click();
-    this.ui?.openStation(b.stationKind);
+    this.ui?.openInventory("craft");
   }
   // 팀에 해당 시설이 세워져 있는지
   hasStation(key) {
     return [...this.buildMgr.buildings.values()].some((b) => b.key === key && !b.dead);
+  }
+  // 인벤토리에서 무기를 손에 든다. 순전히 내 캐릭터 상태라 호스트 승인이 필요 없다.
+  // key 가 null 이면 맨손을 직접 고른 것 — 칼이 있어도 도로 들지 않는다.
+  requestEquip(key) {
+    const p2 = this.local;
+    if (key && !p2.tools[key]) {
+      this.ui?.toast("아직 만들지 않은 무기입니다", "bad");
+      return;
+    }
+    p2.equipped = key || "none";
+    this.sfx.click();
+    const held = CFG.craft[p2.heldWeapon];
+    this.ui?.toast(held ? `${held.name}을(를) 들었다` : "맨손이 되었다", "good");
   }
   requestCraft(key) {
     if (this.isHost) this.hostCraft(this.local.id, key);
@@ -650,7 +659,7 @@ export var Game = class {
   _snapshot() {
     const players = {};
     for (const p2 of this.players.values()) {
-      players[p2.id] = { hv: p2.harvestLv, tl: Object.keys(p2.tools).filter((k2) => p2.tools[k2]) };
+      players[p2.id] = { hv: p2.harvestLv, tl: Object.keys(p2.tools).filter((k2) => p2.tools[k2]), eq: p2.equipped || null };
     }
     return {
       e: this.enemyMgr.snapshot(),
@@ -684,6 +693,7 @@ export var Game = class {
         p2.harvestLv = pd2.hv;
         p2.tools = {};
         for (const k2 of pd2.tl || []) p2.tools[k2] = true;
+        if (p2 !== this.local) p2.equipped = pd2.eq || null;
       }
     }
     if (this.wave.phase === PHASE.LOST && !this.result) {
@@ -811,6 +821,7 @@ export var Game = class {
         hp: Math.round(l2.hp),
         alive: l2.alive,
         harvesting: !!l2.harvesting,
+        held: l2.heldWeapon === "default" ? null : l2.heldWeapon,
         swing: l2.swing > 0.7
       });
     }
@@ -879,6 +890,7 @@ export var Game = class {
       this.local.harvestLv = savedPlayer.hv;
       this.local.tools = {};
       for (const k2 of savedPlayer.tl || []) this.local.tools[k2] = true;
+      this.local.equipped = savedPlayer.eq || null;
     }
     if (save.stats) this.stats = save.stats;
     this.ui?.toast(`이어하기 — 웨이브 ${this.wave.displayWave}`, "good");

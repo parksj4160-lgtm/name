@@ -51,9 +51,14 @@
     <div id="prompt" class="prompt hidden"></div>
   </div>
 
-  <!-- 하단 중앙: 건설 바 -->
-  <div id="build-bar"></div>
+  <!-- 하단 중앙: 배치/모드 안내 -->
   <div id="build-hint" class="hint"></div>
+
+  <!-- 인벤토리 열기 -->
+  <button id="btn-inv" class="inv-open">
+    <span class="ico">🎒</span><span class="lbl">인벤토리 <kbd>I</kbd></span>
+    <span id="inv-badge" class="badge hidden"></span>
+  </button>
 
   <!-- 우하단: 미니맵 -->
   <canvas id="minimap" width="200" height="200"></canvas>
@@ -66,14 +71,19 @@
     <button id="tutorial-skip" class="mini">건너뛰기</button>
   </div>
 
-  <!-- 제작대 / 화로 작업창 (시설을 클릭하면 열린다) -->
-  <div id="station" class="panel station hidden">
-    <div class="station-head">
-      <h3 id="station-title">제작대</h3>
-      <button id="station-close" class="mini">닫기 <kbd>Esc</kbd></button>
+  <!-- 인벤토리 — 건설 · 제작 · 장비를 한곳에서 (I 키 또는 시설 클릭) -->
+  <div id="inventory" class="panel inv hidden">
+    <div class="inv-head">
+      <h3>🎒 인벤토리</h3>
+      <div class="inv-tabs" id="inv-tabs">
+        <button type="button" class="inv-tab" data-tab="build">건설</button>
+        <button type="button" class="inv-tab" data-tab="craft">제작</button>
+        <button type="button" class="inv-tab" data-tab="gear">장비</button>
+      </div>
+      <button id="inv-close" class="mini">닫기 <kbd>Esc</kbd></button>
     </div>
-    <p id="station-desc" class="dim"></p>
-    <div id="station-list" class="station-list"></div>
+    <p id="inv-desc" class="dim"></p>
+    <div id="inv-list" class="inv-list"></div>
   </div>
 
   <!-- 모바일 컨트롤 -->
@@ -94,9 +104,10 @@
       <tr><td>이동</td><td><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> / 방향키 (<kbd>Shift</kbd> 달리기)</td></tr>
       <tr><td>채집</td><td>나무 근처에서 <kbd class="rebind" data-action="harvest">F</kbd> 꾹 누르기 (바위는 곡괭이 필요)</td></tr>
       <tr><td>공격</td><td>좌클릭 또는 <kbd class="rebind" data-action="attack">Space</kbd></td></tr>
-      <tr><td>건설</td><td><kbd class="rebind" data-action="build:wall">1</kbd> 벽 · <kbd class="rebind" data-action="build:arrow">2</kbd> 화살탑 · <kbd class="rebind" data-action="build:frost">3</kbd> 서리탑 · <kbd class="rebind" data-action="build:cannon">4</kbd> 대포탑 · <kbd class="rebind" data-action="build:poison">5</kbd> 독탑 · <kbd class="rebind" data-action="build:support">6</kbd> 보루 · <kbd class="rebind" data-action="build:workbench">7</kbd> 제작대 · <kbd class="rebind" data-action="build:furnace">8</kbd> 화로 → 좌클릭 배치</td></tr>
-      <tr><td>제작대 🪚</td><td>가까이 다가가 <b>클릭</b>하면 제작창이 열린다 — ⛏️ 곡괭이(정수석 채집) · 🗡️ 칼(공격력 +12) · 🏹 활(사거리 +2.4)</td></tr>
-      <tr><td>화로 🔥</td><td>가까이 다가가 <b>클릭</b>하면 광물을 녹여 ⚙️ 철을 얻는다. 철은 칼·활의 재료다.</td></tr>
+      <tr><td>인벤토리</td><td><kbd class="rebind" data-action="inventory">I</kbd> — 건설 · 제작 · 장비를 여기서 전부 고른다</td></tr>
+      <tr><td>건설</td><td>인벤토리 <b>건설</b> 탭에서 고르면 배치 모드가 된다 → 좌클릭으로 배치</td></tr>
+      <tr><td>제작</td><td><b>제작대</b>를 지으면 인벤토리 <b>제작</b> 탭에서 ⛏️ 곡괭이 · 🗡️ 칼 · 🏹 활을 만든다. <b>화로</b>를 지으면 광물을 녹여 ⚙️ 철을 얻는다</td></tr>
+      <tr><td>무기 장착</td><td>인벤토리 <b>장비</b> 탭에서 고르면 그 무기를 손에 든다 (다시 누르면 맨손)</td></tr>
       <tr><td>몬스터</td><td>🧙 주술사는 벽을 무시하고 멀리서 크리스탈을 저격 · 🪓 약탈자는 가장 가까운 건물로 직행해 부순다 · 💀 보스는 5웨이브마다 등장</td></tr>
       <tr><td>업그레이드</td><td><kbd class="rebind" data-action="upgrade">U</kbd> 후 건물 클릭</td></tr>
       <tr><td>수리</td><td><kbd class="rebind" data-action="repair">G</kbd> 후 건물 클릭 (손상 비례 자원 소모)</td></tr>
