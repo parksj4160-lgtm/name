@@ -1,154 +1,163 @@
-// 멀티플레이 전송 계층.
-//  - 기본: BroadcastChannel → 같은 브라우저의 다른 탭/창끼리 바로 연결된다 (설치 불필요).
-//  - 릴레이 서버 주소를 넣으면 WebSocket 으로 다른 기기와도 연결된다. (node server/relay.js)
-// 방에 가장 먼저 들어온 사람이 호스트가 되어 게임 시뮬레이션의 권위를 가진다.
 import { shortId } from './utils.js';
 
-export class Net {
+export var Net = class {
   constructor() {
     this.selfId = shortId();
-    this.name = '플레이어';
+    this.name = "\uD50C\uB808\uC774\uC5B4";
     this.roomCode = null;
-    this.mode = 'off';               // 'off' | 'local' | 'ws'
+    this.mode = "off";
     this.joinTs = 0;
-    this.peers = new Map();          // id -> { id, name, joinTs, lastSeen, ready }
+    this.peers = /* @__PURE__ */ new Map();
     this._handlers = {};
     this._chan = null;
     this._ws = null;
     this._hbTimer = 0;
-    this.status = '오프라인 (싱글 플레이)';
-    addEventListener('beforeunload', () => this.leave());
+    this.status = "\uC624\uD504\uB77C\uC778 (\uC2F1\uAE00 \uD50C\uB808\uC774)";
+    addEventListener("beforeunload", () => this.leave());
   }
-
-  get serverUrl() { return localStorage.getItem('cd.server') || ''; }
+  get serverUrl() {
+    return localStorage.getItem("cd.server") || "";
+  }
   setServerUrl(url) {
-    if (url) localStorage.setItem('cd.server', url);
-    else localStorage.removeItem('cd.server');
+    if (url) localStorage.setItem("cd.server", url);
+    else localStorage.removeItem("cd.server");
   }
-
-  get online() { return this.mode !== 'off'; }
-
+  get online() {
+    return this.mode !== "off";
+  }
   // 접속 순서가 가장 빠른 사람이 호스트. 호스트가 나가면 자동 승계된다.
   get isHost() {
     if (!this.online) return true;
-    for (const p of this.peers.values()) {
-      if (p.joinTs < this.joinTs) return false;
-      if (p.joinTs === this.joinTs && p.id < this.selfId) return false;
+    for (const p2 of this.peers.values()) {
+      if (p2.joinTs < this.joinTs) return false;
+      if (p2.joinTs === this.joinTs && p2.id < this.selfId) return false;
     }
     return true;
   }
-
   get hostId() {
     const r = this.roster();
     return r.length ? r[0].id : this.selfId;
   }
-
   roster() {
     const list = [{ id: this.selfId, name: this.name, joinTs: this.joinTs, isSelf: true }];
-    for (const p of this.peers.values()) {
-      list.push({ id: p.id, name: p.name, joinTs: p.joinTs, isSelf: false });
+    for (const p2 of this.peers.values()) {
+      list.push({ id: p2.id, name: p2.name, joinTs: p2.joinTs, isSelf: false });
     }
     list.sort((a, b) => a.joinTs - b.joinTs || a.id.localeCompare(b.id));
     if (list.length) list[0].isHost = true;
     return list;
   }
-
-  on(type, fn) { (this._handlers[type] = this._handlers[type] || []).push(fn); }
-  _emit(type, data, from) { (this._handlers[type] || []).forEach(fn => fn(data, from)); }
-
+  on(type, fn) {
+    (this._handlers[type] = this._handlers[type] || []).push(fn);
+  }
+  _emit(type, data, from) {
+    (this._handlers[type] || []).forEach((fn) => fn(data, from));
+  }
   connect(code) {
     this.leave();
-    this.roomCode = String(code || '').toUpperCase();
+    this.roomCode = String(code || "").toUpperCase();
     this.joinTs = Date.now();
     this.peers.clear();
-
     const url = this.serverUrl;
     if (url) {
       try {
-        const sep = url.includes('?') ? '&' : '?';
+        const sep = url.includes("?") ? "&" : "?";
         this._ws = new WebSocket(`${url}${sep}room=CD-${encodeURIComponent(this.roomCode)}&id=${this.selfId}`);
         this._ws.onmessage = (ev) => {
-          try { this._receive(JSON.parse(ev.data)); } catch (_) { /* 무시 */ }
+          try {
+            this._receive(JSON.parse(ev.data));
+          } catch (_) {
+          }
         };
         this._ws.onopen = () => {
-          this.mode = 'ws';
-          this.status = `온라인 · 방 ${this.roomCode}`;
-          this._post({ type: 'join' });
+          this.mode = "ws";
+          this.status = `\uC628\uB77C\uC778 \xB7 \uBC29 ${this.roomCode}`;
+          this._post({ type: "join" });
         };
         this._ws.onclose = () => {
-          if (this.mode === 'ws') { this.mode = 'off'; this.status = '서버 연결 끊김'; }
+          if (this.mode === "ws") {
+            this.mode = "off";
+            this.status = "\uC11C\uBC84 \uC5F0\uACB0 \uB04A\uAE40";
+          }
         };
-        this._ws.onerror = () => { this.status = '서버 연결 실패 — 같은 브라우저 탭끼리만 연결됩니다'; };
-        this.mode = 'ws';
-      } catch (_) { this._ws = null; }
+        this._ws.onerror = () => {
+          this.status = "\uC11C\uBC84 \uC5F0\uACB0 \uC2E4\uD328 \u2014 \uAC19\uC740 \uBE0C\uB77C\uC6B0\uC800 \uD0ED\uB07C\uB9AC\uB9CC \uC5F0\uACB0\uB429\uB2C8\uB2E4";
+        };
+        this.mode = "ws";
+      } catch (_) {
+        this._ws = null;
+      }
     }
-
-    if (!this._ws && typeof BroadcastChannel !== 'undefined') {
-      this._chan = new BroadcastChannel('crystal-defense-' + this.roomCode);
+    if (!this._ws && typeof BroadcastChannel !== "undefined") {
+      this._chan = new BroadcastChannel("crystal-defense-" + this.roomCode);
       this._chan.onmessage = (ev) => this._receive(ev.data);
-      this.mode = 'local';
-      this.status = `같은 브라우저 · 방 ${this.roomCode}`;
-      this._post({ type: 'join' });
+      this.mode = "local";
+      this.status = `\uAC19\uC740 \uBE0C\uB77C\uC6B0\uC800 \xB7 \uBC29 ${this.roomCode}`;
+      this._post({ type: "join" });
     }
-
-    if (this.mode === 'off') this.status = '이 브라우저는 멀티플레이를 지원하지 않습니다';
-    return this.mode !== 'off';
+    if (this.mode === "off") this.status = "\uC774 \uBE0C\uB77C\uC6B0\uC800\uB294 \uBA40\uD2F0\uD50C\uB808\uC774\uB97C \uC9C0\uC6D0\uD558\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4";
+    return this.mode !== "off";
   }
-
   leave() {
-    if (this.online) this._post({ type: 'left' });
-    if (this._chan) { this._chan.close(); this._chan = null; }
-    if (this._ws) { try { this._ws.close(); } catch (_) {} this._ws = null; }
-    this.mode = 'off';
+    if (this.online) this._post({ type: "left" });
+    if (this._chan) {
+      this._chan.close();
+      this._chan = null;
+    }
+    if (this._ws) {
+      try {
+        this._ws.close();
+      } catch (_) {
+      }
+      this._ws = null;
+    }
+    this.mode = "off";
     this.roomCode = null;
     this.peers.clear();
-    this.status = '오프라인 (싱글 플레이)';
+    this.status = "\uC624\uD504\uB77C\uC778 (\uC2F1\uAE00 \uD50C\uB808\uC774)";
   }
-
   _post(msg) {
     if (!this.roomCode) return;
     msg.from = this.selfId;
     msg.room = this.roomCode;
-    if (msg.type === 'join' || msg.type === 'here' || msg.type === 'hb') {
+    if (msg.type === "join" || msg.type === "here" || msg.type === "hb") {
       msg.name = this.name;
       msg.joinTs = this.joinTs;
     }
     if (this._ws && this._ws.readyState === 1) this._ws.send(JSON.stringify(msg));
     else if (this._chan) this._chan.postMessage(msg);
   }
-
-  send(type, data) { this._post({ type, data }); }
-
-  _touch(id, info) {
-    let p = this.peers.get(id);
-    if (!p) {
-      p = { id, name: info.name || '플레이어', joinTs: info.joinTs || Date.now(), lastSeen: performance.now() };
-      this.peers.set(id, p);
-      this._emit('peerJoin', p, id);
-    }
-    p.lastSeen = performance.now();
-    if (info.name) p.name = info.name;
-    if (info.joinTs) p.joinTs = info.joinTs;
-    return p;
+  send(type, data) {
+    this._post({ type, data });
   }
-
+  _touch(id, info) {
+    let p2 = this.peers.get(id);
+    if (!p2) {
+      p2 = { id, name: info.name || "\uD50C\uB808\uC774\uC5B4", joinTs: info.joinTs || Date.now(), lastSeen: performance.now() };
+      this.peers.set(id, p2);
+      this._emit("peerJoin", p2, id);
+    }
+    p2.lastSeen = performance.now();
+    if (info.name) p2.name = info.name;
+    if (info.joinTs) p2.joinTs = info.joinTs;
+    return p2;
+  }
   _receive(msg) {
     if (!msg || msg.from === this.selfId) return;
     if (msg.room && this.roomCode && msg.room !== this.roomCode) return;
-
     switch (msg.type) {
-      case 'join':
+      case "join":
         this._touch(msg.from, { name: msg.name, joinTs: msg.joinTs });
-        this._post({ type: 'here' });          // 내가 여기 있다고 알려준다
+        this._post({ type: "here" });
         break;
-      case 'here':
-      case 'hb':
+      case "here":
+      case "hb":
         this._touch(msg.from, { name: msg.name, joinTs: msg.joinTs });
         break;
-      case 'left': {
-        const p = this.peers.get(msg.from);
+      case "left": {
+        const p2 = this.peers.get(msg.from);
         this.peers.delete(msg.from);
-        if (p) this._emit('peerLeave', p, msg.from);
+        if (p2) this._emit("peerLeave", p2, msg.from);
         break;
       }
       default:
@@ -156,20 +165,19 @@ export class Net {
         this._emit(msg.type, msg.data, msg.from);
     }
   }
-
-  update(dt) {
+  update(dt2) {
     if (!this.online) return;
-    this._hbTimer -= dt;
+    this._hbTimer -= dt2;
     if (this._hbTimer <= 0) {
       this._hbTimer = 1.2;
-      this._post({ type: 'hb' });
+      this._post({ type: "hb" });
     }
     const now = performance.now();
-    for (const [id, p] of [...this.peers]) {
-      if (now - p.lastSeen > 6000) {
+    for (const [id, p2] of [...this.peers]) {
+      if (now - p2.lastSeen > 6e3) {
         this.peers.delete(id);
-        this._emit('peerLeave', p, id);
+        this._emit("peerLeave", p2, id);
       }
     }
   }
-}
+};

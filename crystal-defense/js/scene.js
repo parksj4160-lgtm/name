@@ -1,102 +1,88 @@
-// 렌더러 · 조명 · 카메라 리그 · 포인터 레이캐스트.
 import * as THREE from '../vendor/three.module.js';
 import { CFG } from './config.js';
-import { clamp, lerp } from './utils.js';
+import { clamp } from './utils.js';
 
-export class SceneManager {
-  constructor(canvas) {
-    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+export var SceneManager = class {
+  constructor(canvas2) {
+    this.renderer = new THREE.WebGLRenderer({ canvas: canvas2, antialias: true, powerPreference: "high-performance" });
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.25;
-
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x0d1220);
-    this.scene.fog = new THREE.Fog(0x0d1220, 60, 130);
-
+    this.scene.background = new THREE.Color(856608);
+    this.scene.fog = new THREE.Fog(856608, 60, 130);
     this.camera = new THREE.PerspectiveCamera(52, 1, 0.5, 400);
-
-    // 카메라 리그: 플레이어를 따라다니는 오빗 카메라
     this.target = new THREE.Vector3();
     this.focus = new THREE.Vector3();
     this.yaw = Math.PI * 0.25;
     this.pitch = 0.92;
     this.distance = 24;
-
+    this.wantDistance = 24;
+    this.buildView = false;
+    this._buildBoost = 0;
     this._setupLights();
     this._setupGround();
-
     this.raycaster = new THREE.Raycaster();
     this.pointer = new THREE.Vector2(0, 0);
     this._groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
     this.pointerWorld = new THREE.Vector3();
-
-    addEventListener('resize', () => this.resize());
+    addEventListener("resize", () => this.resize());
     this.resize();
   }
-
   _setupLights() {
-    this.scene.add(new THREE.HemisphereLight(0x9ec6ff, 0x2a3348, 1.15));
-
-    const sun = new THREE.DirectionalLight(0xfff2d8, 2.0);
+    this.scene.add(new THREE.HemisphereLight(10405631, 2765640, 1.15));
+    const sun = new THREE.DirectionalLight(16773848, 2);
     sun.position.set(34, 46, 22);
     sun.castShadow = true;
     sun.shadow.mapSize.set(2048, 2048);
-    const s = 60;
-    sun.shadow.camera.left = -s; sun.shadow.camera.right = s;
-    sun.shadow.camera.top = s; sun.shadow.camera.bottom = -s;
-    sun.shadow.camera.near = 1; sun.shadow.camera.far = 160;
-    sun.shadow.bias = -0.0009;
+    const s2 = 60;
+    sun.shadow.camera.left = -s2;
+    sun.shadow.camera.right = s2;
+    sun.shadow.camera.top = s2;
+    sun.shadow.camera.bottom = -s2;
+    sun.shadow.camera.near = 1;
+    sun.shadow.camera.far = 160;
+    sun.shadow.bias = -9e-4;
     this.scene.add(sun);
     this.sun = sun;
-
-    // 크리스탈에서 새어나오는 푸른 빛
-    this.crystalLight = new THREE.PointLight(0x63e0ff, 2.2, 46, 2);
+    this.crystalLight = new THREE.PointLight(6545663, 2.2, 46, 2);
     this.crystalLight.position.set(0, 5, 0);
     this.scene.add(this.crystalLight);
   }
-
   _setupGround() {
     const size = CFG.world.size;
-    const g = new THREE.PlaneGeometry(size, size, 1, 1);
-    const m = new THREE.MeshStandardMaterial({ color: 0x3c5540, roughness: 1, metalness: 0 });
-    const ground = new THREE.Mesh(g, m);
+    const g2 = new THREE.PlaneGeometry(size, size, 1, 1);
+    const m2 = new THREE.MeshStandardMaterial({ color: 3953984, roughness: 1, metalness: 0 });
+    const ground = new THREE.Mesh(g2, m2);
     ground.rotation.x = -Math.PI / 2;
     ground.receiveShadow = true;
     this.scene.add(ground);
     this.ground = ground;
-
-    // 맵 경계 밖은 어두운 황무지 느낌
     const outer = new THREE.Mesh(
       new THREE.RingGeometry(size * 0.62, size * 1.4, 48),
-      new THREE.MeshBasicMaterial({ color: 0x151b28, side: THREE.DoubleSide })
+      new THREE.MeshBasicMaterial({ color: 1383208, side: THREE.DoubleSide })
     );
     outer.rotation.x = -Math.PI / 2;
     outer.position.y = -0.02;
     this.scene.add(outer);
-
-    // 건설 가능 구역 표시
     const zone = new THREE.Mesh(
       new THREE.RingGeometry(CFG.world.buildRadius - 0.22, CFG.world.buildRadius, 96),
-      new THREE.MeshBasicMaterial({ color: 0x5fd4ff, transparent: true, opacity: 0.55 })
+      new THREE.MeshBasicMaterial({ color: 6280447, transparent: true, opacity: 0.55 })
     );
     zone.rotation.x = -Math.PI / 2;
     zone.position.y = 0.03;
     this.scene.add(zone);
     this.buildZoneRing = zone;
-
     const inner = new THREE.Mesh(
       new THREE.CircleGeometry(CFG.world.buildRadius, 96),
-      new THREE.MeshBasicMaterial({ color: 0x2b6d7a, transparent: true, opacity: 0.14 })
+      new THREE.MeshBasicMaterial({ color: 2846074, transparent: true, opacity: 0.14 })
     );
     inner.rotation.x = -Math.PI / 2;
     inner.position.y = 0.015;
     this.scene.add(inner);
-
-    // 건설 모드에서만 켜지는 그리드
-    const grid = new THREE.GridHelper(CFG.world.buildRadius * 2, (CFG.world.buildRadius * 2) / CFG.world.cell, 0x66e0ff, 0x2c5a68);
+    const grid = new THREE.GridHelper(CFG.world.buildRadius * 2, CFG.world.buildRadius * 2 / CFG.world.cell, 6742271, 2906728);
     grid.material.transparent = true;
     grid.material.opacity = 0.34;
     grid.position.y = 0.04;
@@ -104,68 +90,69 @@ export class SceneManager {
     this.scene.add(grid);
     this.grid = grid;
   }
-
-  setBuildGridVisible(v) { this.grid.visible = v; }
-
+  setBuildGridVisible(v2) {
+    this.grid.visible = v2;
+  }
   resize() {
-    const w = innerWidth, h = innerHeight;
-    this.renderer.setSize(w, h, false);
-    this.camera.aspect = w / h;
+    const w2 = innerWidth, h2 = innerHeight;
+    this.renderer.setSize(w2, h2, false);
+    this.camera.aspect = w2 / h2;
     this.camera.updateProjectionMatrix();
   }
-
   rotate(dx, dy) {
-    this.yaw -= dx * 0.0045;
-    this.pitch = clamp(this.pitch + dy * 0.003, 0.42, 1.32);
+    this.yaw -= dx * 45e-4;
+    this.pitch = clamp(this.pitch + dy * 3e-3, 0.42, 1.32);
   }
+  // 휠 한 칸이 현재 거리에 비례해 움직이므로, 가까이서도 멀리서도 같은 감각으로 확대/축소된다.
   zoom(delta) {
-    this.distance = clamp(this.distance + delta * 0.02, 12, 46);
+    const step = Math.exp(clamp(delta, -240, 240) * 9e-4);
+    this.wantDistance = clamp(this.wantDistance * step, 9, 60);
   }
-
+  // 건설 모드에서는 카메라를 살짝 물러나 위에서 내려다보게 해 시야를 넓힌다
+  setBuildView(active) {
+    this.buildView = active;
+  }
   // 플레이어 위치를 따라 부드럽게 이동
-  follow(pos, dt) {
+  follow(pos, dt2) {
     this.target.set(pos.x, 0, pos.z);
-    const k = 1 - Math.pow(0.001, dt);
-    this.focus.lerp(this.target, k);
-
-    const cp = Math.cos(this.pitch), sp = Math.sin(this.pitch);
+    const k2 = 1 - Math.pow(1e-3, dt2);
+    this.focus.lerp(this.target, k2);
+    this.distance += (this.wantDistance - this.distance) * Math.min(1, dt2 * 9);
+    const boostTarget = this.buildView ? 1 : 0;
+    this._buildBoost += (boostTarget - this._buildBoost) * Math.min(1, dt2 * 3);
+    const dist3 = this.distance + this._buildBoost * 12;
+    const pitch = clamp(this.pitch + this._buildBoost * 0.2, 0.42, 1.32);
+    const cp2 = Math.cos(pitch), sp2 = Math.sin(pitch);
     this.camera.position.set(
-      this.focus.x + Math.sin(this.yaw) * cp * this.distance,
-      this.focus.y + sp * this.distance,
-      this.focus.z + Math.cos(this.yaw) * cp * this.distance
+      this.focus.x + Math.sin(this.yaw) * cp2 * dist3,
+      this.focus.y + sp2 * dist3,
+      this.focus.z + Math.cos(this.yaw) * cp2 * dist3
     );
     this.camera.lookAt(this.focus.x, this.focus.y + 1.4, this.focus.z);
   }
-
   setPointer(clientX, clientY) {
-    this.pointer.x = (clientX / innerWidth) * 2 - 1;
+    this.pointer.x = clientX / innerWidth * 2 - 1;
     this.pointer.y = -(clientY / innerHeight) * 2 + 1;
   }
-
   // 화면 포인터가 가리키는 바닥 좌표
   updatePointerWorld() {
     this.raycaster.setFromCamera(this.pointer, this.camera);
     const hit = this.raycaster.ray.intersectPlane(this._groundPlane, this.pointerWorld);
     return hit ? this.pointerWorld : null;
   }
-
   // 카메라 기준 이동 방향(월드 XZ)
   moveBasis() {
-    const s = Math.sin(this.yaw), c = Math.cos(this.yaw);
-    return { fx: -s, fz: -c, rx: c, rz: -s };
+    const s2 = Math.sin(this.yaw), c2 = Math.cos(this.yaw);
+    return { fx: -s2, fz: -c2, rx: c2, rz: -s2 };
   }
-
-  render() { this.renderer.render(this.scene, this.camera); }
-
-  worldToScreenXYZ(x, y, z) {
-    return this.worldToScreen(new THREE.Vector3(x, y, z));
+  render() {
+    this.renderer.render(this.scene, this.camera);
   }
-
+  worldToScreenXYZ(x2, y2, z2) {
+    return this.worldToScreen(new THREE.Vector3(x2, y2, z2));
+  }
   worldToScreen(v3) {
-    const p = v3.clone().project(this.camera);
-    return { x: (p.x * 0.5 + 0.5) * innerWidth, y: (-p.y * 0.5 + 0.5) * innerHeight, visible: p.z < 1 };
+    const p2 = v3.clone().project(this.camera);
+    return { x: (p2.x * 0.5 + 0.5) * innerWidth, y: (-p2.y * 0.5 + 0.5) * innerHeight, visible: p2.z < 1 };
   }
-}
-
-// 부드러운 값 추적용
-export const approach = (cur, goal, dt, speed) => lerp(cur, goal, 1 - Math.exp(-speed * dt));
+};

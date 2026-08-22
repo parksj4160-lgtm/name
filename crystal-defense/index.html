@@ -18,6 +18,7 @@
     <div class="res"><span class="ic">🪨</span><b id="res-stone">0</b><span class="lbl">광물</span></div>
     <div class="res"><span class="ic">💠</span><b id="res-shard">0</b><span class="lbl">정수 <kbd>R</kbd></span></div>
     <button id="btn-hup" class="mini">채집속도 <b id="hup-lv">Lv.1</b> <span id="hup-cost" class="cost"></span></button>
+    <button id="btn-pickaxe" class="mini">곡괭이 <b id="pickaxe-status">필요</b> <span id="pickaxe-cost" class="cost"></span></button>
     <div id="pool-mode" class="tag">팀 공유 자원</div>
   </div>
 
@@ -32,6 +33,7 @@
       <span id="wave-state" class="state">준비 60초</span>
       <button id="btn-wave" class="go">웨이브 시작 <kbd>Enter</kbd></button>
     </div>
+    <div id="wave-preview" class="preview hidden"></div>
   </div>
 
   <!-- 우상단: 파티 -->
@@ -56,6 +58,12 @@
 
   <div id="toasts"></div>
 
+  <!-- 첫 플레이 튜토리얼 -->
+  <div id="tutorial" class="panel tutorial hidden">
+    <span id="tutorial-text"></span>
+    <button id="tutorial-skip" class="mini">건너뛰기</button>
+  </div>
+
   <!-- 모바일 컨트롤 -->
   <div id="touch" class="hidden">
     <div id="stick"><i></i></div>
@@ -65,21 +73,31 @@
     </div>
   </div>
 
+  <button id="btn-mute" class="corner mute" title="음소거 켜기/끄기">🔊</button>
   <button id="btn-help" class="corner">?</button>
   <div id="help" class="panel hidden">
     <h3>조작</h3>
+    <p class="dim rebind-hint">밑줄 친 키를 클릭하면 원하는 키로 바꿀 수 있다.</p>
     <table>
       <tr><td>이동</td><td><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> / 방향키 (<kbd>Shift</kbd> 달리기)</td></tr>
-      <tr><td>채집</td><td>나무·돌 근처에서 <kbd>F</kbd> 꾹 누르기</td></tr>
-      <tr><td>공격</td><td>좌클릭 또는 <kbd>Space</kbd></td></tr>
-      <tr><td>건설</td><td><kbd>1</kbd> 벽 · <kbd>2</kbd> 화살탑 · <kbd>3</kbd> 서리탑 · <kbd>4</kbd> 대포탑 → 좌클릭 배치</td></tr>
-      <tr><td>업그레이드</td><td><kbd>U</kbd> 후 건물 클릭</td></tr>
-      <tr><td>철거(50% 환급)</td><td><kbd>X</kbd> 후 건물 클릭</td></tr>
-      <tr><td>웨이브 시작</td><td><kbd>Enter</kbd> (준비 시간이 끝나면 자동 시작)</td></tr>
-      <tr><td>수정 정수</td><td><kbd>R</kbd> — 크리스탈 25% 회복</td></tr>
+      <tr><td>채집</td><td>나무 근처에서 <kbd class="rebind" data-action="harvest">F</kbd> 꾹 누르기 (바위는 곡괭이 필요)</td></tr>
+      <tr><td>공격</td><td>좌클릭 또는 <kbd class="rebind" data-action="attack">Space</kbd></td></tr>
+      <tr><td>건설</td><td><kbd class="rebind" data-action="build:wall">1</kbd> 벽 · <kbd class="rebind" data-action="build:arrow">2</kbd> 화살탑 · <kbd class="rebind" data-action="build:frost">3</kbd> 서리탑 · <kbd class="rebind" data-action="build:cannon">4</kbd> 대포탑 · <kbd class="rebind" data-action="build:poison">5</kbd> 독탑 · <kbd class="rebind" data-action="build:support">6</kbd> 보루 · <kbd class="rebind" data-action="build:workbench">7</kbd> 제작대 → 좌클릭 배치</td></tr>
+      <tr><td>곡괭이</td><td>제작대를 지은 뒤 좌상단 <b>곡괭이</b> 버튼으로 제작 (바위·정수석 채집에 필요)</td></tr>
+      <tr><td>몬스터</td><td>🧙 주술사는 벽을 무시하고 멀리서 크리스탈을 저격 · 🪓 약탈자는 가장 가까운 건물로 직행해 부순다 · 💀 보스는 5웨이브마다 등장</td></tr>
+      <tr><td>업그레이드</td><td><kbd class="rebind" data-action="upgrade">U</kbd> 후 건물 클릭</td></tr>
+      <tr><td>수리</td><td><kbd class="rebind" data-action="repair">G</kbd> 후 건물 클릭 (손상 비례 자원 소모)</td></tr>
+      <tr><td>철거(50% 환급)</td><td><kbd class="rebind" data-action="sell">X</kbd> 후 건물 클릭</td></tr>
+      <tr><td>웨이브 시작</td><td><kbd class="rebind" data-action="startWave">Enter</kbd> (준비 시간이 끝나면 자동 시작)</td></tr>
+      <tr><td>수정 정수</td><td><kbd class="rebind" data-action="shard">R</kbd> — 크리스탈 25% 회복</td></tr>
       <tr><td>카메라</td><td>우클릭 드래그 회전 · 휠 확대/축소</td></tr>
-      <tr><td>취소</td><td><kbd>Esc</kbd> 또는 우클릭</td></tr>
+      <tr><td>취소</td><td><kbd class="rebind" data-action="cancel">Esc</kbd> 또는 우클릭</td></tr>
+      <tr><td>음소거</td><td><kbd class="rebind" data-action="mute">M</kbd></td></tr>
+      <tr><td>일시정지</td><td><kbd class="rebind" data-action="pause">P</kbd> (싱글 플레이만)</td></tr>
     </table>
+    <button id="keybind-reset" class="mini">키 전체 초기화</button>
+    <label class="check vol">음량 <input type="range" id="in-volume" min="0" max="100" step="5" /> <b id="vol-pct">55%</b></label>
+    <label class="check cb"><input type="checkbox" id="chk-colorblind" /> 색약 모드 — 모든 몬스터 위에 종류 아이콘 표시</label>
   </div>
 </div>
 
@@ -128,16 +146,27 @@
   </div>
 </div>
 
+<!-- ================= 일시정지 ================= -->
+<div id="pause-overlay" class="overlay hidden">
+  <div class="card center">
+    <h1>일시정지</h1>
+    <p class="sub"><kbd>P</kbd> 키를 눌러 계속하기</p>
+  </div>
+</div>
+
 <!-- ================= 결과 ================= -->
 <div id="result" class="overlay hidden">
   <div class="card center">
     <h1 id="result-title">승리!</h1>
     <p id="result-sub"></p>
     <ul id="result-stats"></ul>
+    <ul id="result-wavelog" class="wavelog hidden"></ul>
+    <ul id="result-record" class="record"></ul>
     <button id="btn-again" class="primary">다시 하기</button>
   </div>
 </div>
 
 <script type="module" src="js/main.js"></script>
+
 </body>
 </html>
