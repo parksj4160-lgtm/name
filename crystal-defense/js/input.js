@@ -10,6 +10,11 @@ export var Input = class {
     this.move = { x: 0, y: 0 };
     this._dragging = false;
     this._touchId = null;
+    // 회전 델타는 "회전 중인 그 포인터"의 직전 좌표로만 계산한다.
+    // mouse.x/y 를 함께 쓰면 조이스틱을 잡은 다른 손가락이 그 값을 덮어써서
+    // 다음 회전 프레임에 화면이 튄다 (모바일에서 이동+회전 동시 조작 시).
+    this._dragId = null;
+    this._dragLast = { x: 0, y: 0 };
     addEventListener("keydown", (e) => {
       if (e.repeat) return;
       const k2 = e.key.toLowerCase();
@@ -28,30 +33,51 @@ export var Input = class {
       if (e.button === 2) {
         this.mouse.right = true;
         this._dragging = true;
+        this._beginDrag(e);
       } else if (e.pointerType === "touch") {
         this._touchId = e.pointerId;
         this._touchStartX = e.clientX;
         this._touchStartY = e.clientY;
         this._touchMoved = false;
+        this._beginDrag(e);
       } else {
         this.mouse.down = true;
         this.clicked = true;
       }
     });
     addEventListener("pointermove", (e) => {
-      if (this._dragging) {
-        sm2.rotate(e.clientX - this.mouse.x, e.clientY - this.mouse.y);
-      } else if (this._touchId === e.pointerId) {
-        if (!this._touchMoved && Math.hypot(e.clientX - this._touchStartX, e.clientY - this._touchStartY) > 10) {
-          this._touchMoved = true;
+      const isDragPointer = this._dragId === e.pointerId;
+      if (isDragPointer) {
+        if (this._dragging) {
+          this._rotateBy(e);
+        } else if (this._touchId === e.pointerId) {
+          if (!this._touchMoved && Math.hypot(e.clientX - this._touchStartX, e.clientY - this._touchStartY) > 10) {
+            this._touchMoved = true;
+          }
+          if (this._touchMoved) this._rotateBy(e);
         }
-        if (this._touchMoved) sm2.rotate(e.clientX - this.mouse.x, e.clientY - this.mouse.y);
+        this._dragLast.x = e.clientX;
+        this._dragLast.y = e.clientY;
       }
-      this.mouse.x = e.clientX;
-      this.mouse.y = e.clientY;
-      sm2.setPointer(e.clientX, e.clientY);
+      // 조준/고스트 위치는 마우스이거나, 화면을 만지고 있는 그 손가락만 움직인다.
+      // (조이스틱을 잡은 손가락이 건설 미리보기를 끌고 다니지 않게)
+      if (e.pointerType === "mouse" || isDragPointer) {
+        this.mouse.x = e.clientX;
+        this.mouse.y = e.clientY;
+        sm2.setPointer(e.clientX, e.clientY);
+      }
+    });
+    const endDrag = (e) => {
+      if (this._dragId === e.pointerId) this._dragId = null;
+    };
+    addEventListener("pointercancel", (e) => {
+      endDrag(e);
+      if (this._touchId === e.pointerId) this._touchId = null;
+      this._dragging = false;
+      this.mouse.right = false;
     });
     addEventListener("pointerup", (e) => {
+      endDrag(e);
       if (e.button === 2) {
         this.mouse.right = false;
         this._dragging = false;
@@ -71,6 +97,14 @@ export var Input = class {
       const scale = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 400 : 1;
       sm2.zoom(e.deltaY * scale);
     }, { passive: true });
+  }
+  _beginDrag(e) {
+    this._dragId = e.pointerId;
+    this._dragLast.x = e.clientX;
+    this._dragLast.y = e.clientY;
+  }
+  _rotateBy(e) {
+    this.sm.rotate(e.clientX - this._dragLast.x, e.clientY - this._dragLast.y);
   }
   // 카메라 기준 이동 입력 (-1..1)
   axis() {

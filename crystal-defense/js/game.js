@@ -803,6 +803,12 @@ export var Game = class {
     this.ui?.onPauseChange(this.paused);
   }
   setBuildMode(mode) {
+    // 벽·타워는 제작대가 있어야 짓는다 (제작대·화로 자체는 맨손으로 세운다)
+    const def = CFG.builds[mode];
+    if (def && !def.station && !this.hasStation("workbench")) {
+      this.ui?.toast(`${def.name}은(는) 제작대를 지어야 만들 수 있습니다`, "bad");
+      return this.buildMode;
+    }
     this.buildMode = this.buildMgr.setMode(mode);
     this._tapCell = null;
     this.ui?.refreshBuildBar();

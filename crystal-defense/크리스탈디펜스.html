@@ -370,6 +370,7 @@ button.corner.mute.off { opacity: 0.5; }
   border-radius: 50%; background: rgba(95,212,255,0.4); border: 1px solid var(--cyan);
 }
 #touch-buttons { position: absolute; right: 22px; bottom: 210px; display: flex; flex-direction: column; gap: 10px; pointer-events: auto; }
+#touch-buttons button.harvest { background: rgba(185,138,77,0.32); border-color: rgba(255,216,138,0.5); }
 #touch-buttons button {
   width: 76px; height: 76px; border-radius: 50%; font-size: 14px; font-weight: 700;
   background: rgba(14,20,33,0.85); color: var(--text); border: 1px solid var(--line); font-family: inherit;
@@ -528,8 +529,7 @@ button.corner.mute.off { opacity: 0.5; }
   <div id="touch" class="hidden">
     <div id="stick"><i></i></div>
     <div id="touch-buttons">
-      <button id="tb-harvest">채집</button>
-      <button id="tb-attack">공격</button>
+      <button id="tb-action">공격</button>
     </div>
   </div>
 
@@ -540,12 +540,12 @@ button.corner.mute.off { opacity: 0.5; }
     <p class="dim rebind-hint">밑줄 친 키를 클릭하면 원하는 키로 바꿀 수 있다.</p>
     <table>
       <tr><td>이동</td><td><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> / 방향키 (<kbd>Shift</kbd> 달리기)</td></tr>
-      <tr><td>채집</td><td>나무 근처에서 <kbd class="rebind" data-action="harvest">F</kbd> 꾹 누르기 (바위는 곡괭이 필요)</td></tr>
+      <tr><td>채집</td><td>자원 근처에서 <kbd class="rebind" data-action="harvest">F</kbd> 꾹 누르기. 💠 정수석은 <b>곡괭이를 손에 쥐고 있어야</b> 캘 수 있다</td></tr>
       <tr><td>공격</td><td>좌클릭 또는 <kbd class="rebind" data-action="attack">Space</kbd></td></tr>
       <tr><td>인벤토리</td><td><kbd class="rebind" data-action="inventory">I</kbd> — 건설 · 제작 · 장비를 여기서 전부 고른다</td></tr>
-      <tr><td>건설</td><td>인벤토리 <b>건설</b> 탭에서 고르면 배치 모드가 된다 → 좌클릭으로 배치</td></tr>
+      <tr><td>건설</td><td>인벤토리 <b>건설</b> 탭에서 고르면 배치 모드가 된다 → 좌클릭으로 배치. 벽·타워는 <b>제작대를 먼저 지어야</b> 열린다</td></tr>
       <tr><td>제작</td><td><b>제작대</b>를 지으면 인벤토리 <b>제작</b> 탭에서 ⛏️ 곡괭이 · 🗡️ 칼 · 🏹 활을 만든다. <b>화로</b>를 지으면 광물을 녹여 ⚙️ 철을 얻는다</td></tr>
-      <tr><td>무기 장착</td><td>인벤토리 <b>장비</b> 탭에서 고르면 그 무기를 손에 든다 (다시 누르면 맨손)</td></tr>
+      <tr><td>장비</td><td>인벤토리 <b>장비</b> 탭에서 고르면 손에 든다. ⛏️ 곡괭이도 쥐어야 정수석을 캘 수 있다</td></tr>
       <tr><td>몬스터</td><td>🧙 주술사는 벽을 무시하고 멀리서 크리스탈을 저격 · 🪓 약탈자는 가장 가까운 건물로 직행해 부순다 · 💀 보스는 5웨이브마다 등장</td></tr>
       <tr><td>업그레이드</td><td><kbd class="rebind" data-action="upgrade">U</kbd> 후 건물 클릭</td></tr>
       <tr><td>수리</td><td><kbd class="rebind" data-action="repair">G</kbd> 후 건물 클릭 (손상 비례 자원 소모)</td></tr>
@@ -11909,6 +11909,8 @@ button.corner.mute.off { opacity: 0.5; }
       this.move = { x: 0, y: 0 };
       this._dragging = false;
       this._touchId = null;
+      this._dragId = null;
+      this._dragLast = { x: 0, y: 0 };
       addEventListener("keydown", (e) => {
         if (e.repeat) return;
         const k2 = e.key.toLowerCase();
@@ -11927,30 +11929,49 @@ button.corner.mute.off { opacity: 0.5; }
         if (e.button === 2) {
           this.mouse.right = true;
           this._dragging = true;
+          this._beginDrag(e);
         } else if (e.pointerType === "touch") {
           this._touchId = e.pointerId;
           this._touchStartX = e.clientX;
           this._touchStartY = e.clientY;
           this._touchMoved = false;
+          this._beginDrag(e);
         } else {
           this.mouse.down = true;
           this.clicked = true;
         }
       });
       addEventListener("pointermove", (e) => {
-        if (this._dragging) {
-          sm2.rotate(e.clientX - this.mouse.x, e.clientY - this.mouse.y);
-        } else if (this._touchId === e.pointerId) {
-          if (!this._touchMoved && Math.hypot(e.clientX - this._touchStartX, e.clientY - this._touchStartY) > 10) {
-            this._touchMoved = true;
+        const isDragPointer = this._dragId === e.pointerId;
+        if (isDragPointer) {
+          if (this._dragging) {
+            this._rotateBy(e);
+          } else if (this._touchId === e.pointerId) {
+            if (!this._touchMoved && Math.hypot(e.clientX - this._touchStartX, e.clientY - this._touchStartY) > 10) {
+              this._touchMoved = true;
+            }
+            if (this._touchMoved) this._rotateBy(e);
           }
-          if (this._touchMoved) sm2.rotate(e.clientX - this.mouse.x, e.clientY - this.mouse.y);
+          this._dragLast.x = e.clientX;
+          this._dragLast.y = e.clientY;
         }
-        this.mouse.x = e.clientX;
-        this.mouse.y = e.clientY;
-        sm2.setPointer(e.clientX, e.clientY);
+        if (e.pointerType === "mouse" || isDragPointer) {
+          this.mouse.x = e.clientX;
+          this.mouse.y = e.clientY;
+          sm2.setPointer(e.clientX, e.clientY);
+        }
+      });
+      const endDrag = (e) => {
+        if (this._dragId === e.pointerId) this._dragId = null;
+      };
+      addEventListener("pointercancel", (e) => {
+        endDrag(e);
+        if (this._touchId === e.pointerId) this._touchId = null;
+        this._dragging = false;
+        this.mouse.right = false;
       });
       addEventListener("pointerup", (e) => {
+        endDrag(e);
         if (e.button === 2) {
           this.mouse.right = false;
           this._dragging = false;
@@ -11970,6 +11991,14 @@ button.corner.mute.off { opacity: 0.5; }
         const scale = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 400 : 1;
         sm2.zoom(e.deltaY * scale);
       }, { passive: true });
+    }
+    _beginDrag(e) {
+      this._dragId = e.pointerId;
+      this._dragLast.x = e.clientX;
+      this._dragLast.y = e.clientY;
+    }
+    _rotateBy(e) {
+      this.sm.rotate(e.clientX - this._dragLast.x, e.clientY - this._dragLast.y);
     }
     // 카메라 기준 이동 입력 (-1..1)
     axis() {
@@ -12287,18 +12316,21 @@ button.corner.mute.off { opacity: 0.5; }
     arm: new iu(0.12, 0.45, 3, 6),
     tool: new qs(0.14, 0.9, 0.14),
     sword: new qs(0.1, 1.05, 0.24),
+    pickaxe: new qs(0.5, 0.13, 0.13),
     bow: new Ku(0.38, 0.035, 6, 12, Math.PI * 1.15),
     ring: new qu(0.62, 0.76, 20)
   };
   var WEAPON_MAT = {
     default: new sd({ color: 12093775, roughness: 0.7 }),
     sword: new sd({ color: 14406878, roughness: 0.28, metalness: 0.85 }),
-    bow: new sd({ color: 9068331, roughness: 0.6, metalness: 0.1 })
+    bow: new sd({ color: 9068331, roughness: 0.6, metalness: 0.1 }),
+    pickaxe: new sd({ color: 11119017, roughness: 0.45, metalness: 0.6 })
   };
   var WEAPON_LOOK = {
     default: { geo: GEO4.tool, mat: WEAPON_MAT.default, ry: 0, rz: 0 },
     sword: { geo: GEO4.sword, mat: WEAPON_MAT.sword, ry: 0, rz: 0.15 },
-    bow: { geo: GEO4.bow, mat: WEAPON_MAT.bow, ry: Math.PI / 2, rz: 0 }
+    bow: { geo: GEO4.bow, mat: WEAPON_MAT.bow, ry: Math.PI / 2, rz: 0 },
+    pickaxe: { geo: GEO4.pickaxe, mat: WEAPON_MAT.pickaxe, ry: 0, rz: 0.9 }
   };
   var PALETTE = [6280447, 10354539, 16757599, 16739286, 14065919, 7077840];
   var Player = class {
@@ -12363,8 +12395,9 @@ button.corner.mute.off { opacity: 0.5; }
     get harvestMult() {
       return CFG.harvest.upgrade[this.harvestLv - 1].mult;
     }
-    get hasPickaxe() {
-      return !!this.tools.pickaxe;
+    // 곡괭이는 만들어 두는 것만으로는 부족하고, 손에 쥐고 있어야 정수석을 캘 수 있다
+    get holdingPickaxe() {
+      return this.heldWeapon === "pickaxe";
     }
     // 기본 공격치에 지금 손에 든 무기의 효과만 더한다 (여러 자루를 동시에 들 수는 없다)
     get attackStats() {
@@ -12523,7 +12556,7 @@ button.corner.mute.off { opacity: 0.5; }
       if (!this.harvesting) {
         const node = world.nearestNode(this.x, this.z, CFG.harvest.range);
         if (!node) return null;
-        if (node.type === "gem" && !this.hasPickaxe) return null;
+        if (node.type === "gem" && !this.holdingPickaxe) return null;
         this.harvesting = { node, t: 0, need: CFG.harvest[node.type].time * this.harvestMult };
         this.rot = Math.atan2(node.x - this.x, node.z - this.z);
       }
@@ -13952,6 +13985,11 @@ button.corner.mute.off { opacity: 0.5; }
       this.ui?.onPauseChange(this.paused);
     }
     setBuildMode(mode) {
+      const def = CFG.builds[mode];
+      if (def && !def.station && !this.hasStation("workbench")) {
+        this.ui?.toast(`${def.name}\uC740(\uB294) \uC81C\uC791\uB300\uB97C \uC9C0\uC5B4\uC57C \uB9CC\uB4E4 \uC218 \uC788\uC2B5\uB2C8\uB2E4`, "bad");
+        return this.buildMode;
+      }
       this.buildMode = this.buildMgr.setMode(mode);
       this._tapCell = null;
       this.ui?.refreshBuildBar();
@@ -14052,8 +14090,8 @@ button.corner.mute.off { opacity: 0.5; }
   // js/ui.js
   var $2 = (id) => document.getElementById(id);
   var TUTORIAL_STEPS = [
-    "\u{1F333} \uADFC\uCC98 \uB098\uBB34\uC5D0 \uB2E4\uAC00\uAC00 <kbd>F</kbd> \uB97C \uAFB9 \uB20C\uB7EC \uCC44\uC9D1\uD558\uC138\uC694 (\uBC14\uC704\uB294 \uC81C\uC791\uB300\uC5D0\uC11C \uACE1\uAD2D\uC774\uB97C \uB9CC\uB4E4\uC5B4\uC57C \uCE98 \uC218 \uC788\uC5B4\uC694)",
-    "\u{1F392} <kbd>I</kbd> \uB85C \uC778\uBCA4\uD1A0\uB9AC\uB97C \uC5F4\uC5B4 \uBCBD\xB7\uD0C0\uC6CC\uB97C \uACE8\uB77C \uD06C\uB9AC\uC2A4\uD0C8 \uC8FC\uBCC0\uC5D0 \uC9C0\uC73C\uC138\uC694",
+    "\u{1F333} \uADFC\uCC98 \uB098\uBB34\uC5D0 \uB2E4\uAC00\uAC00 <kbd>F</kbd> \uB97C \uAFB9 \uB20C\uB7EC \uCC44\uC9D1\uD558\uC138\uC694",
+    "\u{1F392} <kbd>I</kbd> \uB85C \uC778\uBCA4\uD1A0\uB9AC\uB97C \uC5F4\uC5B4 \u{1FA9A} \uC81C\uC791\uB300\uB97C \uBA3C\uC800 \uC9C0\uC73C\uC138\uC694 (\uBCBD\xB7\uD0C0\uC6CC\uB294 \uADF8 \uB2E4\uC74C)",
     "\uC900\uBE44\uAC00 \uB418\uBA74 <kbd>Enter</kbd> \uB85C \uCCAB \uC6E8\uC774\uBE0C\uB97C \uC2DC\uC791\uD558\uC138\uC694!"
   ];
   var UI = class {
@@ -14136,19 +14174,25 @@ button.corner.mute.off { opacity: 0.5; }
       const g2 = this.game;
       const tab = this._invTab;
       if (tab === "build") {
-        const rows2 = Object.entries(CFG.builds).map(([key, def]) => ({
-          key,
-          icon: def.icon,
-          name: def.name,
-          desc: def.desc,
-          cost: def.cost,
-          hotkey: g2.km.get("build:" + key),
-          state: g2.buildMgr?.mode === key ? "active" : canAfford(g2.myPool, def.cost) ? "" : "poor",
-          action: () => {
-            g2.setBuildMode(key);
-            this.closeInventory();
-          }
-        }));
+        const hasBench = g2.hasStation("workbench");
+        const rows2 = Object.entries(CFG.builds).map(([key, def]) => {
+          const needsBench = !def.station && !hasBench;
+          return {
+            key,
+            icon: def.icon,
+            name: def.name,
+            desc: def.desc,
+            cost: def.cost,
+            hotkey: g2.km.get("build:" + key),
+            note: needsBench ? "\uC81C\uC791\uB300 \uD544\uC694" : null,
+            state: needsBench ? "locked" : g2.buildMgr?.mode === key ? "active" : canAfford(g2.myPool, def.cost) ? "" : "poor",
+            action: () => {
+              if (needsBench) return;
+              g2.setBuildMode(key);
+              this.closeInventory();
+            }
+          };
+        });
         for (const [key, icon, name, desc] of [
           ["upgrade", "\u2B06\uFE0F", "\uC5C5\uADF8\uB808\uC774\uB4DC", "\uAC74\uBB3C\uC744 \uD074\uB9AD\uD574 \uB808\uBCA8\uC744 \uC62C\uB9B0\uB2E4"],
           ["repair", "\u{1F527}", "\uC218\uB9AC", "\uC190\uC0C1\uB41C \uB9CC\uD07C\uB9CC \uC790\uC6D0\uC744 \uC4F4\uB2E4"],
@@ -14204,7 +14248,6 @@ button.corner.mute.off { opacity: 0.5; }
         action: () => g2.requestEquip(null)
       }];
       for (const [key, r] of Object.entries(CFG.craft)) {
-        if (!r.effect) continue;
         const owned = !!g2.local.tools[key];
         rows.push({
           key,
@@ -14223,9 +14266,9 @@ button.corner.mute.off { opacity: 0.5; }
       if (!this.inventoryOpen) return;
       const rows = this._invRows();
       const DESC = {
-        build: "\uC9C0\uC744 \uAC83\uC744 \uACE0\uB974\uBA74 \uBC30\uCE58 \uBAA8\uB4DC\uAC00 \uB41C\uB2E4. \uC88C\uD074\uB9AD\uC73C\uB85C \uB193\uACE0, \uC6B0\uD074\uB9AD\xB7Esc \uB85C \uCDE8\uC18C\uD55C\uB2E4.",
+        build: "\uC9C0\uC744 \uAC83\uC744 \uACE0\uB974\uBA74 \uBC30\uCE58 \uBAA8\uB4DC\uAC00 \uB41C\uB2E4. \uBCBD\xB7\uD0C0\uC6CC\uB294 \uC81C\uC791\uB300\uB97C \uBA3C\uC800 \uC9C0\uC5B4\uC57C \uC5F4\uB9B0\uB2E4.",
         craft: "\uC81C\uC791\uB300\uB97C \uC9C0\uC73C\uBA74 \uB3C4\uAD6C\uC640 \uBB34\uAE30\uB97C, \uD654\uB85C\uB97C \uC9C0\uC73C\uBA74 \uCCA0\uC744 \uB9CC\uB4E4 \uC218 \uC788\uB2E4.",
-        gear: "\uC190\uC5D0 \uB4E4 \uBB34\uAE30\uB97C \uACE0\uB978\uB2E4. \uB4E0 \uBB34\uAE30\uC758 \uD6A8\uACFC\uB9CC \uC801\uC6A9\uB41C\uB2E4."
+        gear: "\uC190\uC5D0 \uB4E4 \uAC83\uC744 \uACE0\uB978\uB2E4. \uB4E0 \uAC83\uC758 \uD6A8\uACFC\uB9CC \uC801\uC6A9\uB418\uACE0, \uC815\uC218\uC11D\uC740 \uACE1\uAD2D\uC774\uB97C \uC950\uC5B4\uC57C \uCE94\uB2E4."
       };
       this.el.invDesc.textContent = DESC[this._invTab];
       for (const t2 of this.el.invTabs.querySelectorAll(".inv-tab")) {
@@ -14644,17 +14687,19 @@ button.corner.mute.off { opacity: 0.5; }
       };
       stick.addEventListener("pointerup", release);
       stick.addEventListener("pointercancel", release);
-      const hb = $2("tb-harvest");
-      hb.addEventListener("pointerdown", () => {
-        this.harvestHeld = true;
+      const ab = $2("tb-action");
+      ab.addEventListener("pointerdown", (e) => {
+        e.preventDefault();
+        if (this.canHarvestNow) this.harvestHeld = true;
+        else this.game.requestAttack();
       });
-      hb.addEventListener("pointerup", () => {
+      const releaseAction = () => {
         this.harvestHeld = false;
-      });
-      hb.addEventListener("pointercancel", () => {
-        this.harvestHeld = false;
-      });
-      $2("tb-attack").addEventListener("pointerdown", () => this.game.requestAttack());
+      };
+      ab.addEventListener("pointerup", releaseAction);
+      ab.addEventListener("pointercancel", releaseAction);
+      ab.addEventListener("pointerleave", releaseAction);
+      this.el.actionBtn = ab;
     }
     // ---------------------------------------------------------------- 라이프사이클
     onGameStart(resumed = false) {
@@ -14834,10 +14879,17 @@ button.corner.mute.off { opacity: 0.5; }
         this.el.harvestWrap.classList.add("hidden");
       }
       const near = g2.world.nearestNode(p2.x, p2.z, CFG.harvest.range);
+      this.canHarvestNow = !!near && !g2.buildMgr.mode && !(near.type === "gem" && !p2.holdingPickaxe);
+      if (this.el.actionBtn) {
+        const harvest = this.canHarvestNow;
+        this.el.actionBtn.textContent = harvest ? "\uCC44\uC9D1" : "\uACF5\uACA9";
+        this.el.actionBtn.classList.toggle("harvest", harvest);
+        if (!harvest) this.harvestHeld = false;
+      }
       if (near && !g2.buildMgr.mode) {
         this.el.prompt.classList.remove("hidden");
-        if (near.type === "gem" && !p2.hasPickaxe) {
-          this.el.prompt.innerHTML = `\u{1F4A0} \uC815\uC218\uC11D \u2014 \uACE1\uAD2D\uC774\uAC00 \uC788\uC5B4\uC57C \uCE98 \uC218 \uC788\uC2B5\uB2C8\uB2E4 (\uC81C\uC791\uB300\uC5D0\uC11C \uC81C\uC791)`;
+        if (near.type === "gem" && !p2.holdingPickaxe) {
+          this.el.prompt.innerHTML = p2.tools.pickaxe ? `\u{1F4A0} \uC815\uC218\uC11D \u2014 \uACE1\uAD2D\uC774\uB97C <b>\uC190\uC5D0 \uC950\uC5B4\uC57C</b> \uCE98 \uC218 \uC788\uC2B5\uB2C8\uB2E4 (\uC778\uBCA4\uD1A0\uB9AC \uC7A5\uBE44 \uD0ED)` : `\u{1F4A0} \uC815\uC218\uC11D \u2014 \uACE1\uAD2D\uC774\uAC00 \uC788\uC5B4\uC57C \uCE98 \uC218 \uC788\uC2B5\uB2C8\uB2E4 (\uC81C\uC791\uB300\uC5D0\uC11C \uC81C\uC791)`;
         } else {
           const label = near.type === "tree" ? "\u{1F333} \uB098\uBB34" : near.type === "gem" ? "\u{1F4A0} \uC815\uC218\uC11D" : "\u{1FAA8} \uBC14\uC704";
           this.el.prompt.innerHTML = `${label} \u2014 <kbd>F</kbd> \uAFB9 \uB20C\uB7EC \uCC44\uC9D1 (\uB0A8\uC740 ${near.charges})`;

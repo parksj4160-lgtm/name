@@ -8,18 +8,21 @@ var GEO4 = {
   arm: new THREE.CapsuleGeometry(0.12, 0.45, 3, 6),
   tool: new THREE.BoxGeometry(0.14, 0.9, 0.14),
   sword: new THREE.BoxGeometry(0.1, 1.05, 0.24),
+  pickaxe: new THREE.BoxGeometry(0.5, 0.13, 0.13),
   bow: new THREE.TorusGeometry(0.38, 0.035, 6, 12, Math.PI * 1.15),
   ring: new THREE.RingGeometry(0.62, 0.76, 20)
 };
 var WEAPON_MAT = {
   default: new THREE.MeshStandardMaterial({ color: 12093775, roughness: 0.7 }),
   sword: new THREE.MeshStandardMaterial({ color: 14406878, roughness: 0.28, metalness: 0.85 }),
-  bow: new THREE.MeshStandardMaterial({ color: 9068331, roughness: 0.6, metalness: 0.1 })
+  bow: new THREE.MeshStandardMaterial({ color: 9068331, roughness: 0.6, metalness: 0.1 }),
+  pickaxe: new THREE.MeshStandardMaterial({ color: 11119017, roughness: 0.45, metalness: 0.6 })
 };
 var WEAPON_LOOK = {
   default: { geo: GEO4.tool, mat: WEAPON_MAT.default, ry: 0, rz: 0 },
   sword: { geo: GEO4.sword, mat: WEAPON_MAT.sword, ry: 0, rz: 0.15 },
-  bow: { geo: GEO4.bow, mat: WEAPON_MAT.bow, ry: Math.PI / 2, rz: 0 }
+  bow: { geo: GEO4.bow, mat: WEAPON_MAT.bow, ry: Math.PI / 2, rz: 0 },
+  pickaxe: { geo: GEO4.pickaxe, mat: WEAPON_MAT.pickaxe, ry: 0, rz: 0.9 }
 };
 var PALETTE = [6280447, 10354539, 16757599, 16739286, 14065919, 7077840];
 var Player = class {
@@ -84,8 +87,9 @@ var Player = class {
   get harvestMult() {
     return CFG.harvest.upgrade[this.harvestLv - 1].mult;
   }
-  get hasPickaxe() {
-    return !!this.tools.pickaxe;
+  // 곡괭이는 만들어 두는 것만으로는 부족하고, 손에 쥐고 있어야 정수석을 캘 수 있다
+  get holdingPickaxe() {
+    return this.heldWeapon === "pickaxe";
   }
   // 기본 공격치에 지금 손에 든 무기의 효과만 더한다 (여러 자루를 동시에 들 수는 없다)
   get attackStats() {
@@ -244,7 +248,7 @@ export var LocalPlayer = class extends Player {
     if (!this.harvesting) {
       const node = world.nearestNode(this.x, this.z, CFG.harvest.range);
       if (!node) return null;
-      if (node.type === "gem" && !this.hasPickaxe) return null;
+      if (node.type === "gem" && !this.holdingPickaxe) return null;
       this.harvesting = { node, t: 0, need: CFG.harvest[node.type].time * this.harvestMult };
       this.rot = Math.atan2(node.x - this.x, node.z - this.z);
     }

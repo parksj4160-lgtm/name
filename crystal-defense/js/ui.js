@@ -6,8 +6,8 @@ import { PHASE } from './wave.js';
 
 var $2 = (id) => document.getElementById(id);
 var TUTORIAL_STEPS = [
-  "🌳 근처 나무에 다가가 <kbd>F</kbd> 를 꾹 눌러 채집하세요 (바위는 제작대에서 곡괭이를 만들어야 캘 수 있어요)",
-  "🎒 <kbd>I</kbd> 로 인벤토리를 열어 벽\xB7타워를 골라 크리스탈 주변에 지으세요",
+  "🌳 근처 나무에 다가가 <kbd>F</kbd> 를 꾹 눌러 채집하세요",
+  "🎒 <kbd>I</kbd> 로 인벤토리를 열어 🪚 제작대를 먼저 지으세요 (벽\xB7타워는 그 다음)",
   "준비가 되면 <kbd>Enter</kbd> 로 첫 웨이브를 시작하세요!"
 ];
 export var UI = class {
@@ -90,19 +90,26 @@ export var UI = class {
     const g2 = this.game;
     const tab = this._invTab;
     if (tab === "build") {
-      const rows = Object.entries(CFG.builds).map(([key, def]) => ({
-        key,
-        icon: def.icon,
-        name: def.name,
-        desc: def.desc,
-        cost: def.cost,
-        hotkey: g2.km.get("build:" + key),
-        state: g2.buildMgr?.mode === key ? "active" : canAfford(g2.myPool, def.cost) ? "" : "poor",
-        action: () => {
-          g2.setBuildMode(key);
-          this.closeInventory();
-        }
-      }));
+      // 제작대·화로는 맨손으로 세우지만, 벽과 타워는 제작대가 있어야 지을 수 있다
+      const hasBench = g2.hasStation("workbench");
+      const rows = Object.entries(CFG.builds).map(([key, def]) => {
+        const needsBench = !def.station && !hasBench;
+        return {
+          key,
+          icon: def.icon,
+          name: def.name,
+          desc: def.desc,
+          cost: def.cost,
+          hotkey: g2.km.get("build:" + key),
+          note: needsBench ? "제작대 필요" : null,
+          state: needsBench ? "locked" : g2.buildMgr?.mode === key ? "active" : canAfford(g2.myPool, def.cost) ? "" : "poor",
+          action: () => {
+            if (needsBench) return;
+            g2.setBuildMode(key);
+            this.closeInventory();
+          }
+        };
+      });
       for (const [key, icon, name, desc] of [
         ["upgrade", "⬆️", "업그레이드", "건물을 클릭해 레벨을 올린다"],
         ["repair", "🔧", "수리", "손상된 만큼만 자원을 쓴다"],
@@ -159,7 +166,6 @@ export var UI = class {
       action: () => g2.requestEquip(null)
     }];
     for (const [key, r] of Object.entries(CFG.craft)) {
-      if (!r.effect) continue;
       const owned = !!g2.local.tools[key];
       rows.push({
         key,
@@ -178,9 +184,9 @@ export var UI = class {
     if (!this.inventoryOpen) return;
     const rows = this._invRows();
     const DESC = {
-      build: "지을 것을 고르면 배치 모드가 된다. 좌클릭으로 놓고, 우클릭\xB7Esc 로 취소한다.",
+      build: "지을 것을 고르면 배치 모드가 된다. 벽\xB7타워는 제작대를 먼저 지어야 열린다.",
       craft: "제작대를 지으면 도구와 무기를, 화로를 지으면 철을 만들 수 있다.",
-      gear: "손에 들 무기를 고른다. 든 무기의 효과만 적용된다."
+      gear: "손에 들 것을 고른다. 든 것의 효과만 적용되고, 정수석은 곡괭이를 쥐어야 캔다."
     };
     this.el.invDesc.textContent = DESC[this._invTab];
     for (const t2 of this.el.invTabs.querySelectorAll(".inv-tab")) {
@@ -600,17 +606,20 @@ export var UI = class {
     };
     stick.addEventListener("pointerup", release);
     stick.addEventListener("pointercancel", release);
-    const hb = $2("tb-harvest");
-    hb.addEventListener("pointerdown", () => {
-      this.harvestHeld = true;
+    // 채집/공격을 버튼 하나로. 캘 것이 앞에 있으면 꾹 눌러 채집, 없으면 눌러서 공격.
+    const ab = $2("tb-action");
+    ab.addEventListener("pointerdown", (e) => {
+      e.preventDefault();
+      if (this.canHarvestNow) this.harvestHeld = true;
+      else this.game.requestAttack();
     });
-    hb.addEventListener("pointerup", () => {
+    const releaseAction = () => {
       this.harvestHeld = false;
-    });
-    hb.addEventListener("pointercancel", () => {
-      this.harvestHeld = false;
-    });
-    $2("tb-attack").addEventListener("pointerdown", () => this.game.requestAttack());
+    };
+    ab.addEventListener("pointerup", releaseAction);
+    ab.addEventListener("pointercancel", releaseAction);
+    ab.addEventListener("pointerleave", releaseAction);
+    this.el.actionBtn = ab;
   }
   // ---------------------------------------------------------------- 라이프사이클
   onGameStart(resumed = false) {
@@ -790,10 +799,18 @@ export var UI = class {
       this.el.harvestWrap.classList.add("hidden");
     }
     const near = g2.world.nearestNode(p2.x, p2.z, CFG.harvest.range);
+    // 지금 채집할 수 있는 상태인지 — 터치 버튼이 채집/공격 중 무엇으로 동작할지 정한다
+    this.canHarvestNow = !!near && !g2.buildMgr.mode && !(near.type === "gem" && !p2.holdingPickaxe);
+    if (this.el.actionBtn) {
+      const harvest = this.canHarvestNow;
+      this.el.actionBtn.textContent = harvest ? "채집" : "공격";
+      this.el.actionBtn.classList.toggle("harvest", harvest);
+      if (!harvest) this.harvestHeld = false;
+    }
     if (near && !g2.buildMgr.mode) {
       this.el.prompt.classList.remove("hidden");
-      if (near.type === "gem" && !p2.hasPickaxe) {
-        this.el.prompt.innerHTML = `💠 정수석 — 곡괭이가 있어야 캘 수 있습니다 (제작대에서 제작)`;
+      if (near.type === "gem" && !p2.holdingPickaxe) {
+        this.el.prompt.innerHTML = p2.tools.pickaxe ? `💠 정수석 — 곡괭이를 <b>손에 쥐어야</b> 캘 수 있습니다 (인벤토리 장비 탭)` : `💠 정수석 — 곡괭이가 있어야 캘 수 있습니다 (제작대에서 제작)`;
       } else {
         const label = near.type === "tree" ? "🌳 나무" : near.type === "gem" ? "💠 정수석" : "🪨 바위";
         this.el.prompt.innerHTML = `${label} — <kbd>F</kbd> 꾹 눌러 채집 (남은 ${near.charges})`;
