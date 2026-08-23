@@ -10,19 +10,28 @@ var GEO4 = {
   sword: new THREE.BoxGeometry(0.1, 1.05, 0.24),
   pickaxe: new THREE.BoxGeometry(0.5, 0.13, 0.13),
   bow: new THREE.TorusGeometry(0.38, 0.035, 6, 12, Math.PI * 1.15),
+  spear: new THREE.CylinderGeometry(0.035, 0.1, 1.9, 6),
+  hammer: new THREE.CylinderGeometry(0.09, 0.34, 1, 6),
+  bomb: new THREE.SphereGeometry(0.22, 10, 8),
   ring: new THREE.RingGeometry(0.62, 0.76, 20)
 };
 var WEAPON_MAT = {
   default: new THREE.MeshStandardMaterial({ color: 12093775, roughness: 0.7 }),
   sword: new THREE.MeshStandardMaterial({ color: 14406878, roughness: 0.28, metalness: 0.85 }),
   bow: new THREE.MeshStandardMaterial({ color: 9068331, roughness: 0.6, metalness: 0.1 }),
-  pickaxe: new THREE.MeshStandardMaterial({ color: 11119017, roughness: 0.45, metalness: 0.6 })
+  pickaxe: new THREE.MeshStandardMaterial({ color: 11119017, roughness: 0.45, metalness: 0.6 }),
+  spear: new THREE.MeshStandardMaterial({ color: 13227747, roughness: 0.35, metalness: 0.75 }),
+  hammer: new THREE.MeshStandardMaterial({ color: 7034692, roughness: 0.55, metalness: 0.4 }),
+  bomb: new THREE.MeshStandardMaterial({ color: 2829103, roughness: 0.5, metalness: 0.2 })
 };
 var WEAPON_LOOK = {
   default: { geo: GEO4.tool, mat: WEAPON_MAT.default, ry: 0, rz: 0 },
   sword: { geo: GEO4.sword, mat: WEAPON_MAT.sword, ry: 0, rz: 0.15 },
   bow: { geo: GEO4.bow, mat: WEAPON_MAT.bow, ry: Math.PI / 2, rz: 0 },
-  pickaxe: { geo: GEO4.pickaxe, mat: WEAPON_MAT.pickaxe, ry: 0, rz: 0.9 }
+  pickaxe: { geo: GEO4.pickaxe, mat: WEAPON_MAT.pickaxe, ry: 0, rz: 0.9 },
+  spear: { geo: GEO4.spear, mat: WEAPON_MAT.spear, ry: 0, rz: 0.05 },
+  hammer: { geo: GEO4.hammer, mat: WEAPON_MAT.hammer, ry: 0, rz: 0.85 },
+  bomb: { geo: GEO4.bomb, mat: WEAPON_MAT.bomb, ry: 0, rz: 0 }
 };
 var PALETTE = [6280447, 10354539, 16757599, 16739286, 14065919, 7077840];
 var Player = class {
@@ -47,12 +56,14 @@ var Player = class {
     this.attackCd = 0;
     this.swing = 0;
     this.combatUntil = 0;
+    this.invulnerable = false;
+    this.reviveAssisted = false;
     this.mesh = this._makeMesh();
     this.mesh.position.set(this.x, 0, this.z);
   }
   _makeMesh() {
     const g2 = new THREE.Group();
-    const mat = new THREE.MeshStandardMaterial({ color: this.color, roughness: 0.6, metalness: 0.1 });
+    const mat = new THREE.MeshStandardMaterial({ color: this.color, roughness: 0.6, metalness: 0.1, transparent: true });
     this.mat = mat;
     const body = new THREE.Mesh(GEO4.body, mat);
     body.position.y = 0.85;
@@ -119,6 +130,7 @@ var Player = class {
     this.mesh.rotation.z = 0;
     this.x = 0;
     this.z = CFG.world.coreRadius + 2;
+    this.reviveAssisted = false;
   }
   cancelHarvest() {
     this.harvesting = null;
@@ -128,7 +140,7 @@ var Player = class {
   get heldWeapon() {
     if (this.equipped === "none") return "default";
     if (this.equipped && this.tools[this.equipped]) return this.equipped;
-    return this.tools.sword ? "sword" : this.tools.bow ? "bow" : "default";
+    return this.tools.sword ? "sword" : this.tools.spear ? "spear" : this.tools.hammer ? "hammer" : this.tools.bow ? "bow" : "default";
   }
   _updateWeapon() {
     const key = WEAPON_LOOK[this.heldWeapon] ? this.heldWeapon : "default";
@@ -159,41 +171,81 @@ var Player = class {
     const bob = moving ? Math.abs(Math.sin(t2 * 9)) * 0.09 : 0;
     this.mesh.position.y = bob;
     this.mesh.rotation.y = this.rot;
-    this.ring.material.opacity = this.alive ? this.isLocal ? 0.85 : 0.45 : 0.15;
+    this.ring.material.opacity = this.alive ? this.isLocal ? 0.85 : 0.45 : this.reviveAssisted ? 0.45 + Math.abs(Math.sin(t2 * 8)) * 0.35 : 0.15;
     this.mat.emissive?.setHex(this.combatUntil > t2 ? 6693410 : 0);
+    this.mat.opacity = this.invulnerable ? 0.35 + Math.abs(Math.sin(t2 * 26)) * 0.35 : 1;
   }
 };
 export var LocalPlayer = class extends Player {
   constructor(id, name, colorIdx) {
     super(id, name, colorIdx, true);
+    this.dashCd = 0;
+    this.dashUntil = 0;
+    this.dashDir = { x: 0, z: 1 };
   }
-  update(dt2, input, sm2, grid, world) {
+  // 회피 돌진 시작 — 쿨다운 중이거나 쓰러진 상태면 실패. 이동 입력이 있으면 그 방향으로, 없으면 바라보는 방향으로
+  tryDash(input, sm2) {
+    if (!this.alive || this.dashCd > 0) return false;
+    const ax = input.axis();
+    const basis = sm2.moveBasis();
+    let dx = basis.rx * ax.x + basis.fx * ax.y;
+    let dz = basis.rz * ax.x + basis.fz * ax.y;
+    const len = Math.hypot(dx, dz);
+    if (len > 0.01) {
+      dx /= len;
+      dz /= len;
+    } else {
+      dx = Math.sin(this.rot);
+      dz = Math.cos(this.rot);
+    }
+    this.dashDir = { x: dx, z: dz };
+    const dc2 = CFG.player.dash;
+    this.dashUntil = performance.now() / 1e3 + dc2.duration;
+    this.dashCd = dc2.cooldown;
+    this.cancelHarvest();
+    return true;
+  }
+  update(dt2, input, sm2, grid, world, others) {
     const now = performance.now() / 1e3;
     if (!this.alive) {
-      this.downTimer -= dt2;
+      const rc = CFG.player.revive;
+      this.reviveAssisted = !!others && others.some((p2) => p2 !== this && p2.alive && dist(p2.x, p2.z, this.x, this.z) <= rc.radius);
+      this.downTimer -= dt2 * (this.reviveAssisted ? rc.assistMult : 1);
       this.mesh.position.set(this.x, 0.2, this.z);
       if (this.downTimer <= 0) this.revive();
       return { moved: false };
     }
+    this.dashCd -= dt2;
+    this.invulnerable = now < this.dashUntil;
     if (now > this.combatUntil && this.hp < this.maxHp) {
       this.hp = Math.min(this.maxHp, this.hp + CFG.player.regen * dt2);
     }
-    const ax = input.axis();
-    const basis = sm2.moveBasis();
-    let mx = basis.rx * ax.x + basis.fx * ax.y;
-    let mz = basis.rz * ax.x + basis.fz * ax.y;
-    const moving = Math.hypot(mx, mz) > 0.01;
-    if (moving) {
-      this.cancelHarvest();
-      const sprint = input.down("shift");
-      const spd = sprint ? CFG.player.sprint : CFG.player.speed;
-      const len = Math.hypot(mx, mz);
-      mx /= len;
-      mz /= len;
-      this.x += mx * spd * dt2;
-      this.z += mz * spd * dt2;
-      this.rot = Math.atan2(mx, mz);
+    let moving;
+    if (this.invulnerable) {
+      const dc2 = CFG.player.dash;
+      this.x += this.dashDir.x * dc2.speed * dt2;
+      this.z += this.dashDir.z * dc2.speed * dt2;
+      this.rot = Math.atan2(this.dashDir.x, this.dashDir.z);
       this._collide(grid, world);
+      moving = true;
+    } else {
+      const ax = input.axis();
+      const basis = sm2.moveBasis();
+      let mx = basis.rx * ax.x + basis.fx * ax.y;
+      let mz = basis.rz * ax.x + basis.fz * ax.y;
+      moving = Math.hypot(mx, mz) > 0.01;
+      if (moving) {
+        this.cancelHarvest();
+        const sprint = input.down("shift");
+        const spd = sprint ? CFG.player.sprint : CFG.player.speed;
+        const len = Math.hypot(mx, mz);
+        mx /= len;
+        mz /= len;
+        this.x += mx * spd * dt2;
+        this.z += mz * spd * dt2;
+        this.rot = Math.atan2(mx, mz);
+        this._collide(grid, world);
+      }
     }
     this.attackCd -= dt2;
     this.animate(dt2, moving);
@@ -280,6 +332,14 @@ export var LocalPlayer = class extends Player {
     this.cancelHarvest();
     return true;
   }
+  // 폭탄가방을 들었을 때 공격 입력이 대신 이걸 부른다 — 같은 attackCd 를 공유하니 근접과 동시에 못 쓴다
+  tryThrow() {
+    if (!this.alive || this.attackCd > 0) return false;
+    this.attackCd = CFG.craft.bomb.throw.cd;
+    this.swing = 1;
+    this.cancelHarvest();
+    return true;
+  }
 };
 export var RemotePlayer = class extends Player {
   constructor(id, name, colorIdx) {
@@ -290,8 +350,9 @@ export var RemotePlayer = class extends Player {
     this.netTarget = { x: s2.x, z: s2.z, rot: s2.rot };
     this.hp = s2.hp;
     this.alive = s2.alive;
+    this.invulnerable = !!s2.invulnerable;
+    this.reviveAssisted = !!s2.reviveAssisted;
     this.harvesting = s2.harvesting ? { t: 0, need: 1 } : null;
-    // 상대가 손에 든 무기도 그대로 보이게 한다
     if (s2.held) {
       this.tools[s2.held] = true;
       this.equipped = s2.held;

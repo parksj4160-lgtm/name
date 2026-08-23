@@ -1,3 +1,5 @@
+import * as THREE from '../vendor/three.module.js';
+import { ACHIEVEMENTS, unlock } from './achievements.js';
 import { SoundManager } from './audio.js';
 import { BuildManager } from './buildings.js';
 import { CFG, DIFFICULTIES, applyDifficulty, waveComposition } from './config.js';
@@ -66,9 +68,25 @@ export var Game = class {
         craft: { wood: 0, stone: 0, iron: 0 }
       },
       time: 0,
-      waveLog: []
+      waveLog: [],
+      newAchievements: [],
+      bossKillsSeen: [],
+      trapsTriggered: 0,
+      elitesKilled: 0
     };
     this._waveMark = { time: 0, kills: 0 };
+    this._bossActive = false;
+    this._bossWaveDamaged = false;
+    this.sm.resetNight();
+    this._seenVariant = false;
+    this._seenSynergy = false;
+    this._seenTrap = false;
+    this._seenDash = false;
+    this._seenBomb = false;
+    this.boonMult = { atk: 1, towerDmg: 1, skillCostDelta: 0, bounty: 1 };
+    this.pendingBoon = null;
+    this._dropTimer = CFG.supplyDrop.firstDelay;
+    this._dropIdSeq = 1;
     this.buildMode = null;
     this.paused = false;
     this.running = true;
@@ -117,14 +135,16 @@ export var Game = class {
       if (!this.isHost) return;
       const targets = st.splash ? this.enemyMgr.list.filter((e) => !e.dead && dist(e.x, e.z, pos.x, pos.z) <= st.splash) : this.enemyMgr.list.filter((e) => !e.dead && dist(e.x, e.z, pos.x, pos.z) <= 1.2);
       if (!targets.length) return;
+      const now = performance.now() / 1e3;
+      const frostSynergy = b.key === "arrow" && this.buildMgr.hasNearbyFrost(b);
       for (const e of targets) {
-        if (st.slow) e.applySlow(st.slow, st.slowTime, performance.now() / 1e3);
-        if (st.poisonDps) e.applyPoison(st.poisonDps, st.poisonTime, performance.now() / 1e3);
-        this._hurtEnemy(e, st.dmg, b.key === "frost" ? "frost" : "tower", b.x, b.z);
+        if (st.slow) e.applySlow(st.slow, st.slowTime, now);
+        if (st.poisonDps) e.applyPoison(st.poisonDps, st.poisonTime, now);
+        const base = frostSynergy && now < e.slowUntil ? st.dmg * (1 + CFG.synergy.frostArrow.dmgMult) : st.dmg;
+        this._hurtEnemy(e, Math.round(base * this.boonMult.towerDmg), b.key === "frost" ? "frost" : "tower", b.x, b.z);
       }
       this.sfx.towerHit(b.key);
     };
-    // ---- 보스 패턴 연출 + 결과 처리 (호스트에서만 돈다)
     this.enemyMgr.onBossTelegraph = (e, kind) => {
       if (kind === "summon") {
         this.ui?.toast("💀 파괴자가 무언가를 부른다!", "warn");
@@ -140,10 +160,10 @@ export var Game = class {
       }
     };
     this.enemyMgr.onBossSummon = (e, n) => {
-      this.ui?.toast(`잡졸 ${n}마리가 튀어나왔다`, "bad");
+      const msg = e.st.summonVariant === "shield" ? `🛡️ 방패 두른 잡졸 ${n}마리가 튀어나왔다 — 등 뒤를 노려라` : `잡졸 ${n}마리가 튀어나왔다`;
+      this.ui?.toast(msg, "bad");
       this.fx.burst(e.x, 1.6, e.z, 16733525, 18, 6);
     };
-    // 돌진 중 스치는 건물을 부순다 — 벽으로 둘러싸도 보스는 밀고 들어온다
     this.enemyMgr.onBossCharge = (e) => {
       const reach = e.st.radius + 1.4;
       let hit = null;
@@ -167,8 +187,34 @@ export var Game = class {
     this.enemyMgr.onPoisonTick = (e, dmg) => {
       this._hurtEnemy(e, dmg, "poison");
     };
+    this.enemyMgr.onSpawn = (e) => {
+      if (e.elite) {
+        this.ui?.toast(`⭐ 정예 ${CFG.enemies[e.type].name} 등장! 체력\xB7공격력이 훨씬 세지만 처치 보상은 3배다`, "warn");
+        return;
+      }
+      if (!e.variant || this._seenVariant) return;
+      this._seenVariant = true;
+      const v = CFG.variants[e.variant];
+      const HINTS = {
+        shield: "정면 공격은 약해진다 — 등 뒤로 돌아가서 쳐라",
+        split: "죽으면 약한 개체 2마리로 갈라진다",
+        dash: "가끔 폭발적으로 빨라진다",
+        regen: "잠시라도 안 때리면 체력이 도로 차오른다 — 끝까지 몰아쳐라",
+        ward: "타워가 조준하지 못한다 — 직접 달려가서 근접이나 스킬로 처치해야 한다"
+      };
+      const hint = HINTS[e.variant] || "";
+      this.ui?.toast(`${v.icon} ${v.name} 변종 등장! ${hint}`, "warn");
+    };
+    this.buildMgr.onSynergy = (kind) => {
+      if (this._seenSynergy) return;
+      this._seenSynergy = true;
+      const msg = kind === "frostArrow" ? "🧊🏹 시너지 발동! 서리탑 근처 화살탑이 둔화된 적에게 추가 피해를 준다" : "☠️☠️ 시너지 발동! 가까이 모인 독탑끼리 독 피해가 강해진다";
+      this.ui?.toast(msg, "good");
+    };
     this.enemyMgr.onCrystalHit = (e) => {
+      const hpBefore = this.world.crystal.hp;
       const dead = this.world.damageCrystal(e.st.dmg);
+      if (this.world.crystal.hp < hpBefore && this._bossActive) this._bossWaveDamaged = true;
       this.fx.burst(0, 3.2, 0, 6545663, 10, 5);
       this.fx.float(`-${e.st.dmg}`, 0, 4.4, 0, "crystal");
       this.ui?.shake();
@@ -189,11 +235,17 @@ export var Game = class {
       else this.net.send("hurt", { to: p2.id, dmg: e.st.dmg });
     };
     this.wave.onWaveStart = (w2, total) => {
-      const hasBoss = waveComposition(w2).some((c2) => c2.type === "boss");
-      this.ui?.toast(hasBoss ? `⚠️ 웨이브 ${w2} 시작! 보스 등장! 몬스터 ${total}마리` : `웨이브 ${w2} 시작! 몬스터 ${total}마리`, "warn");
+      const bossEntry = waveComposition(w2).find((c2) => CFG.enemies[c2.type]?.boss);
+      const isNight = w2 % CFG.wave.nightEvery === 0;
+      const label = bossEntry ? `⚠️ 웨이브 ${w2} 시작! 보스 등장! ${CFG.enemies[bossEntry.type].icon} ${CFG.enemies[bossEntry.type].name} — 몬스터 ${total}마리` : `웨이브 ${w2} 시작! 몬스터 ${total}마리`;
+      this.ui?.toast(isNight ? `🌙 ${label} — 밤이라 시야가 좁다` : label, "warn");
       this.fx.ring(0, 0, 16734834, 10);
-      if (hasBoss) this.sfx.bossWaveStart();
+      if (bossEntry) this.sfx.bossWaveStart();
       else this.sfx.waveStart();
+      if (this.isHost) {
+        this._bossActive = !!bossEntry;
+        this._bossWaveDamaged = false;
+      }
     };
     this.wave.onWaveClear = (w2, reward, won) => {
       if (this.isHost) this._grantReward(reward);
@@ -205,33 +257,182 @@ export var Game = class {
       });
       this._waveMark = { time: this.stats.time, kills: this.stats.kills };
       if (!won) this.sfx.waveClear();
+      this._checkWaveAchievements(w2);
       if (won) this._win();
+      else if (this.isHost && this.wave.endless && w2 % CFG.endlessBoon.every === 0) this._offerBoon();
     };
   }
+  // 웨이브 클리어마다 확인하는 업적들 — 호스트에서만 정확히 판정한다
+  _checkWaveAchievements(w2) {
+    if (!this.isHost) return;
+    if (this._bossActive && !this._bossWaveDamaged) this._unlockAchievement("flawlessBoss");
+    this._bossActive = false;
+    const buildings = [...this.buildMgr.buildings.values()];
+    if (w2 >= 5 && !buildings.some((b) => b.key === "wall")) this._unlockAchievement("noWall");
+    if (w2 >= 3 && !buildings.some((b) => ["arrow", "frost", "cannon", "poison", "support"].includes(b.key))) {
+      this._unlockAchievement("noTower");
+    }
+  }
+  // 엔드리스 축복: n웨이브마다 무작위 2개 중 하나를 고른다. 표준 캠페인(엔드리스 이전)에는 절대 뜨지 않는다.
+  _offerBoon() {
+    const keys = Object.keys(CFG.boons);
+    const a = keys[Math.floor(Math.random() * keys.length)];
+    let b = keys[Math.floor(Math.random() * keys.length)];
+    while (b === a && keys.length > 1) b = keys[Math.floor(Math.random() * keys.length)];
+    this.pendingBoon = [a, b];
+    this.ui?.showBoonChoice(this.pendingBoon);
+  }
+  pickBoon(key) {
+    if (!this.pendingBoon || !this.pendingBoon.includes(key)) return;
+    const b = CFG.boons[key];
+    if (b.kind === "mult") this.boonMult[b.key] *= b.value;
+    else if (b.kind === "delta") this.boonMult[b.key] += b.value;
+    else if (b.kind === "instant" && key === "aid") this.world.healCrystal(300);
+    else if (b.kind === "maxHp") {
+      this.world.crystal.maxHp += b.value;
+      this.world.crystal.hp += b.value;
+    }
+    this.pendingBoon = null;
+    this.ui?.hideBoonChoice();
+    const msg = `${b.icon} 축복 선택: ${b.name} — ${b.desc}`;
+    this.ui?.toast(msg, "good");
+    this.sfx.upgrade();
+    this.net.send("boonPicked", { text: msg });
+  }
+  _unlockAchievement(key) {
+    if (!unlock(key)) return;
+    const a = ACHIEVEMENTS[key];
+    this.stats.newAchievements.push(key);
+    this.ui?.toast(`🏆 업적 달성! ${a.icon} ${a.name} — ${a.desc}`, "good");
+    this.sfx.upgrade();
+  }
+  // 함정: 길을 막지 않고 적이 밟기를 기다린다 (호스트에서만 판정 — 결과는 스냅샷으로 퍼진다)
+  _updateTraps() {
+    for (const b of [...this.buildMgr.buildings.values()]) {
+      if (!b.isTrap) continue;
+      const st = b.stats;
+      for (const e of this.enemyMgr.list) {
+        if (e.dead) continue;
+        if (dist(b.x, b.z, e.x, e.z) <= st.triggerRadius) {
+          this._triggerTrap(b, e, st);
+          break;
+        }
+      }
+    }
+  }
+  _triggerTrap(b, e, st) {
+    this._hurtEnemy(e, st.dmg, "tower", b.x, b.z);
+    if (st.slow) e.applySlow(st.slow, st.slowTime, performance.now() / 1e3);
+    this.fx.burst(b.x, 0.5, b.z, 14238251, 16, 5);
+    this.fx.ring(b.x, b.z, 14238251, 2.2);
+    this.sfx.buildingHit();
+    this.buildMgr.remove(b.id);
+    this.stats.trapsTriggered = (this.stats.trapsTriggered || 0) + 1;
+    if (this.stats.trapsTriggered >= 3) this._unlockAchievement("trapMaster");
+    if (!this._seenTrap) {
+      this._seenTrap = true;
+      this.ui?.toast("🪤 함정 발동! 큰 피해를 주고 사라졌다 — 다시 설치해야 한다", "good");
+    }
+  }
+  // 보급품 투하: 전투 중 한 번에 최대 1개, 주기적으로 등장한다 (호스트 전용 — 결과는 스냅샷으로 퍼진다)
+  _updateSupplyDrops(dt2) {
+    const c2 = CFG.supplyDrop;
+    if (this.wave.phase !== PHASE.COMBAT || this.wave.wave + 1 < c2.minWave) return;
+    const drop = this.world.drops[0];
+    if (drop) {
+      drop.age = (drop.age || 0) + dt2;
+      if (drop.age >= c2.lifetime) this.world.removeDrop(drop.id);
+      return;
+    }
+    this._dropTimer -= dt2;
+    if (this._dropTimer > 0) return;
+    this._dropTimer = c2.minGap + Math.random() * (c2.maxGap - c2.minGap);
+    const spot = this._findDropSpot();
+    if (!spot) return;
+    const id = this._dropIdSeq++;
+    this.world.spawnDrop(id, spot.x, spot.z);
+    this.ui?.toast("📦 보급품이 떨어졌다! 미니맵을 보고 달려가서 챙겨라 — 안 챙기면 곧 사라진다", "good");
+  }
+  _findDropSpot() {
+    const inner = CFG.world.coreRadius + 5;
+    const outer = CFG.world.buildRadius - 1;
+    for (let tries = 0; tries < 24; tries++) {
+      const a = Math.random() * Math.PI * 2;
+      const r = inner + Math.random() * (outer - inner);
+      const x2 = Math.cos(a) * r, z2 = Math.sin(a) * r;
+      if (this.grid.atWorld(x2, z2)) continue;
+      if (this.world.nearestNode(x2, z2, 1.6)) continue;
+      return { x: x2, z: z2 };
+    }
+    return null;
+  }
+  // 위치는 요청에 실려온 값으로 검증한다 (harvest 와 동일한 패턴)
+  requestSupplyPickup(dropId) {
+    if (this.isHost) this.hostSupplyPickup(this.local.id, dropId, this.local.x, this.local.z);
+    else this.net.send("supplyPickup", { id: dropId, x: this.local.x, z: this.local.z });
+  }
+  hostSupplyPickup(playerId, dropId, px, pz) {
+    const drop = this.world.drops.find((d2) => d2.id === dropId);
+    if (!drop) return;
+    const player = this.players.get(playerId);
+    if (!player) return;
+    const x2 = typeof px === "number" ? px : player.x;
+    const z2 = typeof pz === "number" ? pz : player.z;
+    if (dist(x2, z2, drop.x, drop.z) > CFG.supplyDrop.pickupRadius + 1) return;
+    const c2 = CFG.supplyDrop;
+    const pool = this._poolOf(playerId);
+    pool.wood += c2.reward.wood;
+    pool.stone += c2.reward.stone;
+    let gotShard = false;
+    if (Math.random() < c2.shardChance) {
+      pool.shard = (pool.shard || 0) + 1;
+      gotShard = true;
+    }
+    this.world.removeDrop(dropId);
+    this.fx.burst(drop.x, 1, drop.z, 16759043, 16, 6);
+    this.fx.ring(drop.x, drop.z, 16759043, 3);
+    this.sfx.shard();
+    this._notify(playerId, `📦 보급품 획득! 🪵+${c2.reward.wood} 🪨+${c2.reward.stone}${gotShard ? " 💠+1" : ""}`, "good");
+  }
   _hurtEnemy(e, dmg, kind = "tower", fromX, fromZ) {
-    const died = e.damage(dmg, fromX, fromZ);
-    this.fx.float(String(Math.round(dmg)), e.x, 1.9, e.z, kind === "player" ? "player" : "");
+    const { died, applied } = e.damage(dmg, fromX, fromZ);
+    this.fx.float(String(Math.round(applied)), e.x, 1.9, e.z, kind === "player" ? "player" : "");
     if (kind === "player") this.sfx.meleeHit();
     if (died) {
       this.stats.kills++;
-      this.fx.burst(e.x, 1, e.z, e.st.color, 12, 5);
-      if (e.type === "boss") {
+      this.fx.burst(e.x, 1, e.z, e.tintColor, 12, 5);
+      if (e.st.boss) {
         this.fx.burst(e.x, 1.4, e.z, 16777215, 20, 8);
         this.fx.ring(e.x, e.z, 16734834, 6);
         this.ui?.shake();
         this.sfx.bossDeath();
+        if (!this.stats.bossKillsSeen.includes(e.type)) this.stats.bossKillsSeen.push(e.type);
+        if (this.stats.bossKillsSeen.includes("boss") && this.stats.bossKillsSeen.includes("frostlord")) {
+          this._unlockAchievement("bothBosses");
+        }
       } else {
         this.sfx.enemyDeath();
       }
+      if (e.variant === "split") {
+        this.enemyMgr.spawnSplit(e);
+        this.fx.ring(e.x, e.z, 16755277, 2.4);
+      }
+      if (e.elite) {
+        this.stats.elitesKilled = (this.stats.elitesKilled || 0) + 1;
+        this.fx.ring(e.x, e.z, 16763904, 3);
+        if (this.stats.elitesKilled >= 5) this._unlockAchievement("eliteHunter");
+      }
       const b = e.st.bounty;
+      const bw = Math.round(b.wood * this.boonMult.bounty);
+      const bs2 = Math.round(b.stone * this.boonMult.bounty);
       if (this.shared) {
-        this.pools.team.wood += b.wood;
-        this.pools.team.stone += b.stone;
+        this.pools.team.wood += bw;
+        this.pools.team.stone += bs2;
       } else {
         for (const p2 of this.players.values()) {
           const pool = this._poolOf(p2.id);
-          pool.wood += b.wood;
-          pool.stone += b.stone;
+          pool.wood += bw;
+          pool.stone += bs2;
         }
       }
       this.enemyMgr.kill(e);
@@ -242,7 +443,7 @@ export var Game = class {
     this.fx.float(`-${dmg}`, this.local.x, 2.2, this.local.z, "hurt");
     this.ui?.shake();
     if (down) {
-      this.ui?.toast("쓰러졌다! 잠시 후 크리스탈에서 부활한다", "bad");
+      this.ui?.toast("쓰러졌다! 잠시 후 크리스탈에서 부활한다 — 아군이 가까이 오면 훨씬 빨리 부활한다", "bad");
       this.sfx.playerDown();
     } else {
       this.sfx.playerHurt();
@@ -266,6 +467,7 @@ export var Game = class {
     this.wave.phase = PHASE.WON;
     this.result = "win";
     this.sfx.win();
+    if (this.difficulty === "hard") this._unlockAchievement("ironWill");
     if (!this.net.online) Game.clearLocalSave();
     this.ui?.showResult(true, this.stats, this.wave.wave);
   }
@@ -393,8 +595,15 @@ export var Game = class {
     this.world.consumeNode(node);
     this.stats.harvested += amount;
     this._notifyGain(playerId, node.type, amount, node);
+    if (node.type === "gem" && pool.shard === amount) {
+      this._notify(playerId, "💠 정수 획득! 인벤토리 스킬 탭에서 회복 외에 폭발\xB7시간 왜곡\xB7방벽도 쓸 수 있다", "good");
+    }
   }
   requestAttack() {
+    if (this.local.heldWeapon === "bomb") {
+      this._requestThrow();
+      return;
+    }
     if (!this.local.tryAttack()) return;
     this.sfx.meleeSwing();
     this.fx.burst(
@@ -408,8 +617,75 @@ export var Game = class {
     if (this.isHost) this.hostAttack(this.local.id, this.local.x, this.local.z, this.local.rot);
     else this.net.send("attack", { x: this.local.x, z: this.local.z, rot: this.local.rot });
   }
+  // 폭탄가방을 들었을 때의 공격 — 근접 대신 조준한 지점(포인터가 가리키는 바닥)에 던진다.
+  // 사거리를 넘는 곳을 가리키면 사거리 끝까지만 날아간다
+  _requestThrow() {
+    const cfg = CFG.craft.bomb.throw;
+    if (!canAfford(this.myPool, cfg.cost)) {
+      this._notify(this.local.id, "자원이 부족합니다", "bad");
+      return;
+    }
+    const pointer = this.sm.updatePointerWorld();
+    if (!pointer) return;
+    if (!this.local.tryThrow()) return;
+    const dx = pointer.x - this.local.x, dz = pointer.z - this.local.z;
+    const len = Math.hypot(dx, dz) || 1;
+    const clamped = Math.min(len, cfg.range);
+    const tx = this.local.x + dx / len * clamped, tz = this.local.z + dz / len * clamped;
+    this.sfx.meleeSwing();
+    if (this.isHost) {
+      this.hostThrowBomb(this.local.id, this.local.x, this.local.z, tx, tz);
+    } else {
+      this.net.send("throwBomb", { x: this.local.x, z: this.local.z, tx, tz });
+      const from = new THREE.Vector3(this.local.x, 1.1, this.local.z);
+      const to2 = new THREE.Vector3(tx, 0.4, tz);
+      this.projectiles.fire(from, to2, cfg.speed, 3355443, (pos) => this._bombVFX(pos, cfg.radius));
+    }
+    if (!this._seenBomb) {
+      this._seenBomb = true;
+      this.ui?.toast("💣 폭탄 투척! 손 대신 조준한 곳에 던진다 — 타워가 못 맞추는 결계 몹이나 멀리서 몰려온 무리를 노려라", "good");
+    }
+  }
+  _bombVFX(pos, radius) {
+    this.fx.burst(pos.x, pos.y, pos.z, 3355443, 16, 6);
+    this.fx.ring(pos.x, pos.z, 3355443, radius);
+    this.sfx.buildingHit();
+  }
+  hostThrowBomb(playerId, fromX, fromZ, tx, tz) {
+    const cfg = CFG.craft.bomb.throw;
+    const pool = this._poolOf(playerId);
+    if (!canAfford(pool, cfg.cost)) {
+      this._notify(playerId, "자원이 부족합니다", "bad");
+      return;
+    }
+    payCost(pool, cfg.cost);
+    this._trackSpend(cfg.cost, "craft");
+    const from = new THREE.Vector3(fromX, 1.1, fromZ);
+    const to2 = new THREE.Vector3(tx, 0.4, tz);
+    this.projectiles.fire(from, to2, cfg.speed, 3355443, (pos) => {
+      this._bombVFX(pos, cfg.radius);
+      const targets = this.enemyMgr.list.filter((e) => !e.dead && dist(e.x, e.z, pos.x, pos.z) <= cfg.radius);
+      for (const e of targets) this._hurtEnemy(e, cfg.dmg, "player", pos.x, pos.z);
+    });
+  }
+  // 회피 돌진: 순수 로컬 동작(이동의 연장) — 서버 승인이 필요 없다. 무적 여부는 "pos" 동기화에
+  // 실려서 호스트의 몬스터 명중 판정(_nearestPlayer)에도 그대로 반영된다
+  _tryDash() {
+    if (!this.local.tryDash(this.input, this.sm)) {
+      if (this.local.dashCd > 0) this._notify(this.local.id, "회피 돌진 재사용 대기 중", "bad");
+      return;
+    }
+    this.fx.ring(this.local.x, this.local.z, 8965375, 2.2);
+    this.fx.burst(this.local.x, 1, this.local.z, 8965375, 10, 4);
+    this.sfx.meleeSwing();
+    if (!this._seenDash) {
+      this._seenDash = true;
+      this.ui?.toast("💨 회피 돌진! 잠깐 무적으로 튀어나간다 — 보스 돌진이나 다구리를 피하거나, 결계 몹에게 순식간에 붙을 때 써라", "good");
+    }
+  }
   hostAttack(playerId, x2, z2, rot) {
     const a = this.players.get(playerId)?.attackStats ?? CFG.player.attack;
+    const dmg = Math.round(a.dmg * this.boonMult.atk);
     for (const e of this.enemyMgr.list) {
       if (e.dead) continue;
       const d2 = dist(x2, z2, e.x, e.z);
@@ -417,13 +693,24 @@ export var Game = class {
       const ang = Math.atan2(e.x - x2, e.z - z2);
       let diff = Math.abs((ang - rot + Math.PI) % (Math.PI * 2) - Math.PI);
       if (diff > a.arc) continue;
-      this._hurtEnemy(e, a.dmg, "player", x2, z2);
+      this._hurtEnemy(e, dmg, "player", x2, z2);
     }
   }
   requestStartWave() {
     if (this.isHost) {
       if (this.wave.startWave()) this.net.send("waveStarted", {});
     } else this.net.send("startWave", {});
+  }
+  requestContinueEndless() {
+    if (this.isHost) this.hostContinueEndless(this.local.id);
+    else this.net.send("continueEndless", {});
+  }
+  hostContinueEndless(playerId) {
+    if (!this.wave.continueEndless()) return;
+    this.result = null;
+    this.ui?.hideResult();
+    this.ui?.toast(`⚔️ 엔드리스 모드! ${this.wave.wave + 1}웨이브부터 끝없이 이어진다`, "good");
+    this._unlockAchievement("endlessRunner");
   }
   requestHarvestUpgrade() {
     if (this.isHost) this.hostHarvestUpgrade(this.local.id);
@@ -468,14 +755,14 @@ export var Game = class {
       this.requestAttack();
       return;
     }
-    const node = this.world.nodeNear(pointer.x, pointer.z, PICK);
+    const node = this.world.nearestNode(pointer.x, pointer.z, PICK);
     if (node) {
       if (dist(this.local.x, this.local.z, node.x, node.z) > CFG.harvest.range) {
         this.ui?.toast("더 가까이 가야 캘 수 있습니다", "warn");
         return;
       }
       if (node.type === "gem" && !this.local.holdingPickaxe) {
-        this.ui?.toast(this.local.tools.pickaxe ? "곡괭이를 손에 쥐어야 캘 수 있습니다 (인벤토리 → 장비)" : "곡괭이가 있어야 캘 수 있습니다 (제작대에서 제작)", "bad");
+        this.ui?.toast(this.local.tools.pickaxe ? "곡괭이를 손에 쥐어야 캘 수 있습니다 (좌상단 도구 아이콘)" : "곡괭이가 있어야 캘 수 있습니다 (제작대에서 제작)", "bad");
         return;
       }
       if (this.local.beginHarvest(node)) this.sfx.click();
@@ -574,8 +861,9 @@ export var Game = class {
     else this.net.send("shard", {});
   }
   hostShard(playerId) {
+    const s2 = CFG.skills.heal;
     const pool = this._poolOf(playerId);
-    if ((pool.shard || 0) <= 0) {
+    if ((pool.shard || 0) < s2.cost) {
       this._notify(playerId, "수정 정수가 없습니다", "bad");
       return;
     }
@@ -583,10 +871,82 @@ export var Game = class {
       this._notify(playerId, "크리스탈이 이미 온전합니다", "bad");
       return;
     }
-    pool.shard -= 1;
-    this.world.healCrystal(this.world.crystal.maxHp * 0.25);
+    pool.shard -= s2.cost;
+    this.world.healCrystal(this.world.crystal.maxHp * s2.healPct);
     this.fx.ring(0, 0, 9109440, 8);
-    this.fx.float("+25%", 0, 5, 0, "good");
+    this.fx.float(`+${Math.round(s2.healPct * 100)}%`, 0, 5, 0, "good");
+  }
+  requestSkillBlast() {
+    this.sfx.shard();
+    if (this.isHost) this.hostSkillBlast(this.local.id);
+    else this.net.send("skillBlast", {});
+  }
+  // 엔드리스 축복 "정수 친화"가 폭발·시간 왜곡·방벽 비용을 낮춘다 (회복은 제외, 최소 1)
+  _skillCost(s2) {
+    return Math.max(1, s2.cost + this.boonMult.skillCostDelta);
+  }
+  hostSkillBlast(playerId) {
+    const s2 = CFG.skills.blast;
+    const cost = this._skillCost(s2);
+    const p2 = this.players.get(playerId);
+    const pool = this._poolOf(playerId);
+    if (!p2) return;
+    if ((pool.shard || 0) < cost) {
+      this._notify(playerId, "수정 정수가 부족합니다", "bad");
+      return;
+    }
+    pool.shard -= cost;
+    this._unlockAchievement("skillUser");
+    const targets = this.enemyMgr.list.filter((e) => !e.dead && dist(e.x, e.z, p2.x, p2.z) <= s2.radius);
+    for (const e of targets) this._hurtEnemy(e, s2.dmg, "player", p2.x, p2.z);
+    this.fx.ring(p2.x, p2.z, 16751178, s2.radius);
+    this.fx.burst(p2.x, 1.4, p2.z, 16751178, 20, 6);
+    this.ui?.shake();
+    this._notify(playerId, `💥 폭발! 적 ${targets.length}마리 타격`, "good");
+  }
+  requestSkillChill() {
+    this.sfx.shard();
+    if (this.isHost) this.hostSkillChill(this.local.id);
+    else this.net.send("skillChill", {});
+  }
+  hostSkillChill(playerId) {
+    const s2 = CFG.skills.chill;
+    const cost = this._skillCost(s2);
+    const p2 = this.players.get(playerId);
+    const pool = this._poolOf(playerId);
+    if (!p2) return;
+    if ((pool.shard || 0) < cost) {
+      this._notify(playerId, "수정 정수가 부족합니다", "bad");
+      return;
+    }
+    pool.shard -= cost;
+    this._unlockAchievement("skillUser");
+    const now = performance.now() / 1e3;
+    const targets = this.enemyMgr.list.filter((e) => !e.dead && dist(e.x, e.z, p2.x, p2.z) <= s2.radius);
+    for (const e of targets) e.applySlow(s2.slow, s2.time, now);
+    this.fx.ring(p2.x, p2.z, 8382719, s2.radius);
+    this.fx.burst(p2.x, 1.4, p2.z, 8382719, 16, 4);
+    this._notify(playerId, `🌀 시간 왜곡! 적 ${targets.length}마리 둔화`, "good");
+  }
+  requestSkillBarrier() {
+    this.sfx.shard();
+    if (this.isHost) this.hostSkillBarrier(this.local.id);
+    else this.net.send("skillBarrier", {});
+  }
+  hostSkillBarrier(playerId) {
+    const s2 = CFG.skills.barrier;
+    const cost = this._skillCost(s2);
+    const pool = this._poolOf(playerId);
+    if ((pool.shard || 0) < cost) {
+      this._notify(playerId, "수정 정수가 부족합니다", "bad");
+      return;
+    }
+    pool.shard -= cost;
+    this._unlockAchievement("skillUser");
+    this.world.activateShield(s2.time);
+    this.fx.ring(0, 0, 16766720, 5);
+    this.fx.burst(0, 3.4, 0, 16766720, 20, 6);
+    this._notify(playerId, `🛡️ 긴급 방벽! ${s2.time}초간 크리스탈이 무적`, "good");
   }
   requestGive(toId, wood, stone) {
     this.sfx.click();
@@ -674,11 +1034,23 @@ export var Game = class {
     net.on("harvest", (d2, from) => {
       if (this.isHost) this.hostHarvest(from, d2.id, d2.x, d2.z);
     });
+    net.on("supplyPickup", (d2, from) => {
+      if (this.isHost) this.hostSupplyPickup(from, d2.id, d2.x, d2.z);
+    });
     net.on("attack", (d2, from) => {
       if (this.isHost) this.hostAttack(from, d2.x, d2.z, d2.rot);
     });
+    net.on("throwBomb", (d2, from) => {
+      if (this.isHost) this.hostThrowBomb(from, d2.x, d2.z, d2.tx, d2.tz);
+    });
     net.on("startWave", (d2, from) => {
       if (this.isHost && this.wave?.startWave()) this.net.send("waveStarted", {});
+    });
+    net.on("continueEndless", (d2, from) => {
+      if (this.isHost) this.hostContinueEndless(from);
+    });
+    net.on("boonPicked", (d2) => {
+      if (!this.isHost) this.ui?.toast(d2.text, "good");
     });
     net.on("hup", (d2, from) => {
       if (this.isHost) this.hostHarvestUpgrade(from);
@@ -691,6 +1063,15 @@ export var Game = class {
     });
     net.on("shard", (d2, from) => {
       if (this.isHost) this.hostShard(from);
+    });
+    net.on("skillBlast", (d2, from) => {
+      if (this.isHost) this.hostSkillBlast(from);
+    });
+    net.on("skillChill", (d2, from) => {
+      if (this.isHost) this.hostSkillChill(from);
+    });
+    net.on("skillBarrier", (d2, from) => {
+      if (this.isHost) this.hostSkillBarrier(from);
     });
     net.on("give", (d2, from) => {
       if (this.isHost) this.hostGive(from, d2.to, d2.wood, d2.stone);
@@ -751,8 +1132,10 @@ export var Game = class {
       e: this.enemyMgr.snapshot(),
       b: this.buildMgr.snapshot(),
       n: this.world.nodeSnapshot(),
+      d: this.world.dropSnapshot(),
       w: this.wave.snapshot(),
       c: Math.round(this.world.crystal.hp),
+      cm: Math.round(this.world.crystal.maxHp),
       r: this.shared ? { team: this.pools.team } : { byId: this.pools.byId },
       p: players,
       sh: this.shared
@@ -763,8 +1146,10 @@ export var Game = class {
     this.enemyMgr.applySnapshot(s2.e, s2.w.wave + 1);
     this.buildMgr.applySnapshot(s2.b);
     this.world.applyNodeSnapshot(s2.n);
+    if (s2.d) this.world.applyDropSnapshot(s2.d);
     this.wave.applySnapshot(s2.w);
     const prevHp = this.world.crystal.hp;
+    if (s2.cm) this.world.crystal.maxHp = s2.cm;
     this.world.crystal.hp = s2.c;
     if (s2.c < prevHp) {
       this.ui?.shake();
@@ -790,6 +1175,11 @@ export var Game = class {
       this.result = "win";
       this.ui?.showResult(true, this.stats, this.wave.wave);
     }
+    if ((this.wave.phase === PHASE.PREP || this.wave.phase === PHASE.COMBAT) && this.result === "win") {
+      this.result = null;
+      this.ui?.hideResult();
+      this._unlockAchievement("endlessRunner");
+    }
   }
   // ---------------------------------------------------------------- 루프
   update(dt2) {
@@ -805,17 +1195,30 @@ export var Game = class {
     }
     if (!over) this.stats.time += dt2;
     this._handleInput(dt2, over);
-    if (!over) this.local.update(dt2, this.input, this.sm, this.grid, this.world);
+    if (!over) this.local.update(dt2, this.input, this.sm, this.grid, this.world, [...this.players.values()]);
     for (const p2 of this.players.values()) {
       if (p2 !== this.local && p2.update) p2.update(dt2);
     }
     if (this.isHost && !over) {
-      this.wave.update(dt2);
+      if (!this.pendingBoon) this.wave.update(dt2);
       this.enemyMgr.simulate(dt2, now, [...this.players.values()], this.buildMgr);
+      this._updateTraps();
+      this._updateSupplyDrops(dt2);
     } else {
       this.enemyMgr.interpolate(dt2);
     }
+    if (!over) {
+      for (const d2 of this.world.drops) {
+        if (d2.requested) continue;
+        if (dist(this.local.x, this.local.z, d2.x, d2.z) <= CFG.supplyDrop.pickupRadius) {
+          d2.requested = true;
+          this.requestSupplyPickup(d2.id);
+        }
+      }
+    }
     if (!over) this.buildMgr.updateTowers(dt2, this.enemyMgr.list, now);
+    this.sm.setNightMode(this.wave.phase === PHASE.COMBAT && (this.wave.wave + 1) % CFG.wave.nightEvery === 0);
+    this.sm.updateNight(dt2);
     this.world.update(dt2, now);
     this.projectiles.update(dt2);
     this.fx.update(dt2);
@@ -839,6 +1242,9 @@ export var Game = class {
     if (inp.hit(km.get("sell"))) this.setBuildMode("sell");
     if (inp.hit(km.get("cancel"))) this.setBuildMode(null);
     if (inp.hit(km.get("shard"))) this.requestShard();
+    if (inp.hit(km.get("skillBlast"))) this.requestSkillBlast();
+    if (inp.hit(km.get("skillChill"))) this.requestSkillChill();
+    if (inp.hit(km.get("skillBarrier"))) this.requestSkillBarrier();
     if (inp.hit(km.get("startWave")) && this.wave.phase === PHASE.PREP) this.requestStartWave();
     const pointer = this.sm.updatePointerWorld();
     this.buildMgr.updateGhost(pointer, this.myPool);
@@ -872,6 +1278,7 @@ export var Game = class {
     }
     if (inp.rightClicked && this.buildMgr.mode) this.setBuildMode(null);
     if (inp.hit(km.get("attack"))) this.requestAttack();
+    if (inp.hit(km.get("dash"))) this._tryDash();
     const holding = inp.down(km.get("harvest")) || inp.down("e") || this.ui?.harvestHeld;
     const done = this.local.tickHarvest(dt2, this.world, holding && !this.buildMgr.mode);
     if (done) {
@@ -889,7 +1296,6 @@ export var Game = class {
     this.ui?.onPauseChange(this.paused);
   }
   setBuildMode(mode) {
-    // 벽·타워는 제작대가 있어야 짓는다 (제작대·화로 자체는 맨손으로 세운다)
     const def = CFG.builds[mode];
     if (def && !def.station && !this.hasStation("workbench")) {
       this.ui?.toast(`${def.name}은(는) 제작대를 지어야 만들 수 있습니다`, "bad");
@@ -914,7 +1320,9 @@ export var Game = class {
         alive: l2.alive,
         harvesting: !!l2.harvesting,
         held: l2.heldWeapon === "default" ? null : l2.heldWeapon,
-        swing: l2.swing > 0.7
+        swing: l2.swing > 0.7,
+        invulnerable: l2.invulnerable,
+        reviveAssisted: l2.reviveAssisted
       });
     }
     if (this.isHost) {
@@ -974,6 +1382,7 @@ export var Game = class {
     this.buildMgr.applySnapshot(s2.b);
     this.world.applyNodeSnapshot(s2.n);
     this.wave.applySnapshot(s2.w);
+    if (s2.cm) this.world.crystal.maxHp = s2.cm;
     this.world.crystal.hp = s2.c;
     if (s2.r.team) this.pools.team = s2.r.team;
     if (s2.r.byId) this.pools.byId = s2.r.byId;
@@ -985,6 +1394,10 @@ export var Game = class {
       this.local.equipped = savedPlayer.eq || null;
     }
     if (save.stats) this.stats = save.stats;
+    if (!this.stats.newAchievements) this.stats.newAchievements = [];
+    if (!this.stats.bossKillsSeen) this.stats.bossKillsSeen = [];
+    if (!this.stats.trapsTriggered) this.stats.trapsTriggered = 0;
+    if (!this.stats.elitesKilled) this.stats.elitesKilled = 0;
     this.ui?.toast(`이어하기 — 웨이브 ${this.wave.displayWave}`, "good");
   }
   render() {

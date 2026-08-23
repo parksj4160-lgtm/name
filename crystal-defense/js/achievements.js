@@ -1,0 +1,32 @@
+export var ACHIEVEMENTS = {
+  firstWin: { name: "첫 승리", icon: "🏆", desc: "10웨이브를 처음으로 막아냈다" },
+  noWall: { name: "노 월", icon: "🚫", desc: "벽을 하나도 짓지 않고 5웨이브를 막아냈다" },
+  noTower: { name: "맨몸 방어", icon: "✊", desc: "타워를 하나도 짓지 않고 3웨이브를 막아냈다" },
+  flawlessBoss: { name: "완벽한 처치", icon: "💯", desc: "보스 웨이브 동안 크리스탈이 피해를 전혀 입지 않았다" },
+  endlessRunner: { name: "엔드리스 도전자", icon: "♾️", desc: "엔드리스 모드에 처음 발을 들였다" },
+  skillUser: { name: "정수의 힘", icon: "💠", desc: "정수 액티브 스킬(폭발\xB7시간 왜곡\xB7방벽)을 처음 사용했다" },
+  veteran: { name: "백전노장", icon: "🎖️", desc: "10판을 플레이했다" },
+  bothBosses: { name: "쌍둥이 처치", icon: "⚔️", desc: "한 판에서 파괴자와 서리 군주를 둘 다 처치했다" },
+  trapMaster: { name: "덫사냥꾼", icon: "🪤", desc: "한 판에서 함정을 3번 이상 발동시켰다" },
+  ironWill: { name: "강철 의지", icon: "🔩", desc: "어려움 난이도로 10웨이브를 막아냈다" },
+  eliteHunter: { name: "정예 사냥꾼", icon: "⭐", desc: "정예 몬스터를 5마리 처치했다" }
+};
+var STORE_KEY = "cd.achievements";
+export function loadUnlocked() {
+  try {
+    return JSON.parse(localStorage.getItem(STORE_KEY) || "{}");
+  } catch {
+    return {};
+  }
+}
+export function unlock(key) {
+  if (!ACHIEVEMENTS[key]) return false;
+  const u2 = loadUnlocked();
+  if (u2[key]) return false;
+  u2[key] = true;
+  try {
+    localStorage.setItem(STORE_KEY, JSON.stringify(u2));
+  } catch {
+  }
+  return true;
+}

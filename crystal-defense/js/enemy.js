@@ -2,6 +2,13 @@ import * as THREE from '../vendor/three.module.js';
 import { CFG, enemyStats } from './config.js';
 import { clamp, dist } from './utils.js';
 
+var _variantTintColor = new THREE.Color();
+function tintedColor(baseColor, variant) {
+  if (!variant) return baseColor;
+  const v = CFG.variants[variant];
+  _variantTintColor.set(baseColor).lerp(new THREE.Color(v.tint), 0.55);
+  return _variantTintColor.getHex();
+}
 var GEO3 = {
   body: new THREE.CapsuleGeometry(0.42, 0.6, 4, 8),
   eye: new THREE.SphereGeometry(0.11, 6, 5),
@@ -15,6 +22,13 @@ var HIDE_SCALE = 1e-4;
 var _flashColor = new THREE.Color(16777215);
 var _slowColor = new THREE.Color(2781088);
 var _poisonColor = new THREE.Color(3064149);
+var _regenColor = new THREE.Color(3390720);
+var _eliteTintColor = new THREE.Color();
+function eliteColor(baseColor) {
+  const v = CFG.elite;
+  _eliteTintColor.set(baseColor).lerp(new THREE.Color(v.tint), 0.7);
+  return _eliteTintColor.getHex();
+}
 var _tmpColor = new THREE.Color();
 var _tmpVec = new THREE.Vector3();
 var _tmpQuat = new THREE.Quaternion();
@@ -24,12 +38,24 @@ function resetEnemyIds() {
   nextId2 = 1;
 }
 var Enemy = class {
-  constructor(type, wave, x2, z2, id) {
+  // variant: null 또는 "shield"/"split"/"dash"/"regen". statMult: 분열 자식을 줄이거나(hp/scale<1) 정예를
+  // 키우는(hp/scale/dmg/bounty>1, elite:true) 용도로 같이 쓰는 스탯 배율.
+  constructor(type, wave, x2, z2, id, variant, statMult) {
     const st = enemyStats(type, wave);
+    if (statMult) {
+      st.maxHp = Math.max(1, Math.round(st.maxHp * (statMult.hp ?? 1)));
+      st.scale *= statMult.scale ?? 1;
+      st.radius *= statMult.scale ?? 1;
+      if (statMult.dmg) st.dmg = Math.round(st.dmg * statMult.dmg);
+      if (statMult.bounty) st.bounty = { wood: Math.round(st.bounty.wood * statMult.bounty), stone: Math.round(st.bounty.stone * statMult.bounty) };
+    }
     this.id = id || nextId2++;
     this.type = type;
     this.wave = wave;
     this.st = st;
+    this.variant = variant || null;
+    this.elite = !!(statMult && statMult.elite);
+    this.tintColor = this.elite ? eliteColor(st.color) : tintedColor(st.color, this.variant);
     this.instanced = INSTANCED_TYPES.has(type);
     this.bodyIdx = -1;
     this.maxHp = st.maxHp;
@@ -46,6 +72,10 @@ var Enemy = class {
     this.poisonUntil = 0;
     this.poisonTickCd = 0;
     this.target = null;
+    if (this.variant === "dash") {
+      this.dashCd = CFG.variants.dash.interval * (0.4 + Math.random() * 0.6);
+      this.dashUntil = 0;
+    }
     this.mesh = this._makeMesh();
     this.mesh.position.set(x2, 0, z2);
     this.mesh.userData.enemy = this;
@@ -53,7 +83,6 @@ var Enemy = class {
     this._kox = 0;
     this._koz = 0;
     this._punch = 0;
-    // 보스 패턴 상태 — 소환은 체력 구간마다 한 번, 돌진은 쿨다운마다
     if (st.boss) {
       this.summonsDone = 0;
       this.castKind = null;
@@ -73,7 +102,7 @@ var Enemy = class {
     const g2 = new THREE.Group();
     if (this.instanced) {
     } else {
-      const mat = new THREE.MeshStandardMaterial({ color: this.st.color, roughness: 0.75 });
+      const mat = new THREE.MeshStandardMaterial({ color: this.tintColor, roughness: 0.75 });
       const body = new THREE.Mesh(GEO3.body, mat);
       body.position.y = 0.75;
       body.castShadow = true;
@@ -86,7 +115,7 @@ var Enemy = class {
     const e2 = e1.clone();
     e2.position.x = -0.18;
     g2.add(e1, e2);
-    if (this.type === "brute" || this.type === "boss") {
+    if (this.type === "brute" || this.st.boss) {
       const h1 = new THREE.Mesh(GEO3.horn, this.bodyMat);
       h1.position.set(0.3, 1.35, 0);
       h1.rotation.z = -0.4;
@@ -128,8 +157,17 @@ var Enemy = class {
     this.poisonUntil = Math.max(this.poisonUntil, now + duration);
   }
   // 피격 시 히트 플래시 + 타격 방향 반대쪽으로 살짝 넉백 + 펀치 스케일 튐
+  // 방패 변종: 정면(진행 방향 기준 앞쪽 144˚)에서 맞으면 피해가 크게 줄어든다 — 등 뒤로 돌아가야 제대로 들어간다
   damage(amount, fromX, fromZ) {
-    this.hp -= amount;
+    let applied = amount;
+    if (this.variant === "shield" && typeof fromX === "number") {
+      const v = CFG.variants.shield;
+      const angToAttacker = Math.atan2(fromX - this.x, fromZ - this.z);
+      let d3 = (angToAttacker - this.mesh.rotation.y + Math.PI) % (Math.PI * 2) - Math.PI;
+      if (Math.abs(d3) <= v.frontArc / 2) applied = amount * (1 - v.mitigation);
+    }
+    this.hp -= applied;
+    this._lastHitAt = performance.now() / 1e3;
     this.refreshBar();
     this._flash = 0.12;
     this._punch = 1;
@@ -137,12 +175,12 @@ var Enemy = class {
     if (typeof fromX === "number") {
       const dx = this.x - fromX, dz = this.z - fromZ;
       const len = Math.hypot(dx, dz) || 1;
-      const kb = Math.min(0.4, 0.06 + amount * 4e-3) / this.st.scale;
+      const kb = Math.min(0.4, 0.06 + applied * 4e-3) / this.st.scale;
       this._kox = clamp(this._kox + dx / len * kb, -0.5, 0.5);
       this._koz = clamp(this._koz + dz / len * kb, -0.5, 0.5);
     }
     if (this.hp <= 0) this.dead = true;
-    return this.dead;
+    return { died: this.dead, applied };
   }
 };
 export var EnemyManager = class {
@@ -159,6 +197,7 @@ export var EnemyManager = class {
     this.onPlayerHit = null;
     this.onKill = null;
     this.onPoisonTick = null;
+    this.onSpawn = null;
     const cap = CFG.wave.maxAlive;
     this.bodyInst = new THREE.InstancedMesh(
       GEO3.body,
@@ -178,16 +217,34 @@ export var EnemyManager = class {
   get alive() {
     return this.list.filter((e) => !e.dead).length;
   }
-  spawn(type, wave, x2, z2, id) {
+  spawn(type, wave, x2, z2, id, variant, statMult) {
     if (this.list.length >= CFG.wave.maxAlive) return null;
-    const e = new Enemy(type, wave, x2, z2, id);
+    const e = new Enemy(type, wave, x2, z2, id, variant, statMult);
     if (e.instanced) {
       e.bodyIdx = this._freeBodyIdx.length ? this._freeBodyIdx.pop() : -1;
     }
     this.root.add(e.mesh);
     this.list.push(e);
     this.fx.ring(x2, z2, 16734834, 2);
+    this.onSpawn?.(e);
     return e;
+  }
+  // 분열 변종이 죽을 때 그 자리에서 더 약한 개체 여러 마리로 갈라진다 (자식은 변종을 물려받지 않는다)
+  spawnSplit(parent) {
+    const v = CFG.variants.split;
+    for (let i = 0; i < v.childCount; i++) {
+      const a = Math.PI * 2 * i / v.childCount + Math.random() * 0.6;
+      const r = parent.st.radius + 0.5;
+      this.spawn(
+        parent.type,
+        parent.wave,
+        parent.x + Math.cos(a) * r,
+        parent.z + Math.sin(a) * r,
+        void 0,
+        null,
+        { hp: v.childHpMult, scale: v.childScaleMult }
+      );
+    }
   }
   byId(id) {
     return this.list.find((e) => e.id === id);
@@ -235,12 +292,27 @@ export var EnemyManager = class {
       } else if (e.poisonDps) {
         e.poisonDps = 0;
       }
-      // ---- 보스 패턴: 예고(캐스팅) → 실행. 예고 중에는 멈춰 서서 표시가 뜬다.
+      if (this._isRegenActive(e, now)) {
+        e.hp = Math.min(e.maxHp, e.hp + e.maxHp * CFG.variants.regen.hpPerSec * dt2);
+        e.refreshBar();
+        if (e.bodyMat) {
+          e.bodyMat.emissive?.setHex(3390720);
+          e.bodyMat.emissiveIntensity = 0.5 + Math.sin(now * 5) * 0.15;
+        }
+      }
       if (e.st.boss && this._bossTick(e, dt2, now)) {
         this._applyPosition(e, dt2, now);
         continue;
       }
-      const speed = e.st.speed * e.slowFactor * (e.isCharging ? CFG.bossPattern.chargeSpeed / e.st.speed : 1);
+      if (e.variant === "dash") {
+        e.dashCd -= dt2;
+        if (e.dashCd <= 0) {
+          e.dashCd = CFG.variants.dash.interval;
+          e.dashUntil = now + CFG.variants.dash.duration;
+        }
+      }
+      const dashMult = e.variant === "dash" && now < e.dashUntil ? CFG.variants.dash.speedMult : 1;
+      const speed = e.st.speed * e.slowFactor * dashMult * (e.isCharging ? CFG.bossPattern.chargeSpeed / e.st.speed : 1);
       e.attackCd -= dt2;
       const dc2 = Math.hypot(e.x, e.z);
       const atkRange = e.st.ranged ? e.st.atkRange : CFG.crystal.hitRange;
@@ -295,7 +367,7 @@ export var EnemyManager = class {
       if (step) {
         tx = step.x;
         tz = step.z;
-        if (step.building) {
+        if (step.building && step.building.def.blocks) {
           const d2 = dist(e.x, e.z, step.building.x, step.building.z);
           if (d2 < 1.9 + e.st.radius) {
             if (e.attackCd <= 0) {
@@ -322,8 +394,7 @@ export var EnemyManager = class {
   }
   // 보스 전용 갱신. 이번 프레임을 보스 패턴이 가져갔으면 true (일반 이동을 건너뛴다).
   _bossTick(e, dt2, now) {
-    const P = CFG.bossPattern;
-    // 1) 예고 중 — 제자리에 서서 기다린다
+    const P2 = CFG.bossPattern;
     if (e.castUntil > 0) {
       e.castUntil -= dt2;
       if (e.castUntil > 0) {
@@ -337,31 +408,28 @@ export var EnemyManager = class {
       else this._bossBeginCharge(e);
       return true;
     }
-    // 2) 돌진 중 — 정해진 방향으로 밀고 나가며 스치는 건물을 부순다
     if (e.chargeUntil > 0) {
       e.chargeUntil -= dt2;
-      const sp = P.chargeSpeed;
-      e.x += e.chargeDir.x * sp * dt2;
-      e.z += e.chargeDir.z * sp * dt2;
+      const sp2 = P2.chargeSpeed;
+      e.x += e.chargeDir.x * sp2 * dt2;
+      e.z += e.chargeDir.z * sp2 * dt2;
       this.onBossCharge?.(e);
-      if (e.chargeUntil <= 0) e.chargeCd = P.chargeCd;
+      if (e.chargeUntil <= 0) e.chargeCd = P2.chargeCd;
       return true;
     }
-    // 3) 체력이 구간을 넘어서면 소환 예고
     const ratio = e.hp / e.maxHp;
-    if (e.summonsDone < P.summonAt.length && ratio <= P.summonAt[e.summonsDone]) {
+    if (e.summonsDone < P2.summonAt.length && ratio <= P2.summonAt[e.summonsDone]) {
       e.summonsDone++;
       e.castKind = "summon";
-      e.castUntil = P.summonCast;
+      e.castUntil = P2.summonCast;
       this.fx.ring(e.x, e.z, 16733525, 5);
       this.onBossTelegraph?.(e, "summon");
       return true;
     }
-    // 4) 크리스탈에서 멀면 쿨다운마다 돌진 예고
     e.chargeCd -= dt2;
-    if (e.chargeCd <= 0 && Math.hypot(e.x, e.z) > P.chargeMinDist) {
+    if (e.chargeCd <= 0 && Math.hypot(e.x, e.z) > P2.chargeMinDist) {
       e.castKind = "charge";
-      e.castUntil = P.chargeCast;
+      e.castUntil = P2.chargeCast;
       this.fx.ring(e.x, e.z, 16755302, 4);
       this.onBossTelegraph?.(e, "charge");
       return true;
@@ -369,27 +437,31 @@ export var EnemyManager = class {
     return false;
   }
   _bossSummon(e) {
-    const P = CFG.bossPattern;
-    for (let i = 0; i < P.summonCount; i++) {
-      const a = Math.PI * 2 * i / P.summonCount + Math.random();
+    const P2 = CFG.bossPattern;
+    const variant = e.st.summonVariant || null;
+    for (let i = 0; i < P2.summonCount; i++) {
+      const a = Math.PI * 2 * i / P2.summonCount + Math.random();
       const r = e.st.radius + 1.6;
-      this.spawn(P.summonType, this.waveOf(e), e.x + Math.cos(a) * r, e.z + Math.sin(a) * r);
+      this.spawn(P2.summonType, this.waveOf(e), e.x + Math.cos(a) * r, e.z + Math.sin(a) * r, void 0, variant);
     }
     this.fx.ring(e.x, e.z, 16733525, 7);
-    this.onBossSummon?.(e, P.summonCount);
+    this.onBossSummon?.(e, P2.summonCount);
   }
   _bossBeginCharge(e) {
-    const P = CFG.bossPattern;
+    const P2 = CFG.bossPattern;
     const len = Math.hypot(e.x, e.z) || 1;
-    // 크리스탈 쪽으로 직선 돌진
     e.chargeDir.x = -e.x / len;
     e.chargeDir.z = -e.z / len;
-    e.chargeUntil = P.chargeTime;
+    e.chargeUntil = P2.chargeTime;
     this.onBossTelegraph?.(e, "chargeGo");
   }
   // 소환된 잡졸의 웨이브 스케일은 보스가 속한 웨이브를 따른다
   waveOf(e) {
     return e.wave || this.currentWave || 1;
+  }
+  // 재생 변종이 지금 실제로 체력을 회복하는 중인지 (연출 색·회복 계산에 공용으로 쓴다)
+  _isRegenActive(e, now) {
+    return e.variant === "regen" && e.hp < e.maxHp && now - (e._lastHitAt || 0) >= CFG.variants.regen.quietTime;
   }
   _separation(e) {
     let sx = 0, sz = 0;
@@ -409,7 +481,7 @@ export var EnemyManager = class {
   _nearestPlayer(players, x2, z2, range) {
     let best = null, bd2 = range * range;
     for (const p2 of players) {
-      if (!p2.alive) continue;
+      if (!p2.alive || p2.invulnerable) continue;
       const d2 = (p2.x - x2) ** 2 + (p2.z - z2) ** 2;
       if (d2 < bd2) {
         bd2 = d2;
@@ -421,6 +493,7 @@ export var EnemyManager = class {
   _nearestBuilding(buildMgr, x2, z2) {
     let best = null, bd2 = Infinity;
     for (const b of buildMgr.buildings.values()) {
+      if (b.isTrap) continue;
       const d2 = (b.x - x2) ** 2 + (b.z - z2) ** 2;
       if (d2 < bd2) {
         bd2 = d2;
@@ -446,7 +519,7 @@ export var EnemyManager = class {
   _settle(e, dt2) {
     if (e._flash > 0) {
       e._flash -= dt2;
-      if (e._flash <= 0 && e.bodyMat) e.bodyMat.color.setHex(e.st.color);
+      if (e._flash <= 0 && e.bodyMat) e.bodyMat.color.setHex(e.tintColor);
     }
     const decay = Math.pow(6e-4, dt2);
     e._kox *= decay;
@@ -468,9 +541,10 @@ export var EnemyManager = class {
     this.bodyInst.instanceMatrix.needsUpdate = true;
     let color;
     if (e._flash > 0) color = _flashColor;
-    else if (now !== void 0 && now < e.poisonUntil) color = _tmpColor.set(e.st.color).lerp(_poisonColor, 0.6);
-    else if (now !== void 0 && now < e.slowUntil) color = _tmpColor.set(e.st.color).lerp(_slowColor, 0.6);
-    else color = _tmpColor.set(e.st.color);
+    else if (now !== void 0 && now < e.poisonUntil) color = _tmpColor.set(e.tintColor).lerp(_poisonColor, 0.6);
+    else if (now !== void 0 && now < e.slowUntil) color = _tmpColor.set(e.tintColor).lerp(_slowColor, 0.6);
+    else if (now !== void 0 && this._isRegenActive(e, now)) color = _tmpColor.set(e.tintColor).lerp(_regenColor, 0.55);
+    else color = _tmpColor.set(e.tintColor);
     this.bodyInst.setColorAt(e.bodyIdx, color);
     this.bodyInst.instanceColor.needsUpdate = true;
   }
@@ -507,24 +581,27 @@ export var EnemyManager = class {
         Math.round(e.hp),
         Math.round(e.mesh.rotation.y * 100) / 100,
         // 보스 예고/돌진 상태 — 참가자도 경고를 보고 피할 수 있어야 한다
-        e.castKind ? 1 : e.isCharging ? 2 : 0
+        e.castKind ? 1 : e.isCharging ? 2 : 0,
+        e.variant || "",
+        e.elite ? 1 : 0
       ]);
     }
     return out;
   }
   applySnapshot(list, wave) {
     const seen = /* @__PURE__ */ new Set();
-    for (const [id, type, x2, z2, hp, rot, boss] of list) {
+    for (const [id, type, x2, z2, hp, rot, boss, variant, elite] of list) {
       seen.add(id);
       let e = this.byId(id);
       if (!e) {
-        e = this.spawn(type, wave, x2, z2, id);
+        const ec = CFG.elite;
+        const statMult = elite ? { hp: ec.hpMult, scale: ec.scaleMult, dmg: ec.dmgMult, bounty: ec.bountyMult, elite: true } : void 0;
+        e = this.spawn(type, wave, x2, z2, id, variant || null, statMult);
         if (!e) continue;
       }
       e.netTarget = { x: x2, z: z2, rot };
       e.hp = hp;
       e.refreshBar();
-      // 호스트가 보낸 보스 상태를 그대로 연출한다 (0 없음 / 1 예고 / 2 돌진)
       if (boss !== e._netBoss) {
         e._netBoss = boss;
         if (boss === 1) {
@@ -538,7 +615,7 @@ export var EnemyManager = class {
     for (let i = this.list.length - 1; i >= 0; i--) {
       const e = this.list[i];
       if (!seen.has(e.id)) {
-        this.fx.burst(e.x, 1, e.z, e.st.color, 8, 4);
+        this.fx.burst(e.x, 1, e.z, e.tintColor, 8, 4);
         this._removeAt(i);
       }
     }

@@ -9,11 +9,11 @@ export var SoundManager = class {
     this.volume = Number.isFinite(saved) ? Math.min(1, Math.max(0, saved)) : DEFAULT_VOL;
     this._noiseBuf = null;
     this._lastAt = {};
-    const unlock = () => {
+    const unlock2 = () => {
       this._ensureCtx();
     };
-    addEventListener("pointerdown", unlock, { once: true });
-    addEventListener("keydown", unlock, { once: true });
+    addEventListener("pointerdown", unlock2, { once: true });
+    addEventListener("keydown", unlock2, { once: true });
   }
   _ensureCtx() {
     if (this.ctx) {

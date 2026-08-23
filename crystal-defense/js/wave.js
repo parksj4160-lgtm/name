@@ -1,4 +1,4 @@
-import { CFG, waveComposition, waveReward } from './config.js';
+import { CFG, rollElite, rollVariant, waveComposition, waveReward } from './config.js';
 import { pick } from './utils.js';
 
 export var PHASE = { PREP: "prep", COMBAT: "combat", WON: "won", LOST: "lost" };
@@ -18,6 +18,7 @@ export var WaveDirector = class {
     this.spawnTimer = 0;
     this.spawnedThisWave = 0;
     this.totalThisWave = 0;
+    this.endless = false;
   }
   get displayWave() {
     return Math.min(CFG.wave.goal, this.wave + 1);
@@ -40,6 +41,7 @@ export var WaveDirector = class {
     this.totalThisWave = this.queue.length;
     this.spawnedThisWave = 0;
     this.spawnTimer = 0.4;
+    this._eliteSpawnedThisWave = false;
     this.onWaveStart?.(w2, this.totalThisWave);
     return true;
   }
@@ -57,11 +59,23 @@ export var WaveDirector = class {
         const type = this.queue.shift();
         const portal = pick(this.world.portals);
         const jitter = 3;
+        const isBossType = !!CFG.enemies[type]?.boss;
+        let variant = null, statMult = void 0;
+        if (!isBossType && !this._eliteSpawnedThisWave && rollElite(this.wave + 1)) {
+          this._eliteSpawnedThisWave = true;
+          const ec = CFG.elite;
+          statMult = { hp: ec.hpMult, scale: ec.scaleMult, dmg: ec.dmgMult, bounty: ec.bountyMult, elite: true };
+        } else if (!isBossType) {
+          variant = rollVariant(this.wave + 1);
+        }
         const spawned = this.enemies.spawn(
           type,
           this.wave + 1,
           portal.x + (Math.random() - 0.5) * jitter,
-          portal.z + (Math.random() - 0.5) * jitter
+          portal.z + (Math.random() - 0.5) * jitter,
+          void 0,
+          variant,
+          statMult
         );
         if (spawned) this.spawnedThisWave++;
         else {
@@ -76,7 +90,7 @@ export var WaveDirector = class {
   _clear() {
     this.wave += 1;
     const reward = waveReward(this.wave);
-    if (this.wave >= CFG.wave.goal) {
+    if (this.wave >= CFG.wave.goal && !this.endless) {
       this.phase = PHASE.WON;
       this.onWaveClear?.(this.wave, reward, true);
       return;
@@ -84,6 +98,14 @@ export var WaveDirector = class {
     this.phase = PHASE.PREP;
     this.prepLeft = CFG.wave.prepTime;
     this.onWaveClear?.(this.wave, reward, false);
+  }
+  // 승리 화면의 "계속하기": 목표 웨이브에서 멈추지 않고 그대로 이어간다
+  continueEndless() {
+    if (this.phase !== PHASE.WON) return false;
+    this.endless = true;
+    this.phase = PHASE.PREP;
+    this.prepLeft = CFG.wave.prepTime;
+    return true;
   }
   lose() {
     this.phase = PHASE.LOST;
@@ -98,7 +120,8 @@ export var WaveDirector = class {
       phase: this.phase,
       prepLeft: Math.round(this.prepLeft * 10) / 10,
       q,
-      total: this.totalThisWave
+      total: this.totalThisWave,
+      endless: this.endless
     };
   }
   applySnapshot(s2) {
@@ -107,6 +130,7 @@ export var WaveDirector = class {
     this.phase = s2.phase;
     this.prepLeft = s2.prepLeft;
     this.totalThisWave = s2.total;
+    this.endless = !!s2.endless;
     this.queue = [];
     for (const [type, n] of Object.entries(s2.q || {})) {
       for (let i = 0; i < n; i++) this.queue.push(type);

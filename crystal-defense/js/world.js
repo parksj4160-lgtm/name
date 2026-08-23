@@ -1,5 +1,5 @@
 import * as THREE from '../vendor/three.module.js';
-import { CFG } from './config.js';
+import { CFG, biomeOf } from './config.js';
 import { dist, mulberry32 } from './utils.js';
 
 var GEO = {
@@ -11,7 +11,10 @@ var GEO = {
   pedestal: new THREE.CylinderGeometry(3, 3.6, 1.1, 8),
   portal: new THREE.TorusGeometry(2.2, 0.28, 8, 24),
   gem: new THREE.OctahedronGeometry(0.4, 0),
-  gemStump: new THREE.CylinderGeometry(0.3, 0.36, 0.16, 6)
+  gemStump: new THREE.CylinderGeometry(0.3, 0.36, 0.16, 6),
+  crate: new THREE.BoxGeometry(0.95, 0.85, 0.95),
+  dropRing: new THREE.RingGeometry(1.05, 1.3, 28),
+  dropBeam: new THREE.CylinderGeometry(0.07, 0.07, 6, 6)
 };
 var MAT = {
   trunk: new THREE.MeshStandardMaterial({ color: 5979428, roughness: 0.95 }),
@@ -39,7 +42,9 @@ var MAT = {
     transparent: true,
     opacity: 0.9
   }),
-  gemStump: new THREE.MeshStandardMaterial({ color: 5915496, roughness: 0.8 })
+  gemStump: new THREE.MeshStandardMaterial({ color: 5915496, roughness: 0.8 }),
+  crate: new THREE.MeshStandardMaterial({ color: 9127211, roughness: 0.85 }),
+  dropGlow: new THREE.MeshBasicMaterial({ color: 16759043, transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false })
 };
 export var World = class {
   constructor(sceneMgr, seed = 1) {
@@ -50,7 +55,9 @@ export var World = class {
     this.seed = seed;
     this.nodes = [];
     this.portals = [];
-    this.crystal = { hp: CFG.crystal.hp, maxHp: CFG.crystal.hp };
+    this.drops = [];
+    this.biome = biomeOf(seed);
+    this.crystal = { hp: CFG.crystal.hp, maxHp: CFG.crystal.hp, shieldUntil: 0 };
     this._build();
   }
   dispose() {
@@ -82,12 +89,30 @@ export var World = class {
     halo.position.y = 0.06;
     g2.add(halo);
     this.crystalHalo = halo;
+    const shield = new THREE.Mesh(
+      new THREE.SphereGeometry(3.2, 24, 16),
+      new THREE.MeshBasicMaterial({ color: 16766720, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false })
+    );
+    shield.position.y = 3.4;
+    shield.visible = false;
+    g2.add(shield);
+    this.crystalShield = shield;
     this.scene.add(g2);
     this.crystalGroup = g2;
   }
   _buildPortals() {
     const r = CFG.world.size * 0.44;
-    const angles = [Math.PI * 0.25, Math.PI * 0.75, Math.PI * 1.25, Math.PI * 1.75];
+    const biomeCfg = CFG.biomes[this.biome];
+    const n = biomeCfg.portalCount;
+    let angles;
+    if (this.biome === "canyon") {
+      const spread = Math.PI * 0.3;
+      const base = Math.PI * 0.25;
+      angles = [base - spread / 2, base + spread / 2];
+    } else {
+      angles = [];
+      for (let i = 0; i < n; i++) angles.push(Math.PI * 2 * i / n + Math.PI / 4);
+    }
     for (const a of angles) {
       const x2 = Math.cos(a) * r, z2 = Math.sin(a) * r;
       const m2 = new THREE.Mesh(GEO.portal, MAT.portal);
@@ -116,9 +141,10 @@ export var World = class {
         made++;
       }
     };
-    place("tree", 46);
-    place("rock", 30);
-    place("gem", 5);
+    const mult = CFG.biomes[this.biome].nodeMult;
+    place("tree", Math.round(46 * mult));
+    place("rock", Math.round(30 * mult));
+    place("gem", Math.max(3, Math.round(5 * mult)));
   }
   _makeNode(id, type, x2, z2, rng) {
     const cfg = CFG.harvest[type];
@@ -214,10 +240,6 @@ export var World = class {
   nodeById(id) {
     return this.nodes.find((n) => n.id === id);
   }
-  // 화면에서 가리킨 지점 근처의 자원 (클릭 대상 고르기용)
-  nodeNear(x2, z2, range) {
-    return this.nearestNode(x2, z2, range);
-  }
   nearestNode(x2, z2, range) {
     let best = null, bd2 = range * range;
     for (const n of this.nodes) {
@@ -277,6 +299,53 @@ export var World = class {
       }
     }
   }
+  // --- 보급품 투하 ---
+  spawnDrop(id, x2, z2) {
+    const g2 = new THREE.Group();
+    g2.position.set(x2, 0.12, z2);
+    const crate = new THREE.Mesh(GEO.crate, MAT.crate);
+    crate.position.y = 0.45;
+    crate.castShadow = true;
+    g2.add(crate);
+    const ring = new THREE.Mesh(GEO.dropRing, MAT.dropGlow);
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.y = -0.07;
+    g2.add(ring);
+    const beam = new THREE.Mesh(GEO.dropBeam, MAT.dropGlow);
+    beam.position.y = 3.4;
+    g2.add(beam);
+    this.scene.add(g2);
+    const drop = { id, x: x2, z: z2, group: g2, requested: false };
+    this.drops.push(drop);
+    return drop;
+  }
+  removeDrop(id) {
+    const i = this.drops.findIndex((d2) => d2.id === id);
+    if (i < 0) return;
+    this.scene.remove(this.drops[i].group);
+    this.drops.splice(i, 1);
+  }
+  dropSnapshot() {
+    return this.drops.map((d2) => [d2.id, Math.round(d2.x * 10) / 10, Math.round(d2.z * 10) / 10]);
+  }
+  applyDropSnapshot(list) {
+    const seen = /* @__PURE__ */ new Set();
+    for (const [id, x2, z2] of list) {
+      seen.add(id);
+      if (!this.drops.some((d2) => d2.id === id)) this.spawnDrop(id, x2, z2);
+    }
+    for (let i = this.drops.length - 1; i >= 0; i--) {
+      if (!seen.has(this.drops[i].id)) this.removeDrop(this.drops[i].id);
+    }
+  }
+  updateDrops(dt2, now) {
+    if (!this.drops.length) return;
+    MAT.dropGlow.opacity = 0.4 + Math.sin(now * 4) * 0.15;
+    for (const d2 of this.drops) {
+      d2.group.position.y = 0.12 + Math.sin(now * 2.2 + d2.id) * 0.1;
+      d2.group.rotation.y += dt2 * 1.1;
+    }
+  }
   // 건설 시 자원 노드와 겹치는지
   blocksBuild(x2, z2) {
     for (const n of this.nodes) {
@@ -286,6 +355,7 @@ export var World = class {
     return false;
   }
   damageCrystal(amount) {
+    if (performance.now() / 1e3 < this.crystal.shieldUntil) return false;
     this.crystal.hp = Math.max(0, this.crystal.hp - amount);
     this._pulse = 0.35;
     return this.crystal.hp <= 0;
@@ -293,13 +363,17 @@ export var World = class {
   healCrystal(amount) {
     this.crystal.hp = Math.min(this.crystal.maxHp, this.crystal.hp + amount);
   }
+  // 긴급 방벽 스킬: duration초 동안 크리스탈이 어떤 피해도 받지 않는다
+  activateShield(duration) {
+    this.crystal.shieldUntil = performance.now() / 1e3 + duration;
+  }
   update(dt2, now) {
     this.crystalMesh.rotation.y += dt2 * 0.5;
     this.crystalMesh.position.y = 3.4 + Math.sin(now * 1.6) * 0.18;
     const ratio = this.crystal.hp / this.crystal.maxHp;
     this.crystalMesh.material.emissiveIntensity = 0.6 + ratio * 1.2;
     this.crystalMesh.material.color.setHSL(0.52 * ratio + 0, 0.9, 0.55 + 0.1 * ratio);
-    this.sm.crystalLight.intensity = 1.2 + ratio * 1.6;
+    this.sm.crystalLight.intensity = (1.2 + ratio * 1.6) * this.sm.crystalNightMult;
     if (this._pulse > 0) {
       this._pulse -= dt2;
       const s2 = 1 + Math.max(0, this._pulse) * 0.6;
@@ -309,10 +383,19 @@ export var World = class {
       this.crystalMesh.scale.setScalar(1);
       this.crystalHalo.material.opacity = 0.35 + Math.sin(now * 2) * 0.08;
     }
+    const shieldLeft = this.crystal.shieldUntil - now;
+    if (shieldLeft > 0) {
+      this.crystalShield.visible = true;
+      this.crystalShield.material.opacity = 0.16 + Math.sin(now * 6) * 0.06 + Math.min(0.15, shieldLeft * 0.3);
+      this.crystalShield.rotation.y += dt2 * 0.7;
+    } else if (this.crystalShield.visible) {
+      this.crystalShield.visible = false;
+    }
     for (const p2 of this.portals) {
       p2.mesh.rotation.z += dt2 * 1.2;
       p2.mesh.material.emissiveIntensity = 0.9 + Math.sin(now * 3 + p2.x) * 0.35;
     }
     this.updateNodes(now);
+    this.updateDrops(dt2, now);
   }
 };

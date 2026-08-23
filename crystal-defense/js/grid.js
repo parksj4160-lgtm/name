@@ -121,7 +121,7 @@ export var BuildGrid = class {
     }
     const enterCost = (i) => {
       const b = this.occupied[i];
-      if (!b) return 1;
+      if (!b || !b.def.blocks) return 1;
       return 1 + b.hp / 30;
     };
     while (heap.size) {

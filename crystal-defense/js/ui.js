@@ -1,7 +1,8 @@
+import { ACHIEVEMENTS, loadUnlocked, unlock } from './achievements.js';
 import { CFG, DIFFICULTIES, waveComposition } from './config.js';
 import { Game } from './game.js';
 import { keyLabel } from './keymap.js';
-import { canAfford, clamp, costText, dist, fmtTime, roomCode } from './utils.js';
+import { canAfford, clamp, costText, fmtTime, roomCode } from './utils.js';
 import { PHASE } from './wave.js';
 
 var $2 = (id) => document.getElementById(id);
@@ -27,6 +28,7 @@ export var UI = class {
       hupLv: $2("hup-lv"),
       hupCost: $2("hup-cost"),
       poolMode: $2("pool-mode"),
+      biomeTag: $2("biome-tag"),
       iron: $2("res-iron"),
       toolRow: $2("tool-row"),
       crystalFill: $2("crystal-fill"),
@@ -57,14 +59,20 @@ export var UI = class {
       mute: $2("btn-mute"),
       pauseOverlay: $2("pause-overlay"),
       wavePreview: $2("wave-preview"),
+      btnContinue: $2("btn-continue"),
       tutorial: $2("tutorial"),
-      tutorialText: $2("tutorial-text")
+      tutorialText: $2("tutorial-text"),
+      achList: $2("ach-list"),
+      achCount: $2("ach-count"),
+      boonOverlay: $2("boon-overlay"),
+      boonChoices: $2("boon-choices")
     };
     this.mm = this.el.minimap.getContext("2d");
     this._bindLobby();
     this._bindHud();
     this._bindTouch();
     this._toastTimers = [];
+    this.refreshAchievements();
   }
   // ------------------------------------------------------------- 인벤토리
   // 건설 · 제작 · 장비를 한 창에서 고른다. 예전 하단 단축키 바를 대체한다.
@@ -90,9 +98,8 @@ export var UI = class {
     const g2 = this.game;
     const tab = this._invTab;
     if (tab === "build") {
-      // 제작대·화로는 맨손으로 세우지만, 벽과 타워는 제작대가 있어야 지을 수 있다
       const hasBench = g2.hasStation("workbench");
-      const rows = Object.entries(CFG.builds).map(([key, def]) => {
+      const rows2 = Object.entries(CFG.builds).map(([key, def]) => {
         const needsBench = !def.station && !hasBench;
         return {
           key,
@@ -115,7 +122,7 @@ export var UI = class {
         ["repair", "🔧", "수리", "손상된 만큼만 자원을 쓴다"],
         ["sell", "🔨", "철거", "투자한 자원의 50%를 돌려받는다"]
       ]) {
-        rows.push({
+        rows2.push({
           key,
           icon,
           name,
@@ -129,10 +136,10 @@ export var UI = class {
           }
         });
       }
-      return rows;
+      return rows2;
     }
     if (tab === "craft") {
-      const rows = Object.entries(CFG.craft).map(([key, r]) => ({
+      const rows2 = Object.entries(CFG.craft).map(([key, r]) => ({
         key,
         icon: r.icon,
         name: r.name,
@@ -142,7 +149,7 @@ export var UI = class {
         note: g2.local.tools[key] ? "보유 중" : !g2.hasStation("workbench") ? "제작대 필요" : null,
         action: () => g2.requestCraft(key)
       }));
-      rows.push({
+      rows2.push({
         key: "smelt",
         icon: "⚙️",
         name: `철 ${CFG.smelt.yield}개 제련`,
@@ -152,9 +159,32 @@ export var UI = class {
         note: !g2.hasStation("furnace") ? "화로 필요" : null,
         action: () => g2.requestSmelt()
       });
-      return rows;
+      return rows2;
     }
-    // 장비 — 만든 무기를 손에 든다
+    if (tab === "skill") {
+      const pool = g2.myPool;
+      const ACTIONS = {
+        heal: () => g2.requestShard(),
+        blast: () => g2.requestSkillBlast(),
+        chill: () => g2.requestSkillChill(),
+        barrier: () => g2.requestSkillBarrier()
+      };
+      const HOTKEYS = { heal: "shard", blast: "skillBlast", chill: "skillChill", barrier: "skillBarrier" };
+      return Object.entries(CFG.skills).map(([key, s]) => {
+        const shardCost = key === "heal" ? s.cost : g2._skillCost(s);
+        const cost = { shard: shardCost };
+        return {
+          key,
+          icon: s.icon,
+          name: s.name,
+          desc: s.desc,
+          cost,
+          hotkey: g2.km.get(HOTKEYS[key]),
+          state: canAfford(pool, cost) ? "" : "poor",
+          action: ACTIONS[key]
+        };
+      });
+    }
     const held = g2.local.heldWeapon;
     const rows = [{
       key: "none",
@@ -186,13 +216,13 @@ export var UI = class {
     const DESC = {
       build: "지을 것을 고르면 배치 모드가 된다. 벽\xB7타워는 제작대를 먼저 지어야 열린다.",
       craft: "제작대를 지으면 도구와 무기를, 화로를 지으면 철을 만들 수 있다.",
+      skill: "정수(💠)를 회복 대신 전투에 쓴다. 회복과 경쟁하니 상황에 맞게 고를 것.",
       gear: "손에 들 것을 고른다. 든 것의 효과만 적용되고, 정수석은 곡괭이를 쥐어야 캔다."
     };
     this.el.invDesc.textContent = DESC[this._invTab];
     for (const t2 of this.el.invTabs.querySelectorAll(".inv-tab")) {
       t2.classList.toggle("on", t2.dataset.tab === this._invTab);
     }
-    // 탭이 바뀔 때만 다시 그리고, 그 외에는 상태만 갱신한다
     if (this._invRendered !== this._invTab) {
       this.el.invList.innerHTML = "";
       this._invEls = {};
@@ -260,6 +290,8 @@ export var UI = class {
     if (st.slow) parts.push(`둔화 <b>${Math.round(st.slow * 100)}%</b>`);
     if (st.poisonDps) parts.push(`독 <b>${st.poisonDps}</b>/초`);
     if (st.buffMult) parts.push(`주변 타워 공격력 <b>+${Math.round(st.buffMult * 100)}%</b> (범위 ${st.buffRadius})`);
+    if (st.triggerRadius) parts.push(`감지 반경 <b>${st.triggerRadius}</b>`);
+    if (st.singleUse) parts.push(`1회용`);
     const ok = canAfford(this.game.myPool, def.cost);
     return `${def.icon} ${def.name} — ${parts.join(" \xB7 ")} \xB7 비용 <b class="${ok ? "" : "lack"}">${costText(def.cost)}</b>`;
   }
@@ -393,6 +425,7 @@ export var UI = class {
       g2.begin({ seed, shared, difficulty });
       g2._syncRosterIntoGame();
     };
+    $2("btn-continue").onclick = () => this.game.requestContinueEndless();
     $2("btn-again").onclick = () => {
       const g22 = this.game;
       if (g22.net.online && !g22.net.isHost) {
@@ -606,7 +639,6 @@ export var UI = class {
     };
     stick.addEventListener("pointerup", release);
     stick.addEventListener("pointercancel", release);
-
   }
   // ---------------------------------------------------------------- 라이프사이클
   onGameStart(resumed = false) {
@@ -614,13 +646,20 @@ export var UI = class {
     this.el.lobby.classList.add("hidden");
     this.el.result.classList.add("hidden");
     this.el.pauseOverlay.classList.add("hidden");
+    this.el.boonOverlay.classList.add("hidden");
     this._invTab = "build";
     this._invRendered = null;
     this._crystalWarned = false;
     this.el.crystalWarning.classList.add("hidden");
     this.closeInventory();
     this.refreshBuildBar();
-    if (!resumed) this.toast("크리스탈을 지켜라! 자원을 클릭해 캐고, I로 인벤토리", "good");
+    const bcfg = CFG.biomes[this.game.world.biome];
+    this.el.biomeTag.textContent = `${bcfg.icon} ${bcfg.name}`;
+    this.el.biomeTag.title = bcfg.desc;
+    if (!resumed) {
+      this.toast("크리스탈을 지켜라! 자원·몬스터를 클릭해 캐고 때린다, I로 인벤토리", "good");
+      this.toast(`${bcfg.icon} 지형: ${bcfg.name} — ${bcfg.desc}`, "warn");
+    }
     if (resumed || localStorage.getItem("cd.tutorialDone")) {
       this.el.tutorial.classList.add("hidden");
       this._tutStep = -1;
@@ -679,10 +718,31 @@ export var UI = class {
       this._endTutorial();
     }
   }
+  hideResult() {
+    this.el.result.classList.add("hidden");
+  }
+  // 엔드리스 축복 2개 중 하나를 고르는 선택창
+  showBoonChoice(keys) {
+    this.el.boonChoices.innerHTML = keys.map((k2) => {
+      const b = CFG.boons[k2];
+      return `<button type="button" class="boon-card" data-boon="${k2}">
+<span class="bc-icon">${b.icon}</span>
+<span><span class="bc-name">${b.name}</span><br><span class="bc-desc">${b.desc}</span></span>
+</button>`;
+    }).join("");
+    for (const btn of this.el.boonChoices.querySelectorAll(".boon-card")) {
+      btn.onclick = () => this.game.pickBoon(btn.dataset.boon);
+    }
+    this.el.boonOverlay.classList.remove("hidden");
+  }
+  hideBoonChoice() {
+    this.el.boonOverlay.classList.add("hidden");
+  }
   showResult(win, stats, wave) {
     this.el.result.classList.remove("hidden");
     $2("result-title").textContent = win ? "승리! 🎉" : "크리스탈 파괴… 💥";
-    $2("result-sub").textContent = win ? `${CFG.wave.goal}웨이브를 모두 막아냈다.` : `${wave}웨이브까지 버텼다.`;
+    $2("result-sub").textContent = win ? `${CFG.wave.goal}웨이브를 모두 막아냈다. 계속하면 끝없이 이어진다.` : `${wave}웨이브까지 버텼다.`;
+    this.el.btnContinue.classList.toggle("hidden", !win);
     $2("result-stats").innerHTML = `
 <li>생존 시간 <b>${fmtTime(stats.time)}</b></li>
 <li>처치한 몬스터 <b>${stats.kills}</b></li>
@@ -703,6 +763,34 @@ export var UI = class {
 <li class="${rec.isNewBest ? "new-best" : ""}">🏆 역대 최고 웨이브 <b>${rec.bestWave}</b>${rec.isNewBest ? " — 신기록!" : ""}</li>
 <li>⚔️ 누적 처치 <b>${rec.totalKills}</b></li>
 <li>🎮 플레이 횟수 <b>${rec.plays}</b> (승리 ${rec.wins}회)</li>`;
+    if (win && unlock("firstWin")) stats.newAchievements.push("firstWin");
+    if (rec.plays >= 10 && unlock("veteran")) stats.newAchievements.push("veteran");
+    const achEl = $2("result-achievements");
+    if (stats.newAchievements.length) {
+      achEl.innerHTML = stats.newAchievements.map((k2) => {
+        const a = ACHIEVEMENTS[k2];
+        return `<li>${a.icon} <b>${a.name}</b> <span class="dim">${a.desc}</span></li>`;
+      }).join("");
+      achEl.classList.remove("hidden");
+    } else {
+      achEl.classList.add("hidden");
+    }
+    this.refreshAchievements();
+  }
+  // 로비의 업적 목록을 채운다 — 전체 달성 현황을 항상 볼 수 있게
+  refreshAchievements() {
+    const list = this.el.achList;
+    if (!list) return;
+    const unlocked = loadUnlocked();
+    const entries = Object.entries(ACHIEVEMENTS);
+    const got = entries.filter(([k2]) => unlocked[k2]).length;
+    this.el.achCount.textContent = `${got} / ${entries.length}`;
+    list.innerHTML = entries.map(([k2, a]) => `
+<li class="${unlocked[k2] ? "on" : ""}">
+<span class="ai-icon">${a.icon}</span>
+<span class="ai-name">${a.name}</span>
+<span class="ai-desc">${a.desc}</span>
+</li>`).join("");
   }
   // 자원을 어디에 썼는지 항목별로 쪼개 보여준다 (쓴 곳만)
   _spendBreakdown(stats) {
@@ -772,7 +860,8 @@ export var UI = class {
     const c2 = g2.world.crystal;
     const ratio = clamp(c2.hp / c2.maxHp, 0, 1);
     this.el.crystalFill.style.transform = `scaleX(${ratio})`;
-    this.el.crystalText.textContent = `${Math.ceil(c2.hp)} / ${c2.maxHp}`;
+    const shieldLeft = c2.shieldUntil - performance.now() / 1e3;
+    this.el.crystalText.textContent = `${Math.ceil(c2.hp)} / ${c2.maxHp}` + (shieldLeft > 0 ? ` 🛡️${Math.ceil(shieldLeft)}s` : "");
     const danger = ratio < 0.3 && ratio > 0;
     this.el.crystalWarning.classList.toggle("hidden", !danger);
     if (danger && !this._crystalWarned) {
@@ -783,11 +872,12 @@ export var UI = class {
       this._crystalWarned = false;
     }
     const w2 = g2.wave;
-    this.el.waveLabel.textContent = `웨이브 ${Math.min(CFG.wave.goal, w2.wave + 1)} / ${CFG.wave.goal}`;
+    const nextWave = w2.endless ? w2.wave + 1 : Math.min(CFG.wave.goal, w2.wave + 1);
+    this.el.waveLabel.textContent = w2.endless ? `웨이브 ${nextWave} ♾️ 엔드리스` : `웨이브 ${nextWave} / ${CFG.wave.goal}`;
     if (w2.phase === PHASE.PREP) {
       this.el.waveState.textContent = `준비 시간 ${fmtTime(w2.prepLeft)}`;
       this.el.waveBtn.classList.remove("hidden");
-      this._showWavePreview(Math.min(CFG.wave.goal, w2.wave + 1));
+      this._showWavePreview(nextWave);
     } else if (w2.phase === PHASE.COMBAT) {
       this.el.waveState.textContent = `남은 몬스터 ${w2.remaining}`;
       this.el.waveBtn.classList.add("hidden");
@@ -808,11 +898,10 @@ export var UI = class {
       this.el.harvestWrap.classList.add("hidden");
     }
     const near = g2.world.nearestNode(p2.x, p2.z, CFG.harvest.range);
-    // 지금 채집할 수 있는 상태인지 — 터치 버튼이 채집/공격 중 무엇으로 동작할지 정한다
     if (near && !g2.buildMgr.mode) {
       this.el.prompt.classList.remove("hidden");
       if (near.type === "gem" && !p2.holdingPickaxe) {
-        this.el.prompt.innerHTML = p2.tools.pickaxe ? `💠 정수석 — 곡괭이를 <b>손에 쥐어야</b> 캘 수 있습니다 (인벤토리 장비 탭)` : `💠 정수석 — 곡괭이가 있어야 캘 수 있습니다 (제작대에서 제작)`;
+        this.el.prompt.innerHTML = p2.tools.pickaxe ? `💠 정수석 — 곡괭이를 <b>손에 쥐어야</b> 캘 수 있습니다 (좌상단 도구 아이콘)` : `💠 정수석 — 곡괭이가 있어야 캘 수 있습니다 (제작대에서 제작)`;
       } else {
         const label = near.type === "tree" ? "🌳 나무" : near.type === "gem" ? "💠 정수석" : "🪨 바위";
         this.el.prompt.innerHTML = `${label} — <b>눌러서 채집</b> (남은 ${near.charges})`;
@@ -838,11 +927,11 @@ export var UI = class {
     const hunting = g2.wave.phase === PHASE.COMBAT && g2.wave.remaining <= 3;
     for (const e of g2.enemyMgr.list) {
       if (e.dead) continue;
-      const isNotable = hunting || this.colorblind || e.type === "boss" || e.type === "shooter" || e.type === "raider";
+      const isNotable = hunting || this.colorblind || e.st.boss || e.type === "shooter" || e.type === "raider" || e.elite;
       const slowed = now < e.slowUntil;
       const poisoned = now < e.poisonUntil;
-      if (!isNotable && !slowed && !poisoned) continue;
-      const text = (isNotable ? CFG.enemies[e.type].icon : "") + (slowed ? "❄️" : "") + (poisoned ? "☠️" : "");
+      if (!isNotable && !slowed && !poisoned && !e.variant) continue;
+      const text = (e.elite ? "⭐" : "") + (isNotable ? CFG.enemies[e.type].icon : "") + (e.variant ? CFG.variants[e.variant].icon : "") + (slowed ? "❄️" : "") + (poisoned ? "☠️" : "");
       seen.add(e.id);
       let tag = this.enemyTags.get(e.id);
       if (!tag) {
@@ -891,9 +980,9 @@ export var UI = class {
     if (this._previewWave === wave) return;
     this._previewWave = wave;
     const comp = waveComposition(wave);
-    const hasBoss = comp.some((c2) => c2.type === "boss");
+    const hasBoss = comp.some((c2) => CFG.enemies[c2.type]?.boss);
     this.el.wavePreview.innerHTML = comp.map(
-      (c2) => `<span class="${c2.type === "boss" ? "boss" : ""}">${CFG.enemies[c2.type].icon}<b>${c2.count}</b></span>`
+      (c2) => `<span class="${CFG.enemies[c2.type]?.boss ? "boss" : ""}">${CFG.enemies[c2.type].icon}<b>${c2.count}</b></span>`
     ).join("");
     this.el.wavePreview.classList.toggle("boss-wave", hasBoss);
     this.el.wavePreview.classList.remove("hidden");
@@ -992,6 +1081,20 @@ export var UI = class {
       ctx.beginPath();
       ctx.arc(tx(p2.x), tz(p2.z), 3.4, 0, Math.PI * 2);
       ctx.stroke();
+    }
+    if (g2.world.drops.length) {
+      const dp = 3 + Math.sin(performance.now() / 150) * 1.4;
+      ctx.fillStyle = "#ffd21a";
+      ctx.strokeStyle = "rgba(255,210,26,0.9)";
+      ctx.lineWidth = 1.4;
+      for (const d2 of g2.world.drops) {
+        ctx.beginPath();
+        ctx.arc(tx(d2.x), tz(d2.z), dp, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(tx(d2.x), tz(d2.z), dp + 3, 0, Math.PI * 2);
+        ctx.stroke();
+      }
     }
     ctx.fillStyle = "#ff6a7d";
     for (const e of g2.enemyMgr.list) {

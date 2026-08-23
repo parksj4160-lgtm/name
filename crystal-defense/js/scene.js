@@ -32,7 +32,9 @@ export var SceneManager = class {
     this.resize();
   }
   _setupLights() {
-    this.scene.add(new THREE.HemisphereLight(10405631, 2765640, 1.15));
+    const hemi = new THREE.HemisphereLight(10405631, 2765640, 1.15);
+    this.scene.add(hemi);
+    this.hemi = hemi;
     const sun = new THREE.DirectionalLight(16773848, 2);
     sun.position.set(34, 46, 22);
     sun.castShadow = true;
@@ -50,6 +52,41 @@ export var SceneManager = class {
     this.crystalLight = new THREE.PointLight(6545663, 2.2, 46, 2);
     this.crystalLight.position.set(0, 5, 0);
     this.scene.add(this.crystalLight);
+    this._day = { bg: 856608, fogNear: 60, fogFar: 130, hemi: 1.15, sun: 2, crystalI: 2.2, crystalR: 46 };
+    this._nightVal = { bg: 526344, fogNear: 22, fogFar: 58, hemi: 0.32, sun: 0.45, crystalI: 3.6, crystalR: 62 };
+    this._nightC1 = new THREE.Color(this._day.bg);
+    this._nightC2 = new THREE.Color(this._nightVal.bg);
+    this._night = 0;
+    this._nightTarget = 0;
+    this.crystalNightMult = 1;
+  }
+  setNightMode(active) {
+    this._nightTarget = active ? 1 : 0;
+  }
+  // 새 판을 시작할 때 이전 판이 밤 웨이브 중이었어도 즉시 낮으로 되돌린다.
+  // updateNight() 는 _night === _nightTarget 이면 아무 것도 다시 계산하지 않고 즉시 반환하므로,
+  // 강제로 어긋나게 만든 뒤 큰 dt 로 한 번 밟아서 낮 값을 실제로 다시 적용시킨다.
+  resetNight() {
+    this._nightTarget = 0;
+    this._night = 1;
+    this.updateNight(10);
+  }
+  updateNight(dt2) {
+    if (this._night === this._nightTarget) return;
+    this._night += (this._nightTarget - this._night) * Math.min(1, dt2 * 1.1);
+    if (Math.abs(this._night - this._nightTarget) < 1e-3) this._night = this._nightTarget;
+    const t2 = this._night;
+    const d2 = this._day, n2 = this._nightVal;
+    const bg = this._nightC1.copy(this._nightC1.set(d2.bg)).lerp(this._nightC2.set(n2.bg), t2);
+    this.scene.background.copy(bg);
+    this.scene.fog.color.copy(bg);
+    this.scene.fog.near = d2.fogNear + (n2.fogNear - d2.fogNear) * t2;
+    this.scene.fog.far = d2.fogFar + (n2.fogFar - d2.fogFar) * t2;
+    this.hemi.intensity = d2.hemi + (n2.hemi - d2.hemi) * t2;
+    this.sun.intensity = d2.sun + (n2.sun - d2.sun) * t2;
+    const crystalI = d2.crystalI + (n2.crystalI - d2.crystalI) * t2;
+    this.crystalNightMult = crystalI / d2.crystalI;
+    this.crystalLight.distance = d2.crystalR + (n2.crystalR - d2.crystalR) * t2;
   }
   _setupGround() {
     const size = CFG.world.size;

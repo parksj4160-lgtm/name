@@ -14,7 +14,9 @@ var GEO2 = {
   supportRing: new THREE.TorusGeometry(1, 0.05, 6, 20),
   barrel: new THREE.CylinderGeometry(0.22, 0.26, 1.4, 8),
   bar: new THREE.PlaneGeometry(1.5, 0.16),
-  buffRing: new THREE.RingGeometry(1.05, 1.25, 24)
+  buffRing: new THREE.RingGeometry(1.05, 1.25, 24),
+  trapBase: new THREE.CylinderGeometry(0.85, 0.85, 0.12, 8),
+  trapSpike: new THREE.ConeGeometry(0.1, 0.38, 4)
 };
 var MAT2 = {
   wall: [
@@ -33,6 +35,8 @@ var MAT2 = {
   workbenchTool: new THREE.MeshStandardMaterial({ color: 10137781, roughness: 0.5, metalness: 0.4 }),
   furnaceBody: new THREE.MeshStandardMaterial({ color: 5723991, roughness: 0.9 }),
   furnaceFire: new THREE.MeshStandardMaterial({ color: 16750899, emissive: 15693600, emissiveIntensity: 1.4, roughness: 0.4 }),
+  trapBase: new THREE.MeshStandardMaterial({ color: 4863530, roughness: 0.85, metalness: 0.3 }),
+  trapSpike: new THREE.MeshStandardMaterial({ color: 14238251, roughness: 0.4, metalness: 0.6 }),
   ghostOk: new THREE.MeshStandardMaterial({ color: 5570463, transparent: true, opacity: 0.45, emissive: 2002770, emissiveIntensity: 0.6 }),
   ghostBad: new THREE.MeshStandardMaterial({ color: 16734826, transparent: true, opacity: 0.4, emissive: 9379372, emissiveIntensity: 0.6 }),
   barBg: new THREE.MeshBasicMaterial({ color: 1119519, transparent: true, opacity: 0.8, depthTest: false }),
@@ -79,8 +83,11 @@ var Building = class {
   get stationKind() {
     return this.def.station || null;
   }
+  get isTrap() {
+    return this.key === "trap";
+  }
   get isTower() {
-    return this.key !== "wall" && !this.isSupport && !this.stationKind;
+    return this.key !== "wall" && this.key !== "trap" && !this.isSupport && !this.stationKind;
   }
   get nextCost() {
     const nxt = this.def.levels[this.level];
@@ -92,7 +99,7 @@ var Building = class {
     const fg = new THREE.Mesh(GEO2.bar, MAT2.barFg.clone());
     fg.position.z = 0.01;
     g2.add(bg, fg);
-    g2.position.y = this.key === "wall" ? 2.7 : this.key === "workbench" ? 1.6 : 3.4;
+    g2.position.y = this.key === "wall" ? 2.7 : this.key === "workbench" ? 1.6 : this.key === "trap" ? 0.7 : 3.4;
     g2.visible = false;
     g2.renderOrder = 5;
     this.mesh.add(g2);
@@ -115,6 +122,23 @@ var Building = class {
     this.buffRing.visible = true;
     this.buffRing.material.opacity = 0.35 + Math.min(0.45, (mult - 1) * 0.7);
   }
+  // 타워 시너지(서리+화살, 독+독) 표시 — 보루 버프 고리와 겹치지 않게 약간 위에, 색으로 종류를 구분한다
+  showSynergy(active, colorHex) {
+    if (!active) {
+      if (this.synergyRing) this.synergyRing.visible = false;
+      return;
+    }
+    if (!this.synergyRing) {
+      const r = new THREE.Mesh(GEO2.buffRing, MAT2.buffRing.clone());
+      r.rotation.x = -Math.PI / 2;
+      r.position.y = 0.13;
+      this.mesh.add(r);
+      this.synergyRing = r;
+    }
+    this.synergyRing.visible = true;
+    this.synergyRing.material.color.setHex(colorHex);
+    this.synergyRing.material.opacity = 0.5;
+  }
   applyLevel(level) {
     this.level = level;
     const st = this.def.levels[level - 1];
@@ -133,6 +157,7 @@ var Building = class {
     }
     this.mesh = nm;
     this.buffRing = null;
+    this.synergyRing = null;
     this._makeBar();
     this.turret = nm.userData.turret;
   }
@@ -201,6 +226,20 @@ function buildMesh(key, level) {
     const mouth = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.5, 0.08), MAT2.furnaceFire);
     mouth.position.set(0, 0.5, 0.71);
     g2.add(mouth);
+    return g2;
+  }
+  if (key === "trap") {
+    const plate = new THREE.Mesh(GEO2.trapBase, MAT2.trapBase);
+    plate.position.y = 0.06;
+    plate.receiveShadow = true;
+    g2.add(plate);
+    for (let i = 0; i < 5; i++) {
+      const a = Math.PI * 2 * i / 5;
+      const spike = new THREE.Mesh(GEO2.trapSpike, MAT2.trapSpike);
+      spike.position.set(Math.cos(a) * 0.42, 0.24, Math.sin(a) * 0.42);
+      spike.castShadow = true;
+      g2.add(spike);
+    }
     return g2;
   }
   const base = new THREE.Mesh(GEO2.base, MAT2.base);
@@ -275,6 +314,7 @@ export var BuildManager = class {
     this.ghostCell = null;
     this.hover = null;
     this.onImpact = null;
+    this.onSynergy = null;
     this.rangeRing = new THREE.Mesh(RANGE_RING_GEO, MAT2.rangeRing);
     this.rangeRing.rotation.x = -Math.PI / 2;
     this.rangeRing.position.y = 0.05;
@@ -437,6 +477,25 @@ export var BuildManager = class {
       }
     }
   }
+  // 화살탑 시너지: 사거리 안(정확히는 인접 반경)에 서리탑이 있으면 true
+  hasNearbyFrost(b) {
+    const r = CFG.synergy.frostArrow.radius;
+    for (const o of this.buildings.values()) {
+      if (o === b || o.key !== "frost") continue;
+      if (dist(b.x, b.z, o.x, o.z) <= r) return true;
+    }
+    return false;
+  }
+  // 독탑 시너지: 인접한 다른 독탑 하나당 독 피해가 누적 증가(상한 있음)
+  poisonSynergyMult(b) {
+    const s2 = CFG.synergy.poisonStack;
+    let count = 0;
+    for (const o of this.buildings.values()) {
+      if (o === b || o.key !== "poison") continue;
+      if (dist(b.x, b.z, o.x, o.z) <= s2.radius) count++;
+    }
+    return 1 + Math.min(s2.max, count * s2.dpsMultPerNeighbor);
+  }
   // 범위 안 보루(support)들의 공격력 버프를 모두 더한다 (중첩 가능, 상한 100%)
   supportBuffMult(b) {
     let bonus = 0;
@@ -453,6 +512,7 @@ export var BuildManager = class {
     const r2 = range * range;
     for (const e of enemies) {
       if (e.dead) continue;
+      if (e.variant === "ward") continue;
       const d2 = (e.x - b.x) ** 2 + (e.z - b.z) ** 2;
       if (d2 > r2) continue;
       const score = e.x * e.x + e.z * e.z;
@@ -467,7 +527,11 @@ export var BuildManager = class {
   shoot(b, target) {
     const st = b.stats;
     const mult = this.supportBuffMult(b);
-    const effStats = mult !== 1 ? { ...st, dmg: Math.round(st.dmg * mult) } : st;
+    let effStats = mult !== 1 ? { ...st, dmg: Math.round(st.dmg * mult) } : st;
+    if (b.key === "poison" && st.poisonDps) {
+      const pm = this.poisonSynergyMult(b);
+      if (pm !== 1) effStats = { ...effStats, poisonDps: Math.round(effStats.poisonDps * pm) };
+    }
     const from = new THREE.Vector3(b.x, 2.9, b.z);
     const to2 = new THREE.Vector3(target.x, 0.8, target.z);
     const color = PROJECTILE_COLOR[b.key];
@@ -491,6 +555,21 @@ export var BuildManager = class {
       this._buffTimer = 0.25;
       for (const b of this.buildings.values()) {
         if (b.isTower) b.showBuff(this.supportBuffMult(b));
+        if (b.key === "arrow") {
+          const active = this.hasNearbyFrost(b);
+          b.showSynergy(active, 5891071);
+          if (active && !b._synergyNotified) {
+            b._synergyNotified = true;
+            this.onSynergy?.("frostArrow");
+          }
+        } else if (b.key === "poison") {
+          const pm = this.poisonSynergyMult(b);
+          b.showSynergy(pm > 1, 9419324);
+          if (pm > 1 && !b._synergyNotified) {
+            b._synergyNotified = true;
+            this.onSynergy?.("poisonStack");
+          }
+        }
       }
     }
     if (this.hover) {

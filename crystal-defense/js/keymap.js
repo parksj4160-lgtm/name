@@ -2,11 +2,15 @@ var DEFAULTS = {
   inventory: "i",
   harvest: "f",
   attack: " ",
+  dash: "v",
   upgrade: "u",
   repair: "g",
   sell: "x",
   cancel: "escape",
   shard: "r",
+  skillBlast: "t",
+  skillChill: "y",
+  skillBarrier: "b",
   startWave: "enter",
   pause: "p",
   help: "h",
@@ -16,17 +20,21 @@ var LABELS = {
   inventory: "인벤토리",
   harvest: "채집",
   attack: "공격",
+  dash: "회피 돌진",
   upgrade: "업그레이드 모드",
   repair: "수리 모드",
   sell: "철거 모드",
   cancel: "취소",
-  shard: "수정 정수 사용",
+  shard: "정수 스킬: 회복",
+  skillBlast: "정수 스킬: 폭발",
+  skillChill: "정수 스킬: 시간 왜곡",
+  skillBarrier: "정수 스킬: 긴급 방벽",
   startWave: "웨이브 시작",
   pause: "일시정지",
   help: "도움말",
   mute: "음소거"
 };
-var STORE_KEY = "cd.keymap";
+var STORE_KEY2 = "cd.keymap";
 export var KeyMap = class {
   constructor(buildDefs = {}) {
     this.defaults = { ...DEFAULTS };
@@ -41,7 +49,7 @@ export var KeyMap = class {
   _load() {
     let saved = {};
     try {
-      saved = JSON.parse(localStorage.getItem(STORE_KEY) || "{}");
+      saved = JSON.parse(localStorage.getItem(STORE_KEY2) || "{}");
     } catch {
       saved = {};
     }
@@ -51,7 +59,7 @@ export var KeyMap = class {
   }
   _save() {
     try {
-      localStorage.setItem(STORE_KEY, JSON.stringify(this.map));
+      localStorage.setItem(STORE_KEY2, JSON.stringify(this.map));
     } catch {
     }
   }
