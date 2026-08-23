@@ -1,5 +1,5 @@
 import * as THREE from '../vendor/three.module.js';
-import { CFG } from './config.js';
+import { CFG, needsPickaxe } from './config.js';
 import { clamp, dist } from './utils.js';
 
 var GEO4 = {
@@ -294,7 +294,7 @@ export var LocalPlayer = class extends Player {
   // 특정 자원을 콕 집어 캐기 시작한다 (클릭/탭으로 고른 것). 성공하면 true.
   beginHarvest(node) {
     if (!this.alive || !node || node.depleted) return false;
-    if (node.type === "gem" && !this.holdingPickaxe) return false;
+    if (needsPickaxe(node.type) && !this.holdingPickaxe) return false;
     if (dist(this.x, this.z, node.x, node.z) > CFG.harvest.range) return false;
     this.harvesting = { node, t: 0, need: CFG.harvest[node.type].time * this.harvestMult };
     this.rot = Math.atan2(node.x - this.x, node.z - this.z);
@@ -308,7 +308,7 @@ export var LocalPlayer = class extends Player {
       if (!holding) return null;
       const node = world.nearestNode(this.x, this.z, CFG.harvest.range);
       if (!node) return null;
-      if (node.type === "gem" && !this.holdingPickaxe) return null;
+      if (needsPickaxe(node.type) && !this.holdingPickaxe) return null;
       this.harvesting = { node, t: 0, need: CFG.harvest[node.type].time * this.harvestMult };
       this.rot = Math.atan2(node.x - this.x, node.z - this.z);
     }

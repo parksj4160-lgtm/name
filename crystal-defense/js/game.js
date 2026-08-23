@@ -2,7 +2,7 @@ import * as THREE from '../vendor/three.module.js';
 import { ACHIEVEMENTS, unlock } from './achievements.js';
 import { SoundManager } from './audio.js';
 import { BuildManager } from './buildings.js';
-import { CFG, DIFFICULTIES, applyDifficulty, waveComposition } from './config.js';
+import { CFG, DIFFICULTIES, applyDifficulty, waveComposition, needsPickaxe } from './config.js';
 import { EnemyManager } from './enemy.js';
 import { Fx, ProjectilePool } from './fx.js';
 import { BuildGrid } from './grid.js';
@@ -761,7 +761,7 @@ export var Game = class {
         this.ui?.toast("더 가까이 가야 캘 수 있습니다", "warn");
         return;
       }
-      if (node.type === "gem" && !this.local.holdingPickaxe) {
+      if (needsPickaxe(node.type) && !this.local.holdingPickaxe) {
         this.ui?.toast(this.local.tools.pickaxe ? "곡괭이를 손에 쥐어야 캘 수 있습니다 (좌상단 도구 아이콘)" : "곡괭이가 있어야 캘 수 있습니다 (제작대에서 제작)", "bad");
         return;
       }

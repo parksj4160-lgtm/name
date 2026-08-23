@@ -1,5 +1,5 @@
 import { ACHIEVEMENTS, loadUnlocked, unlock } from './achievements.js';
-import { CFG, DIFFICULTIES, waveComposition } from './config.js';
+import { CFG, DIFFICULTIES, waveComposition, needsPickaxe } from './config.js';
 import { Game } from './game.js';
 import { keyLabel } from './keymap.js';
 import { canAfford, clamp, costText, fmtTime, roomCode } from './utils.js';
@@ -7,7 +7,7 @@ import { PHASE } from './wave.js';
 
 var $2 = (id) => document.getElementById(id);
 var TUTORIAL_STEPS = [
-  "🌳 나무에 다가가 <b>나무를 직접 클릭</b>하면 캡니다 (몬스터도 클릭하면 때립니다)",
+  "🌳 나무를 직접 클릭하면 캡니다 (바위는 곡괭이를 만들어 쥐어야 캘 수 있어요)",
   "🎒 목재 20을 모았으면 <kbd>I</kbd> 로 인벤토리를 열어 🪚 제작대를 지으세요 (벽\xB7타워는 그 다음)",
   "준비가 되면 <kbd>Enter</kbd> 로 첫 웨이브를 시작하세요!"
 ];
@@ -900,8 +900,9 @@ export var UI = class {
     const near = g2.world.nearestNode(p2.x, p2.z, CFG.harvest.range);
     if (near && !g2.buildMgr.mode) {
       this.el.prompt.classList.remove("hidden");
-      if (near.type === "gem" && !p2.holdingPickaxe) {
-        this.el.prompt.innerHTML = p2.tools.pickaxe ? `💠 정수석 — 곡괭이를 <b>손에 쥐어야</b> 캘 수 있습니다 (좌상단 도구 아이콘)` : `💠 정수석 — 곡괭이가 있어야 캘 수 있습니다 (제작대에서 제작)`;
+      if (needsPickaxe(near.type) && !p2.holdingPickaxe) {
+        const nm = near.type === "gem" ? "💠 정수석" : "🪨 바위";
+        this.el.prompt.innerHTML = p2.tools.pickaxe ? `${nm} — 곡괭이를 <b>손에 쥐어야</b> 캘 수 있습니다 (좌상단 도구 아이콘)` : `${nm} — 곡괭이가 있어야 캘 수 있습니다 (제작대에서 제작)`;
       } else {
         const label = near.type === "tree" ? "🌳 나무" : near.type === "gem" ? "💠 정수석" : "🪨 바위";
         this.el.prompt.innerHTML = `${label} — <b>눌러서 채집</b> (남은 ${near.charges})`;

@@ -44,10 +44,12 @@ export var CFG = {
   harvest: {
     range: 3.2,
     tree: { time: 1.5, yield: 6, charges: 4, respawn: 22 },
-    rock: { time: 2.1, yield: 5, charges: 3, respawn: 28 },
+    // 바위·정수석은 맨손으로 못 캔다 — 곡괭이를 손에 쥐고 있어야 한다.
+    // (나무는 맨손으로 캘 수 있어야 첫 곡괭이를 만들 수 있으므로 조건이 없다)
+    rock: { time: 2.1, yield: 5, charges: 3, respawn: 28, needsPickaxe: true },
     // 정수석: 아주 드물게 있는 채집물. 캐면 수정 정수(크리스탈 회복용)를 바로 얻는다.
     // 곡괭이가 필요하고, 캐는 데 오래 걸리며, 한 번 캐면 오래 리스폰되지 않는다.
-    gem: { time: 3, yield: 1, charges: 1, respawn: 90 },
+    gem: { time: 3, yield: 1, charges: 1, respawn: 90, needsPickaxe: true },
     // 채집 속도 업그레이드 (레벨당 시간 배율)
     upgrade: [
       { mult: 1, cost: null },
@@ -340,6 +342,10 @@ export var CFG = {
     // 클라이언트 → 호스트 위치 전송 주기
   }
 };
+// 이 자원을 캐려면 곡괭이를 손에 쥐어야 하는가
+export function needsPickaxe(nodeType) {
+  return !!CFG.harvest[nodeType]?.needsPickaxe;
+}
 export function waveComposition(w2) {
   const list = [];
   list.push({ type: "grunt", count: 4 + Math.floor(w2 * 1.6) });

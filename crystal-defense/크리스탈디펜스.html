@@ -578,7 +578,7 @@ button.corner.mute.off { opacity: 0.5; }
     <table>
       <tr><td>이동</td><td><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> / 방향키 (<kbd>Shift</kbd> 달리기)</td></tr>
       <tr><td>💨 회피 돌진</td><td><kbd class="rebind" data-action="dash">V</kbd> — 이동 방향으로(멈춰 있으면 바라보는 방향으로) 짧게 무적 상태로 튀어나간다. 쿨다운 3초. 보스 돌진·다구리를 피하거나, 🌀 결계 몹처럼 타워가 못 맞추는 적에게 순식간에 붙을 때 쓴다</td></tr>
-      <tr><td>공격 · 채집</td><td><b>대상을 직접 클릭(탭)</b> — 몬스터를 누르면 때리고, 나무·바위·정수석을 누르면 캔다. 빈 곳을 누르면 그냥 휘두른다. <kbd class="rebind" data-action="attack">Space</kbd> 로도 휘두르고 <kbd class="rebind" data-action="harvest">F</kbd> 로 가장 가까운 자원을 캔다. 💠 정수석은 <b>곡괭이를 손에 쥐어야</b> 캘 수 있다 (좌상단 도구 아이콘을 눌러 바로 교체)</td></tr>
+      <tr><td>공격 · 채집</td><td><b>대상을 직접 클릭(탭)</b> — 몬스터를 누르면 때리고, 나무·바위·정수석을 누르면 캔다. 빈 곳을 누르면 그냥 휘두른다. <kbd class="rebind" data-action="attack">Space</kbd> 로도 휘두르고 <kbd class="rebind" data-action="harvest">F</kbd> 로 가장 가까운 자원을 캔다. 🪨 바위와 💠 정수석은 <b>곡괭이를 손에 쥐어야</b> 캘 수 있다 (나무는 맨손으로 가능 — 좌상단 도구 아이콘을 눌러 바로 교체)</td></tr>
       <tr><td>인벤토리</td><td><kbd class="rebind" data-action="inventory">I</kbd> — 건설 · 제작 · 장비를 여기서 전부 고른다</td></tr>
       <tr><td>건설</td><td>인벤토리 <b>건설</b> 탭에서 고르면 배치 모드가 된다 → 좌클릭으로 배치. 벽·타워는 <b>제작대를 먼저 지어야</b> 열린다</td></tr>
       <tr><td>🪤 함정</td><td>벽·타워와 달리 <b>길을 막지 않는다</b> — 적이 지나가는 길목 한복판에 심어 두면, 적이 밟는 순간 큰 피해+둔화를 주고 사라지는 1회용이다. 벽 뒤가 아니라 통로 위에 놓는 게 핵심</td></tr>
@@ -10457,10 +10457,12 @@ button.corner.mute.off { opacity: 0.5; }
     harvest: {
       range: 3.2,
       tree: { time: 1.5, yield: 6, charges: 4, respawn: 22 },
-      rock: { time: 2.1, yield: 5, charges: 3, respawn: 28 },
+      // 바위·정수석은 맨손으로 못 캔다 — 곡괭이를 손에 쥐고 있어야 한다.
+      // (나무는 맨손으로 캘 수 있어야 첫 곡괭이를 만들 수 있으므로 조건이 없다)
+      rock: { time: 2.1, yield: 5, charges: 3, respawn: 28, needsPickaxe: true },
       // 정수석: 아주 드물게 있는 채집물. 캐면 수정 정수(크리스탈 회복용)를 바로 얻는다.
       // 곡괭이가 필요하고, 캐는 데 오래 걸리며, 한 번 캐면 오래 리스폰되지 않는다.
-      gem: { time: 3, yield: 1, charges: 1, respawn: 90 },
+      gem: { time: 3, yield: 1, charges: 1, respawn: 90, needsPickaxe: true },
       // 채집 속도 업그레이드 (레벨당 시간 배율)
       upgrade: [
         { mult: 1, cost: null },
@@ -10753,6 +10755,9 @@ button.corner.mute.off { opacity: 0.5; }
       // 클라이언트 → 호스트 위치 전송 주기
     }
   };
+  function needsPickaxe(nodeType) {
+    return !!CFG.harvest[nodeType]?.needsPickaxe;
+  }
   function waveComposition(w2) {
     const list = [];
     list.push({ type: "grunt", count: 4 + Math.floor(w2 * 1.6) });
@@ -13113,7 +13118,7 @@ button.corner.mute.off { opacity: 0.5; }
     // 특정 자원을 콕 집어 캐기 시작한다 (클릭/탭으로 고른 것). 성공하면 true.
     beginHarvest(node) {
       if (!this.alive || !node || node.depleted) return false;
-      if (node.type === "gem" && !this.holdingPickaxe) return false;
+      if (needsPickaxe(node.type) && !this.holdingPickaxe) return false;
       if (dist(this.x, this.z, node.x, node.z) > CFG.harvest.range) return false;
       this.harvesting = { node, t: 0, need: CFG.harvest[node.type].time * this.harvestMult };
       this.rot = Math.atan2(node.x - this.x, node.z - this.z);
@@ -13127,7 +13132,7 @@ button.corner.mute.off { opacity: 0.5; }
         if (!holding) return null;
         const node = world.nearestNode(this.x, this.z, CFG.harvest.range);
         if (!node) return null;
-        if (node.type === "gem" && !this.holdingPickaxe) return null;
+        if (needsPickaxe(node.type) && !this.holdingPickaxe) return null;
         this.harvesting = { node, t: 0, need: CFG.harvest[node.type].time * this.harvestMult };
         this.rot = Math.atan2(node.x - this.x, node.z - this.z);
       }
@@ -14670,7 +14675,7 @@ button.corner.mute.off { opacity: 0.5; }
           this.ui?.toast("\uB354 \uAC00\uAE4C\uC774 \uAC00\uC57C \uCE98 \uC218 \uC788\uC2B5\uB2C8\uB2E4", "warn");
           return;
         }
-        if (node.type === "gem" && !this.local.holdingPickaxe) {
+        if (needsPickaxe(node.type) && !this.local.holdingPickaxe) {
           this.ui?.toast(this.local.tools.pickaxe ? "\uACE1\uAD2D\uC774\uB97C \uC190\uC5D0 \uC950\uC5B4\uC57C \uCE98 \uC218 \uC788\uC2B5\uB2C8\uB2E4 (\uC88C\uC0C1\uB2E8 \uB3C4\uAD6C \uC544\uC774\uCF58)" : "\uACE1\uAD2D\uC774\uAC00 \uC788\uC5B4\uC57C \uCE98 \uC218 \uC788\uC2B5\uB2C8\uB2E4 (\uC81C\uC791\uB300\uC5D0\uC11C \uC81C\uC791)", "bad");
           return;
         }
@@ -15317,7 +15322,7 @@ button.corner.mute.off { opacity: 0.5; }
   // js/ui.js
   var $2 = (id) => document.getElementById(id);
   var TUTORIAL_STEPS = [
-    "\u{1F333} \uB098\uBB34\uC5D0 \uB2E4\uAC00\uAC00 <b>\uB098\uBB34\uB97C \uC9C1\uC811 \uD074\uB9AD</b>\uD558\uBA74 \uCEA1\uB2C8\uB2E4 (\uBAAC\uC2A4\uD130\uB3C4 \uD074\uB9AD\uD558\uBA74 \uB54C\uB9BD\uB2C8\uB2E4)",
+    "\u{1F333} \uB098\uBB34\uB97C \uC9C1\uC811 \uD074\uB9AD\uD558\uBA74 \uCEA1\uB2C8\uB2E4 (\uBC14\uC704\uB294 \uACE1\uAD2D\uC774\uB97C \uB9CC\uB4E4\uC5B4 \uC950\uC5B4\uC57C \uCE98 \uC218 \uC788\uC5B4\uC694)",
     "\u{1F392} \uBAA9\uC7AC 20\uC744 \uBAA8\uC558\uC73C\uBA74 <kbd>I</kbd> \uB85C \uC778\uBCA4\uD1A0\uB9AC\uB97C \uC5F4\uC5B4 \u{1FA9A} \uC81C\uC791\uB300\uB97C \uC9C0\uC73C\uC138\uC694 (\uBCBD\xB7\uD0C0\uC6CC\uB294 \uADF8 \uB2E4\uC74C)",
     "\uC900\uBE44\uAC00 \uB418\uBA74 <kbd>Enter</kbd> \uB85C \uCCAB \uC6E8\uC774\uBE0C\uB97C \uC2DC\uC791\uD558\uC138\uC694!"
   ];
@@ -16210,8 +16215,9 @@ button.corner.mute.off { opacity: 0.5; }
       const near = g2.world.nearestNode(p2.x, p2.z, CFG.harvest.range);
       if (near && !g2.buildMgr.mode) {
         this.el.prompt.classList.remove("hidden");
-        if (near.type === "gem" && !p2.holdingPickaxe) {
-          this.el.prompt.innerHTML = p2.tools.pickaxe ? `\u{1F4A0} \uC815\uC218\uC11D \u2014 \uACE1\uAD2D\uC774\uB97C <b>\uC190\uC5D0 \uC950\uC5B4\uC57C</b> \uCE98 \uC218 \uC788\uC2B5\uB2C8\uB2E4 (\uC88C\uC0C1\uB2E8 \uB3C4\uAD6C \uC544\uC774\uCF58)` : `\u{1F4A0} \uC815\uC218\uC11D \u2014 \uACE1\uAD2D\uC774\uAC00 \uC788\uC5B4\uC57C \uCE98 \uC218 \uC788\uC2B5\uB2C8\uB2E4 (\uC81C\uC791\uB300\uC5D0\uC11C \uC81C\uC791)`;
+        if (needsPickaxe(near.type) && !p2.holdingPickaxe) {
+          const nm = near.type === "gem" ? "\u{1F4A0} \uC815\uC218\uC11D" : "\u{1FAA8} \uBC14\uC704";
+          this.el.prompt.innerHTML = p2.tools.pickaxe ? `${nm} \u2014 \uACE1\uAD2D\uC774\uB97C <b>\uC190\uC5D0 \uC950\uC5B4\uC57C</b> \uCE98 \uC218 \uC788\uC2B5\uB2C8\uB2E4 (\uC88C\uC0C1\uB2E8 \uB3C4\uAD6C \uC544\uC774\uCF58)` : `${nm} \u2014 \uACE1\uAD2D\uC774\uAC00 \uC788\uC5B4\uC57C \uCE98 \uC218 \uC788\uC2B5\uB2C8\uB2E4 (\uC81C\uC791\uB300\uC5D0\uC11C \uC81C\uC791)`;
         } else {
           const label = near.type === "tree" ? "\u{1F333} \uB098\uBB34" : near.type === "gem" ? "\u{1F4A0} \uC815\uC218\uC11D" : "\u{1FAA8} \uBC14\uC704";
           this.el.prompt.innerHTML = `${label} \u2014 <b>\uB20C\uB7EC\uC11C \uCC44\uC9D1</b> (\uB0A8\uC740 ${near.charges})`;
