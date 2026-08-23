@@ -5,43 +5,44 @@
 
 ## 규칙
 
-1. **세션을 끝까지 쓴다 (약 95%).** 개선 하나로 끝내지 말고 백로그를 계속 소화한다.
-   단, **새 항목 착수는 85% 전까지만.** 85%를 넘기면 새로 벌이지 말고 진행 중인 것을
-   마무리·검증·기록·푸시하는 데 남은 예산을 쓴다. 그래야 95%를 다 쓰면서도 깨진 채로 끝나지 않는다.
-2. **하나를 완결하고 다음으로 간다.** 여러 개를 동시에 벌여놓지 않는다. 구현 → 검증 → 빌드 → 커밋 → 푸시를 한 항목마다 완주한다.
-3. **항목마다 즉시 커밋·푸시한다.** 세션이 언제 끝날지 모르므로, 검증을 통과한 작업은 그 자리에서 원격에 남긴다. 마지막에 몰아서 커밋하지 않는다.
-4. **검증 없이 넘어가지 않는다.** 헤드리스 브라우저로 실제 게임을 띄우고, 스크린샷을 눈으로 확인하고, 콘솔 에러가 0인지 본다.
-5. **깨진 코드는 푸시하지 않는다.** 원인을 못 찾으면 되돌리고, 시도한 내용과 막힌 지점을 아래 `막힌 것들`에 기록한다.
-6. **백로그가 비면 채운다.** 직접 플레이 테스트를 해서 새 항목을 발굴하고, 우선순위를 매겨 백로그에 추가한 뒤 계속 작업한다.
-7. 기존 게임플레이를 깨뜨리지 않는 것이 항상 최우선이다. 장르 변경이나 핵심 규칙 교체 같은 큰 결정은 하지 않는다.
+1. **세션을 90% 가까이 적극적으로 쓴다.** 하나 하고 끝내지 말고 계속 다음으로 넘어간다.
+   단 **새 항목 착수는 80% 전까지만** — 그 뒤로는 진행 중인 것을 마무리·검증·기록·푸시하는 데 쓴다.
+2. **최우선순위는 ① 버그 수정 ② 재미·창의성·게임성.** 플레이하다 이상한 걸 발견하면 새 기능보다
+   먼저 고친다. 그다음이 플레이어가 체감할 새로운 것(적·무기·상황·선택지)이다.
+   UI 정리나 리팩터링은 위 둘을 방해하지 않는 선에서만.
+3. **하나를 완결하고 다음으로 간다.** 구현 → 검증 → 빌드 → 커밋 → 푸시 → 아티팩트를 항목마다 완주한다.
+   여러 개를 동시에 벌여놓지 않는다.
+4. **항목마다 즉시 커밋·푸시한다.** 세션이 언제 끝날지 모른다. 마지막에 몰아서 하지 않는다.
+5. **검증 없이 넘어가지 않는다.** 헤드리스로 실제 게임을 띄우고, 스크린샷을 눈으로 보고, 콘솔 에러 0 확인.
+6. **깨진 코드는 푸시하지 않는다.** 원인을 못 찾으면 되돌리고 `막힌 것들`에 기록한다.
+7. **이미 한 작업을 반복하지 않는다.** 백로그에 적기 전에 아래 완료 기록을 확인하고 `grep` 으로
+   그 기능이 코드에 정말 없는지 검증한다.
+8. **의미 없는 수정으로 세션을 낭비하지 않는다.** 개선이 아니라 변경을 위한 변경이면 하지 않는다.
+9. **사용자에게 묻지 않고 승인을 기다리지 않는다.** 스스로 판단해서 진행한다.
+10. 장르는 유지한다. 3D 웨이브 디펜스와 파밍 → 건설 → 방어의 순환은 그대로 두고 그 안에서 넓힌다.
+11. 새 기능에는 **플레이어가 알아차릴 방법**(토스트·표시·도움말 한 줄)을 반드시 같이 넣는다.
+12. 보고는 **무엇을 바꿨는지만** 짧게. 검증 과정·내부 용어는 빼고, 플레이어가 체감할 변화 중심으로.
 
-## ⚠️ 다음 실행이 가장 먼저 할 일
+## ⚠️ 0단계 — 저장소가 아티팩트보다 뒤처졌는지 먼저 확인하고, 그렇다면 복구부터
 
-**푸시가 되는지 먼저 확인하라.** 예약 세션에서는 지금까지 계속 이렇게 거부돼 왔다:
+예약 세션은 `git push` 가 403 으로 거부될 때가 있다:
 
 > access denied by the git proxy: parksj4160-lgtm/name is not in this session's
 > authorized repository set
 
-읽기(clone/fetch)는 되고 쓰기만 막힌다. 대화형 세션에서는 정상적으로 푸시된다.
+읽기는 되고 쓰기만 막힌다. 그렇게 끝난 회차의 작업은 **아티팩트에만** 남고 origin 은 뒤처진다.
+**그 복구는 다음 실행이 자동으로 한다. 사람을 기다리지 않는다.**
 
-**2026-08-23 이 세션(예약)도 시작부터 끝까지 계속 403 이었다** — `add_repo` 같은 별도 도구는
-이 세션엔 아예 없었다(ToolSearch 로 찾아봤지만 안 나옴). 로컬 커밋 11개(`513ab4b`~`0695354`,
-배경음악부터 실제 2탭 멀티플레이 검증까지)가 origin 에 못 올라간 채로 세션이 끝났다 —
-**origin 은 지금 최신이 아니다.** 아티팩트에는 전부 반영되어 있으니, 대화형 세션이 붙으면
-아티팩트 번들에서 소스를 복구해 저장소에 합치고 푸시해야 한다(아래 `막힌 것들` 의 복구 절차
-참고 — 이번엔 소스 변경이 없는 순수 `IMPROVEMENTS.md` 커밋도 몇 개 섞여 있으니, 코드 복구뿐
-아니라 이 파일의 완료 기록도 최신 버전(지금 이 파일)으로 덮어써야 한다).
+1. 아티팩트를 `action: "read"` 로 읽어 맨 위 `CRYSTAL-DEFENSE-NOTES` 주석의 `STATUS:` 줄을 본다.
+2. `STATUS` 가 "origin 이 최신" 이고 `git log` 도 그와 맞으면 → 복구 불필요, 바로 새 개선으로.
+3. 아티팩트가 앞서 있으면(저장소에 없는 완료 기록이 주석에 있으면) → **복구를 먼저 끝내고 푸시한다.**
+   절차는 아래 `막힌 것들` 에 상세히 적혀 있다.
 
-막혀 있으면 `add_repo` 로 `parksj4160-lgtm/name` 을 `access: "push"` 로 붙여 보고,
-그래도 안 되면 아래 방식으로 이어간다.
-
-**푸시가 막혔을 때:** 아티팩트에 게시된 HTML 안에 `CRYSTAL-DEFENSE-NOTES` 주석으로 이 파일
-전체가 들어 있고, 번들에서 소스도 복원할 수 있다 (`막힌 것들` 의 복구 절차 참고).
-그래서 커밋이 유실돼도 작업 자체는 이어진다. 대신 **아티팩트를 게시할 때 이 파일 전문을
-반드시 그 주석으로 다시 넣어라.** 그게 유일한 인수인계 경로다.
+**이번에도 푸시가 막히면:** 로컬 커밋은 정상적으로 쌓아 두고, 아티팩트 게시 시 주석에
+이 파일 **전문**과 `STATUS:` 줄(무엇이 origin 에 못 갔는지)을 반드시 함께 심는다.
+그게 다음 실행이 복구할 유일한 근거다. **작업을 버리지 않는다.**
 
 **순서 규칙:** 소스를 먼저 커밋·푸시하고 그다음 아티팩트를 게시한다.
-뒤집으면 세션이 중간에 끊겼을 때 소스와 아티팩트가 어긋난다.
 
 ## 백로그 (우선순위 순)
 
@@ -228,21 +229,131 @@ clientHeight(618)` 로 정상적으로 스크롤되고 레이아웃이 깨지지
   만들어내 참가자가 `silenceUntil`을 정확히 재구성하는 것까지 실측으로 확인됐다(전 과정 진짜
   네트워크 페이로드로 오간 것 — 합성 호출이 아님). 콘솔 에러 0(파비콘 404 제외).
 
-## 막힌 것들
+## 막힌 것들 · 아티팩트 → 소스 복구 절차 (검증된 스크립트)
 
-**2026-08-22 — 소스와 아티팩트가 어긋나 있었다 (해결됨, 재발 방지 필요)**
-이 세션 시작 시점에 `claude/game-development-22s5mv` 브랜치의 `js/` 소스는 초기 버전이었지만,
-아티팩트에는 그보다 훨씬 앞선 빌드(효과음·독탑·보루·주술사·약탈자·수리·일시정지·튜토리얼·
-키 리바인딩·색약 모드·InstancedMesh·정수석/곡괭이)가 이미 게시되어 있었다.
-즉 이전 세션이 **아티팩트만 갱신하고 소스를 푸시하지 못한 채** 끝난 것으로 보인다.
+예약 세션의 푸시가 403 으로 막혀 작업이 아티팩트에만 남는 일이 여러 번 있었다.
+아래는 대화형 세션이 **네 번 실제로 써서 성공한** 복구 스크립트다. 그대로 따라 하면 된다.
 
-복구 방법: 아티팩트에 게시된 단일 HTML 안의 esbuild 번들에서 `// js/<파일>.js` 주석 경계를 잘라
-파일별로 되돌리고, three.js 미니파이 심볼을 `vendor/three.module.js` 의 export 표로 역매핑해
-`import * as THREE` 형태로 되살렸다. `net.js`·`grid.js`·`fx.js`·`wave.js`·`main.js` 는 정규화 비교 결과
-변경이 없어 그대로 두었고, `world.js`·`player.js` 는 차이가 작아 기존 소스에 직접 패치했다.
+**1) 아티팩트를 읽어 로컬 파일로 받는다.** `Artifact` 툴 `action: "read"` 로 URL 을 읽으면
+전체 HTML 이 로컬 파일로 저장되고 결과에 그 경로가 나온다. 그 경로를 아래 `F` 에 넣는다.
 
-**다음 실행이 지킬 것: 아티팩트 게시 전에 반드시 커밋·푸시를 먼저 끝낸다.**
-순서를 뒤집으면 세션이 중간에 끊겼을 때 이번과 같은 어긋남이 다시 생긴다.
+**2) 번들을 잘라 모듈별로 되돌린다.**
+
+```python
+import re, os
+F   = "<위에서 받은 아티팩트 HTML 경로>"
+OUT = "<작업 디렉터리>/js"      # 미리 만들어 둘 것
+lines = open(F, encoding='utf-8').read().split('\n')
+orig = '\n'.join(lines[1:])                      # 1행은 호스트가 붙인 frame-runtime — 버린다
+if orig.endswith('\n</body></html>'): orig = orig[:-len('\n</body></html>')]
+open('artifact.html','w',encoding='utf-8').write(orig)
+
+starts = [i for i,l in enumerate(lines) if l.strip() == '(() => {']
+ends   = [i for i,l in enumerate(lines) if l.strip() == '})();']
+s0 = starts[0]; e0 = max(e for e in ends if e > s0)   # 마지막 })(); 가 번들의 끝
+bundle = '\n'.join(lines[s0+1:e0])
+
+marks = [(m.start(), m.group(1)) for m in
+         re.finditer(r'^  // ((?:js|vendor)/[\w.]+\.js)$', bundle, re.M)]
+mods = {}
+for i,(pos,name) in enumerate(marks):
+    end = marks[i+1][0] if i+1 < len(marks) else len(bundle)
+    mods[os.path.basename(name)] = bundle[pos:end]
+
+# three.js 미니파이 심볼 → 실제 export 이름
+three = open('vendor/three.module.js', encoding='utf-8').read()
+pairs = re.search(r'export\{(.*?)\};?\s*$', three, re.S).group(1)
+tmap = {}
+for pr in pairs.split(','):
+    mm = re.match(r'^([\w$]+) as ([\w$]+)$', pr.strip())
+    if mm: tmap[mm.group(1)] = mm.group(2)
+
+game = {k:v for k,v in mods.items() if k != 'three.module.js'}
+decl = re.compile(r'^  (?:var|let|const|function|class)\s+([\w$]+)', re.M)
+owner = {}
+for f,b in game.items():
+    if f == 'main.js': continue
+    for d in decl.findall(b): owner.setdefault(d, f)
+
+CTOR = re.compile(r'\bnew ([A-Za-z_$][\w$]*)\(')
+cleaned = {}
+for f,b in game.items():
+    b = re.sub(r'^  // (?:js|vendor)/[\w.]+\.js\n', '', b)
+    b = '\n'.join(l[2:] if l.startswith('  ') else l for l in b.split('\n')).rstrip() + '\n'
+    b = CTOR.sub(lambda m: f"new THREE.{tmap[m.group(1)]}("
+                 if m.group(1) in tmap and m.group(1) not in owner else m.group(0), b)
+    b = b.replace('side: p', 'side: THREE.DoubleSide')
+    b = b.replace('shadowMap.type = c;', 'shadowMap.type = THREE.PCFSoftShadowMap;')
+    b = b.replace('toneMapping = nt;', 'toneMapping = THREE.ACESFilmicToneMapping;')
+    b = re.sub(r'\\u\{([0-9a-fA-F]+)\}', lambda m: chr(int(m.group(1),16)), b)   # 한글 복원
+    b = re.sub(r'\\u([0-9a-fA-F]{4})',     lambda m: chr(int(m.group(1),16)), b)
+    cleaned[f] = b
+
+# 모듈 간 import/export 재구성
+ident = re.compile(r'(?<![\w$.])([A-Za-z_$][\w$]*)')
+d2    = re.compile(r'^(?:var|let|const|function|class)\s+([\w$]+)', re.M)
+decls = {f:set(d2.findall(b)) for f,b in cleaned.items()}
+needed, imports = {}, {}
+for f,b in cleaned.items():
+    cross = {}
+    for x in sorted(set(ident.findall(b)) - decls[f]):
+        o = owner.get(x)
+        if o and o != f: cross.setdefault(o, []).append(x)
+    imports[f] = cross
+    for o,syms in cross.items(): needed.setdefault(o, set()).update(syms)
+for f,b in cleaned.items():
+    hdr = []
+    if 'THREE.' in b: hdr.append("import * as THREE from '../vendor/three.module.js';")
+    for o in sorted(imports[f]):
+        hdr.append(f"import {{ {', '.join(sorted(imports[f][o]))} }} from './{o}';")
+    for sym in sorted(needed.get(f, ())):
+        b = re.sub(rf'^((?:var|let|const|function|class)\s+{re.escape(sym)}\b)',
+                   r'export \1', b, count=1, flags=re.M)
+    open(f"{OUT}/{f}", 'w', encoding='utf-8').write(('\n'.join(hdr) + '\n\n' if hdr else '') + b)
+```
+
+**3) HTML · CSS · 이 파일을 되돌린다.** (`artifact.html` 기준)
+
+```python
+html = open('artifact.html', encoding='utf-8').read()
+m = re.search(r'<!-- CRYSTAL-DEFENSE-NOTES[^\n]*\n(.*?)\n-->\n', html, re.S)
+notes = re.sub(r'^STATUS:[^\n]*\n+', '', m.group(1))   # STATUS 머리말은 파일 본문이 아니다
+open('IMPROVEMENTS.md','w',encoding='utf-8').write(notes.strip() + '\n')
+html = html[:m.start()] + html[m.end():]
+m = re.search(r'<style>\n(.*?)\n</style>', html, re.S)
+open('css/style.css','w',encoding='utf-8').write(m.group(1).rstrip() + '\n')
+html = html[:m.start()] + '<link rel="stylesheet" href="css/style.css" />' + html[m.end():]
+m = re.search(r'<script>\n\(\(\) => \{\n.*?\n\}\)\(\);\n.*?</script>', html, re.S)
+html = html[:m.start()] + '<script type="module" src="js/main.js"></script>' + html[m.end():]
+html = re.sub(r'<title>.*?</title>', '<title>크리스탈 디펜스 (Crystal Defense)</title>', html, count=1)
+```
+
+**⚠️ 골격 복원을 잊지 말 것.** 아티팩트 호스트가 `<!DOCTYPE>`·`<html>`·`<head>`·`<body>` 를
+벗겨내므로 `index.html` 은 `<title>` 부터 시작한다. 다시 씌워야 한다:
+
+```python
+k = html.index('<link rel="stylesheet" href="css/style.css" />') + len('<link rel="stylesheet" href="css/style.css" />')
+head, body = html[:k], html[k:]
+html = ('<!DOCTYPE html>\n<html lang="ko">\n<head>\n<meta charset="utf-8" />\n'
+        '<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, '
+        'user-scalable=no, viewport-fit=cover" />\n'
+        + head.strip() + '\n</head>\n<body>' + body.rstrip() + '\n</body>\n</html>\n')
+open('index.html','w',encoding='utf-8').write(html)
+```
+
+**4) 검증하고 푸시한다.** `npx esbuild js/main.js --bundle --format=iife --outfile=/dev/null` 로
+문법을 먼저 보고, `./build-standalone.sh` 후 헤드리스로 실제 실행까지 확인한 다음 커밋·푸시한다.
+
+**정확도 확인법(권장):** 복구한 소스를 다시 번들링해 아티팩트의 원본 번들과 모듈별로 비교하면
+복구가 맞았는지 알 수 있다. 지금까지 매번 18개 중 15~16개가 완전 일치했고, 다른 것들은
+템플릿 문자열 들여쓰기나 esbuild 지역변수 접미사 같은 무해한 차이뿐이었다.
+
+**대화형 세션에서 이미 푸시된 커밋이 아티팩트보다 최신일 수 있다.** 그때는 아티팩트 버전을
+그대로 덮어쓰지 말고, 저장소에만 있는 변경을 복구본 위에 다시 얹어야 한다
+(`git log` 로 아티팩트 게시 시각 이후 커밋을 확인할 것).
+
+**순서 규칙: 소스를 먼저 커밋·푸시하고 그다음 아티팩트를 게시한다.**
+순서를 뒤집으면 세션이 중간에 끊겼을 때 어긋남이 생긴다.
 
 ## 완료 기록
 
