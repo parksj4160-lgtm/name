@@ -1,5 +1,3 @@
-merge-check: republished after commit 0dfcfa9 (실기기 UI 점검 기록, 코드 변경 없음). git push still 403 (proxy access denied), local commit retained per documented fallback.
-
 # 크리스탈 디펜스 — 자동 개선 백로그
 
 이 파일은 **5시간마다 자동으로 실행되는 개선 루틴**이 읽고 쓰는 작업 노트다.
