@@ -291,7 +291,13 @@ button.ghost { background: transparent; color: var(--dim); }
   display: flex; gap: 6px; align-items: center; flex-wrap: wrap;
   min-height: 20px; margin-top: 2px; font-size: 11px;
 }
-.tools .tool { font-size: 16px; line-height: 1.2; }
+.tools .tool {
+  font-size: 16px; line-height: 1; padding: 3px 5px; cursor: pointer;
+  background: rgba(255,255,255,0.06); border: 1px solid transparent;
+  border-radius: 7px; color: inherit; font-family: inherit;
+}
+.tools .tool:hover { background: rgba(95,212,255,0.2); }
+.tools .tool.on { border-color: var(--cyan); background: rgba(95,212,255,0.18); }
 .inv {
   left: 50%; top: 50%; transform: translate(-50%, -50%);
   width: min(460px, 94vw); max-height: 78vh;
@@ -363,7 +369,6 @@ button.corner.mute.off { opacity: 0.5; }
   border-radius: 50%; background: rgba(95,212,255,0.4); border: 1px solid var(--cyan);
 }
 #touch-buttons { position: absolute; right: 22px; bottom: 210px; display: flex; flex-direction: column; gap: 10px; pointer-events: auto; }
-#touch-buttons button.harvest { background: rgba(185,138,77,0.32); border-color: rgba(255,216,138,0.5); }
 #touch-buttons button {
   width: 76px; height: 76px; border-radius: 50%; font-size: 14px; font-weight: 700;
   background: rgba(14,20,33,0.85); color: var(--text); border: 1px solid var(--line); font-family: inherit;

@@ -298,7 +298,13 @@ button.ghost { background: transparent; color: var(--dim); }
   display: flex; gap: 6px; align-items: center; flex-wrap: wrap;
   min-height: 20px; margin-top: 2px; font-size: 11px;
 }
-.tools .tool { font-size: 16px; line-height: 1.2; }
+.tools .tool {
+  font-size: 16px; line-height: 1; padding: 3px 5px; cursor: pointer;
+  background: rgba(255,255,255,0.06); border: 1px solid transparent;
+  border-radius: 7px; color: inherit; font-family: inherit;
+}
+.tools .tool:hover { background: rgba(95,212,255,0.2); }
+.tools .tool.on { border-color: var(--cyan); background: rgba(95,212,255,0.18); }
 .inv {
   left: 50%; top: 50%; transform: translate(-50%, -50%);
   width: min(460px, 94vw); max-height: 78vh;
@@ -370,7 +376,6 @@ button.corner.mute.off { opacity: 0.5; }
   border-radius: 50%; background: rgba(95,212,255,0.4); border: 1px solid var(--cyan);
 }
 #touch-buttons { position: absolute; right: 22px; bottom: 210px; display: flex; flex-direction: column; gap: 10px; pointer-events: auto; }
-#touch-buttons button.harvest { background: rgba(185,138,77,0.32); border-color: rgba(255,216,138,0.5); }
 #touch-buttons button {
   width: 76px; height: 76px; border-radius: 50%; font-size: 14px; font-weight: 700;
   background: rgba(14,20,33,0.85); color: var(--text); border: 1px solid var(--line); font-family: inherit;
@@ -525,12 +530,9 @@ button.corner.mute.off { opacity: 0.5; }
     <div id="inv-list" class="inv-list"></div>
   </div>
 
-  <!-- 모바일 컨트롤 -->
+  <!-- 모바일 컨트롤 — 이동 조이스틱만. 채집·공격은 대상을 직접 탭한다. -->
   <div id="touch" class="hidden">
     <div id="stick"><i></i></div>
-    <div id="touch-buttons">
-      <button id="tb-action">공격</button>
-    </div>
   </div>
 
   <button id="btn-mute" class="corner mute" title="음소거 켜기/끄기">🔊</button>
@@ -540,8 +542,8 @@ button.corner.mute.off { opacity: 0.5; }
     <p class="dim rebind-hint">밑줄 친 키를 클릭하면 원하는 키로 바꿀 수 있다.</p>
     <table>
       <tr><td>이동</td><td><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> / 방향키 (<kbd>Shift</kbd> 달리기)</td></tr>
-      <tr><td>채집</td><td>자원 근처에서 <kbd class="rebind" data-action="harvest">F</kbd> 꾹 누르기. 💠 정수석은 <b>곡괭이를 손에 쥐고 있어야</b> 캘 수 있다</td></tr>
-      <tr><td>공격</td><td>좌클릭 또는 <kbd class="rebind" data-action="attack">Space</kbd></td></tr>
+      <tr><td>💠 정수석</td><td><b>곡괭이를 손에 쥐고 있어야</b> 캘 수 있다 (좌상단 도구 아이콘을 눌러 바로 바꿀 수 있다)</td></tr>
+      <tr><td>공격 · 채집</td><td><b>대상을 직접 클릭</b> — 몬스터를 누르면 때리고, 나무·바위·정수석을 누르면 캔다. 빈 곳을 누르면 그냥 휘두른다. <kbd class="rebind" data-action="attack">Space</kbd> 로도 휘두르고, <kbd class="rebind" data-action="harvest">F</kbd> 를 누르면 가장 가까운 자원을 캔다</td></tr>
       <tr><td>인벤토리</td><td><kbd class="rebind" data-action="inventory">I</kbd> — 건설 · 제작 · 장비를 여기서 전부 고른다</td></tr>
       <tr><td>건설</td><td>인벤토리 <b>건설</b> 탭에서 고르면 배치 모드가 된다 → 좌클릭으로 배치. 벽·타워는 <b>제작대를 먼저 지어야</b> 열린다</td></tr>
       <tr><td>제작</td><td><b>제작대</b>를 지으면 인벤토리 <b>제작</b> 탭에서 ⛏️ 곡괭이 · 🗡️ 칼 · 🏹 활을 만든다. <b>화로</b>를 지으면 광물을 녹여 ⚙️ 철을 얻는다</td></tr>
@@ -10527,8 +10529,8 @@ button.corner.mute.off { opacity: 0.5; }
     };
   }
   var DIFFICULTIES = {
-    normal: { key: "normal", label: "\uBCF4\uD1B5", desc: "\uAE30\uBCF8 \uB09C\uC774\uB3C4", startWood: 60, startStone: 30, prepBonus: 0 },
-    easy: { key: "easy", label: "\uC26C\uC6C0", desc: "\uC2DC\uC791 \uC790\uC6D0 +50% \xB7 \uC900\uBE44 \uC2DC\uAC04 +20\uCD08", startWood: 90, startStone: 45, prepBonus: 20 }
+    normal: { key: "normal", label: "\uBCF4\uD1B5", desc: "\uB9E8\uC190\uC73C\uB85C \uC2DC\uC791 \xB7 \uB098\uBB34\uBD80\uD130 \uCE94\uB2E4", startWood: 0, startStone: 0, prepBonus: 0 },
+    easy: { key: "easy", label: "\uC26C\uC6C0", desc: "\uC900\uBE44 \uC2DC\uAC04 +30\uCD08 \xB7 \uC2DC\uC791 \uC790\uC6D0\uC740 \uB611\uAC19\uC774 0", startWood: 0, startStone: 0, prepBonus: 30 }
   };
   var BASE_PREP_TIME = CFG.wave.prepTime;
   var BASE_FIRST_PREP_TIME = CFG.wave.firstPrepTime;
@@ -12459,7 +12461,7 @@ button.corner.mute.off { opacity: 0.5; }
       this.maxHp = CFG.player.hp;
       this.alive = true;
       this.downTimer = 0;
-      this.res = { wood: 40, stone: 20 };
+      this.res = { wood: 0, stone: 0 };
       this.shards = 0;
       this.tools = {};
       this.equipped = null;
@@ -12660,13 +12662,21 @@ button.corner.mute.off { opacity: 0.5; }
       }
     }
     // 채집 시도/진행. 완료 시 노드를 돌려준다.
+    // 특정 자원을 콕 집어 캐기 시작한다 (클릭/탭으로 고른 것). 성공하면 true.
+    beginHarvest(node) {
+      if (!this.alive || !node || node.depleted) return false;
+      if (node.type === "gem" && !this.holdingPickaxe) return false;
+      if (dist(this.x, this.z, node.x, node.z) > CFG.harvest.range) return false;
+      this.harvesting = { node, t: 0, need: CFG.harvest[node.type].time * this.harvestMult };
+      this.rot = Math.atan2(node.x - this.x, node.z - this.z);
+      return true;
+    }
+    // holding 이 true 면 근처 자원을 자동으로 잡아 캔다 (F 키 유지용).
+    // 이미 캐던 것이 있으면 holding 과 무관하게 계속 캔다 — 클릭으로 시작한 채집이 그대로 이어진다.
     tickHarvest(dt2, world, holding) {
       if (!this.alive) return null;
-      if (!holding) {
-        this.harvesting = null;
-        return null;
-      }
       if (!this.harvesting) {
+        if (!holding) return null;
         const node = world.nearestNode(this.x, this.z, CFG.harvest.range);
         if (!node) return null;
         if (node.type === "gem" && !this.holdingPickaxe) return null;
@@ -13208,6 +13218,10 @@ button.corner.mute.off { opacity: 0.5; }
     nodeById(id) {
       return this.nodes.find((n) => n.id === id);
     }
+    // 화면에서 가리킨 지점 근처의 자원 (클릭 대상 고르기용)
+    nodeNear(x2, z2, range) {
+      return this.nearestNode(x2, z2, range);
+    }
     nearestNode(x2, z2, range) {
       let best = null, bd2 = range * range;
       for (const n of this.nodes) {
@@ -13321,7 +13335,7 @@ button.corner.mute.off { opacity: 0.5; }
       this.ui = null;
       this.running = false;
       this.shared = true;
-      this.pools = { team: { wood: 60, stone: 30, iron: 0, shard: 0 }, byId: {} };
+      this.pools = { team: { wood: 0, stone: 0, iron: 0, shard: 0 }, byId: {} };
       this.players = /* @__PURE__ */ new Map();
       this.stats = { harvested: 0, built: 0, kills: 0 };
       this._accum = { snap: 0, pos: 0, save: 0 };
@@ -13742,6 +13756,52 @@ button.corner.mute.off { opacity: 0.5; }
       if (playerId === this.local.id) this.sfx.upgrade();
       else this.net.send("hupOk", { to: playerId, lv: p2.harvestLv });
     }
+    // 화면을 클릭했을 때 — 가리킨 것이 몬스터면 때리고, 자원이면 캔다. 아무것도 없으면 그냥 휘두른다.
+    // 채집 버튼 없이 대상을 직접 눌러 상호작용하는 게 기본 조작이다.
+    clickWorld(pointer) {
+      if (!pointer) {
+        this.requestAttack();
+        return;
+      }
+      const PICK = 2.2;
+      const enemy = this._enemyNear(pointer.x, pointer.z, PICK);
+      if (enemy) {
+        const reach = this.local.attackStats.range + enemy.st.radius;
+        if (dist(this.local.x, this.local.z, enemy.x, enemy.z) > reach) {
+          this.ui?.toast(`${enemy.st.name}\uC5D0\uAC8C \uB354 \uAC00\uAE4C\uC774 \uAC00\uC138\uC694`, "warn");
+          return;
+        }
+        this.local.rot = Math.atan2(enemy.x - this.local.x, enemy.z - this.local.z);
+        this.requestAttack();
+        return;
+      }
+      const node = this.world.nodeNear(pointer.x, pointer.z, PICK);
+      if (node) {
+        if (dist(this.local.x, this.local.z, node.x, node.z) > CFG.harvest.range) {
+          this.ui?.toast("\uB354 \uAC00\uAE4C\uC774 \uAC00\uC57C \uCE98 \uC218 \uC788\uC2B5\uB2C8\uB2E4", "warn");
+          return;
+        }
+        if (node.type === "gem" && !this.local.holdingPickaxe) {
+          this.ui?.toast(this.local.tools.pickaxe ? "\uACE1\uAD2D\uC774\uB97C \uC190\uC5D0 \uC950\uC5B4\uC57C \uCE98 \uC218 \uC788\uC2B5\uB2C8\uB2E4 (\uC778\uBCA4\uD1A0\uB9AC \u2192 \uC7A5\uBE44)" : "\uACE1\uAD2D\uC774\uAC00 \uC788\uC5B4\uC57C \uCE98 \uC218 \uC788\uC2B5\uB2C8\uB2E4 (\uC81C\uC791\uB300\uC5D0\uC11C \uC81C\uC791)", "bad");
+          return;
+        }
+        if (this.local.beginHarvest(node)) this.sfx.click();
+        return;
+      }
+      this.requestAttack();
+    }
+    _enemyNear(x2, z2, r) {
+      let best = null, bd2 = r * r;
+      for (const e of this.enemyMgr.list) {
+        if (e.dead) continue;
+        const d2 = (e.x - x2) ** 2 + (e.z - z2) ** 2;
+        if (d2 < bd2) {
+          bd2 = d2;
+          best = e;
+        }
+      }
+      return best;
+    }
     // 제작대·화로를 클릭하면 인벤토리의 제작 탭이 열린다 (인벤토리에서 바로 열어도 된다)
     tryOpenStation(b) {
       this.sfx.click();
@@ -14114,7 +14174,7 @@ button.corner.mute.off { opacity: 0.5; }
         } else if (this.buildMgr.hover?.stationKind) {
           this.tryOpenStation(this.buildMgr.hover);
         } else {
-          this.requestAttack();
+          this.clickWorld(pointer);
         }
       }
       if (inp.rightClicked && this.buildMgr.mode) this.setBuildMode(null);
@@ -14241,8 +14301,8 @@ button.corner.mute.off { opacity: 0.5; }
   // js/ui.js
   var $2 = (id) => document.getElementById(id);
   var TUTORIAL_STEPS = [
-    "\u{1F333} \uADFC\uCC98 \uB098\uBB34\uC5D0 \uB2E4\uAC00\uAC00 <kbd>F</kbd> \uB97C \uAFB9 \uB20C\uB7EC \uCC44\uC9D1\uD558\uC138\uC694",
-    "\u{1F392} <kbd>I</kbd> \uB85C \uC778\uBCA4\uD1A0\uB9AC\uB97C \uC5F4\uC5B4 \u{1FA9A} \uC81C\uC791\uB300\uB97C \uBA3C\uC800 \uC9C0\uC73C\uC138\uC694 (\uBCBD\xB7\uD0C0\uC6CC\uB294 \uADF8 \uB2E4\uC74C)",
+    "\u{1F333} \uB098\uBB34\uC5D0 \uB2E4\uAC00\uAC00 <b>\uB098\uBB34\uB97C \uC9C1\uC811 \uD074\uB9AD</b>\uD558\uBA74 \uCEA1\uB2C8\uB2E4 (\uBAAC\uC2A4\uD130\uB3C4 \uD074\uB9AD\uD558\uBA74 \uB54C\uB9BD\uB2C8\uB2E4)",
+    "\u{1F392} \uBAA9\uC7AC 20\uC744 \uBAA8\uC558\uC73C\uBA74 <kbd>I</kbd> \uB85C \uC778\uBCA4\uD1A0\uB9AC\uB97C \uC5F4\uC5B4 \u{1FA9A} \uC81C\uC791\uB300\uB97C \uC9C0\uC73C\uC138\uC694 (\uBCBD\xB7\uD0C0\uC6CC\uB294 \uADF8 \uB2E4\uC74C)",
     "\uC900\uBE44\uAC00 \uB418\uBA74 <kbd>Enter</kbd> \uB85C \uCCAB \uC6E8\uC774\uBE0C\uB97C \uC2DC\uC791\uD558\uC138\uC694!"
   ];
   var UI = class {
@@ -14838,19 +14898,6 @@ button.corner.mute.off { opacity: 0.5; }
       };
       stick.addEventListener("pointerup", release);
       stick.addEventListener("pointercancel", release);
-      const ab = $2("tb-action");
-      ab.addEventListener("pointerdown", (e) => {
-        e.preventDefault();
-        if (this.canHarvestNow) this.harvestHeld = true;
-        else this.game.requestAttack();
-      });
-      const releaseAction = () => {
-        this.harvestHeld = false;
-      };
-      ab.addEventListener("pointerup", releaseAction);
-      ab.addEventListener("pointercancel", releaseAction);
-      ab.addEventListener("pointerleave", releaseAction);
-      this.el.actionBtn = ab;
     }
     // ---------------------------------------------------------------- 라이프사이클
     onGameStart(resumed = false) {
@@ -14864,7 +14911,7 @@ button.corner.mute.off { opacity: 0.5; }
       this.el.crystalWarning.classList.add("hidden");
       this.closeInventory();
       this.refreshBuildBar();
-      if (!resumed) this.toast("\uD06C\uB9AC\uC2A4\uD0C8\uC744 \uC9C0\uCF1C\uB77C! F\uB85C \uCC44\uC9D1, I\uB85C \uC778\uBCA4\uD1A0\uB9AC", "good");
+      if (!resumed) this.toast("\uD06C\uB9AC\uC2A4\uD0C8\uC744 \uC9C0\uCF1C\uB77C! \uC790\uC6D0\uC744 \uD074\uB9AD\uD574 \uCE90\uACE0, I\uB85C \uC778\uBCA4\uD1A0\uB9AC", "good");
       if (resumed || localStorage.getItem("cd.tutorialDone")) {
         this.el.tutorial.classList.add("hidden");
         this._tutStep = -1;
@@ -14882,10 +14929,32 @@ button.corner.mute.off { opacity: 0.5; }
       this.el.tutorial.classList.add("hidden");
       localStorage.setItem("cd.tutorialDone", "1");
     }
+    // 좌상단 도구 줄 — 눌러서 바로 손에 쥔다. 지금 든 것은 테두리로 표시한다.
     _refreshTools() {
-      const t2 = this.game.local.tools;
-      const owned = Object.keys(CFG.craft).filter((k2) => t2[k2]);
-      this.el.toolRow.innerHTML = owned.length ? owned.map((k2) => `<span class="tool" title="${CFG.craft[k2].name}">${CFG.craft[k2].icon}</span>`).join("") : `<span class="dim">\uC81C\uC791\uB300\uB97C \uC9D3\uACE0 \uC778\uBCA4\uD1A0\uB9AC\uC5D0\uC11C \uC81C\uC791</span>`;
+      const g2 = this.game;
+      const owned = Object.keys(CFG.craft).filter((k2) => g2.local.tools[k2]);
+      const held = g2.local.heldWeapon;
+      const sig = owned.join(",") + "|" + held;
+      if (sig === this._toolSig) return;
+      this._toolSig = sig;
+      this.el.toolRow.innerHTML = "";
+      if (!owned.length) {
+        this.el.toolRow.innerHTML = `<span class="dim">\uC81C\uC791\uB300\uB97C \uC9D3\uACE0 \uC778\uBCA4\uD1A0\uB9AC\uC5D0\uC11C \uC81C\uC791</span>`;
+        return;
+      }
+      for (const k2 of owned) {
+        const b = document.createElement("button");
+        b.className = "tool" + (held === k2 ? " on" : "");
+        b.textContent = CFG.craft[k2].icon;
+        b.title = `${CFG.craft[k2].name} \u2014 \uB20C\uB7EC\uC11C \uC190\uC5D0 \uC950\uAE30`;
+        b.onclick = () => {
+          g2.requestEquip(held === k2 ? null : k2);
+          this._toolSig = null;
+          this._invRendered = null;
+          this.refreshInventory();
+        };
+        this.el.toolRow.appendChild(b);
+      }
     }
     // 채집 → 건설 → 웨이브 시작 진행에 맞춰 튜토리얼 단계를 넘긴다
     _updateTutorial() {
@@ -15030,20 +15099,13 @@ button.corner.mute.off { opacity: 0.5; }
         this.el.harvestWrap.classList.add("hidden");
       }
       const near = g2.world.nearestNode(p2.x, p2.z, CFG.harvest.range);
-      this.canHarvestNow = !!near && !g2.buildMgr.mode && !(near.type === "gem" && !p2.holdingPickaxe);
-      if (this.el.actionBtn) {
-        const harvest = this.canHarvestNow;
-        this.el.actionBtn.textContent = harvest ? "\uCC44\uC9D1" : "\uACF5\uACA9";
-        this.el.actionBtn.classList.toggle("harvest", harvest);
-        if (!harvest) this.harvestHeld = false;
-      }
       if (near && !g2.buildMgr.mode) {
         this.el.prompt.classList.remove("hidden");
         if (near.type === "gem" && !p2.holdingPickaxe) {
           this.el.prompt.innerHTML = p2.tools.pickaxe ? `\u{1F4A0} \uC815\uC218\uC11D \u2014 \uACE1\uAD2D\uC774\uB97C <b>\uC190\uC5D0 \uC950\uC5B4\uC57C</b> \uCE98 \uC218 \uC788\uC2B5\uB2C8\uB2E4 (\uC778\uBCA4\uD1A0\uB9AC \uC7A5\uBE44 \uD0ED)` : `\u{1F4A0} \uC815\uC218\uC11D \u2014 \uACE1\uAD2D\uC774\uAC00 \uC788\uC5B4\uC57C \uCE98 \uC218 \uC788\uC2B5\uB2C8\uB2E4 (\uC81C\uC791\uB300\uC5D0\uC11C \uC81C\uC791)`;
         } else {
           const label = near.type === "tree" ? "\u{1F333} \uB098\uBB34" : near.type === "gem" ? "\u{1F4A0} \uC815\uC218\uC11D" : "\u{1FAA8} \uBC14\uC704";
-          this.el.prompt.innerHTML = `${label} \u2014 <kbd>F</kbd> \uAFB9 \uB20C\uB7EC \uCC44\uC9D1 (\uB0A8\uC740 ${near.charges})`;
+          this.el.prompt.innerHTML = `${label} \u2014 <b>\uB20C\uB7EC\uC11C \uCC44\uC9D1</b> (\uB0A8\uC740 ${near.charges})`;
         }
       } else {
         this.el.prompt.classList.add("hidden");

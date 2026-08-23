@@ -6,8 +6,8 @@ import { PHASE } from './wave.js';
 
 var $2 = (id) => document.getElementById(id);
 var TUTORIAL_STEPS = [
-  "🌳 근처 나무에 다가가 <kbd>F</kbd> 를 꾹 눌러 채집하세요",
-  "🎒 <kbd>I</kbd> 로 인벤토리를 열어 🪚 제작대를 먼저 지으세요 (벽\xB7타워는 그 다음)",
+  "🌳 나무에 다가가 <b>나무를 직접 클릭</b>하면 캡니다 (몬스터도 클릭하면 때립니다)",
+  "🎒 목재 20을 모았으면 <kbd>I</kbd> 로 인벤토리를 열어 🪚 제작대를 지으세요 (벽\xB7타워는 그 다음)",
   "준비가 되면 <kbd>Enter</kbd> 로 첫 웨이브를 시작하세요!"
 ];
 export var UI = class {
@@ -606,20 +606,7 @@ export var UI = class {
     };
     stick.addEventListener("pointerup", release);
     stick.addEventListener("pointercancel", release);
-    // 채집/공격을 버튼 하나로. 캘 것이 앞에 있으면 꾹 눌러 채집, 없으면 눌러서 공격.
-    const ab = $2("tb-action");
-    ab.addEventListener("pointerdown", (e) => {
-      e.preventDefault();
-      if (this.canHarvestNow) this.harvestHeld = true;
-      else this.game.requestAttack();
-    });
-    const releaseAction = () => {
-      this.harvestHeld = false;
-    };
-    ab.addEventListener("pointerup", releaseAction);
-    ab.addEventListener("pointercancel", releaseAction);
-    ab.addEventListener("pointerleave", releaseAction);
-    this.el.actionBtn = ab;
+
   }
   // ---------------------------------------------------------------- 라이프사이클
   onGameStart(resumed = false) {
@@ -633,7 +620,7 @@ export var UI = class {
     this.el.crystalWarning.classList.add("hidden");
     this.closeInventory();
     this.refreshBuildBar();
-    if (!resumed) this.toast("크리스탈을 지켜라! F로 채집, I로 인벤토리", "good");
+    if (!resumed) this.toast("크리스탈을 지켜라! 자원을 클릭해 캐고, I로 인벤토리", "good");
     if (resumed || localStorage.getItem("cd.tutorialDone")) {
       this.el.tutorial.classList.add("hidden");
       this._tutStep = -1;
@@ -651,10 +638,32 @@ export var UI = class {
     this.el.tutorial.classList.add("hidden");
     localStorage.setItem("cd.tutorialDone", "1");
   }
+  // 좌상단 도구 줄 — 눌러서 바로 손에 쥔다. 지금 든 것은 테두리로 표시한다.
   _refreshTools() {
-    const t2 = this.game.local.tools;
-    const owned = Object.keys(CFG.craft).filter((k2) => t2[k2]);
-    this.el.toolRow.innerHTML = owned.length ? owned.map((k2) => `<span class="tool" title="${CFG.craft[k2].name}">${CFG.craft[k2].icon}</span>`).join("") : `<span class="dim">제작대를 짓고 인벤토리에서 제작</span>`;
+    const g2 = this.game;
+    const owned = Object.keys(CFG.craft).filter((k2) => g2.local.tools[k2]);
+    const held = g2.local.heldWeapon;
+    const sig = owned.join(",") + "|" + held;
+    if (sig === this._toolSig) return;
+    this._toolSig = sig;
+    this.el.toolRow.innerHTML = "";
+    if (!owned.length) {
+      this.el.toolRow.innerHTML = `<span class="dim">제작대를 짓고 인벤토리에서 제작</span>`;
+      return;
+    }
+    for (const k2 of owned) {
+      const b = document.createElement("button");
+      b.className = "tool" + (held === k2 ? " on" : "");
+      b.textContent = CFG.craft[k2].icon;
+      b.title = `${CFG.craft[k2].name} — 눌러서 손에 쥐기`;
+      b.onclick = () => {
+        g2.requestEquip(held === k2 ? null : k2);
+        this._toolSig = null;
+        this._invRendered = null;
+        this.refreshInventory();
+      };
+      this.el.toolRow.appendChild(b);
+    }
   }
   // 채집 → 건설 → 웨이브 시작 진행에 맞춰 튜토리얼 단계를 넘긴다
   _updateTutorial() {
@@ -800,20 +809,13 @@ export var UI = class {
     }
     const near = g2.world.nearestNode(p2.x, p2.z, CFG.harvest.range);
     // 지금 채집할 수 있는 상태인지 — 터치 버튼이 채집/공격 중 무엇으로 동작할지 정한다
-    this.canHarvestNow = !!near && !g2.buildMgr.mode && !(near.type === "gem" && !p2.holdingPickaxe);
-    if (this.el.actionBtn) {
-      const harvest = this.canHarvestNow;
-      this.el.actionBtn.textContent = harvest ? "채집" : "공격";
-      this.el.actionBtn.classList.toggle("harvest", harvest);
-      if (!harvest) this.harvestHeld = false;
-    }
     if (near && !g2.buildMgr.mode) {
       this.el.prompt.classList.remove("hidden");
       if (near.type === "gem" && !p2.holdingPickaxe) {
         this.el.prompt.innerHTML = p2.tools.pickaxe ? `💠 정수석 — 곡괭이를 <b>손에 쥐어야</b> 캘 수 있습니다 (인벤토리 장비 탭)` : `💠 정수석 — 곡괭이가 있어야 캘 수 있습니다 (제작대에서 제작)`;
       } else {
         const label = near.type === "tree" ? "🌳 나무" : near.type === "gem" ? "💠 정수석" : "🪨 바위";
-        this.el.prompt.innerHTML = `${label} — <kbd>F</kbd> 꾹 눌러 채집 (남은 ${near.charges})`;
+        this.el.prompt.innerHTML = `${label} — <b>눌러서 채집</b> (남은 ${near.charges})`;
       }
     } else {
       this.el.prompt.classList.add("hidden");

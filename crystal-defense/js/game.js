@@ -26,7 +26,7 @@ export var Game = class {
     this.ui = null;
     this.running = false;
     this.shared = true;
-    this.pools = { team: { wood: 60, stone: 30, iron: 0, shard: 0 }, byId: {} };
+    this.pools = { team: { wood: 0, stone: 0, iron: 0, shard: 0 }, byId: {} };
     this.players = /* @__PURE__ */ new Map();
     this.stats = { harvested: 0, built: 0, kills: 0 };
     this._accum = { snap: 0, pos: 0, save: 0 };
@@ -449,6 +449,52 @@ export var Game = class {
     if (playerId === this.local.id) this.sfx.upgrade();
     else this.net.send("hupOk", { to: playerId, lv: p2.harvestLv });
   }
+  // 화면을 클릭했을 때 — 가리킨 것이 몬스터면 때리고, 자원이면 캔다. 아무것도 없으면 그냥 휘두른다.
+  // 채집 버튼 없이 대상을 직접 눌러 상호작용하는 게 기본 조작이다.
+  clickWorld(pointer) {
+    if (!pointer) {
+      this.requestAttack();
+      return;
+    }
+    const PICK = 2.2;
+    const enemy = this._enemyNear(pointer.x, pointer.z, PICK);
+    if (enemy) {
+      const reach = this.local.attackStats.range + enemy.st.radius;
+      if (dist(this.local.x, this.local.z, enemy.x, enemy.z) > reach) {
+        this.ui?.toast(`${enemy.st.name}에게 더 가까이 가세요`, "warn");
+        return;
+      }
+      this.local.rot = Math.atan2(enemy.x - this.local.x, enemy.z - this.local.z);
+      this.requestAttack();
+      return;
+    }
+    const node = this.world.nodeNear(pointer.x, pointer.z, PICK);
+    if (node) {
+      if (dist(this.local.x, this.local.z, node.x, node.z) > CFG.harvest.range) {
+        this.ui?.toast("더 가까이 가야 캘 수 있습니다", "warn");
+        return;
+      }
+      if (node.type === "gem" && !this.local.holdingPickaxe) {
+        this.ui?.toast(this.local.tools.pickaxe ? "곡괭이를 손에 쥐어야 캘 수 있습니다 (인벤토리 → 장비)" : "곡괭이가 있어야 캘 수 있습니다 (제작대에서 제작)", "bad");
+        return;
+      }
+      if (this.local.beginHarvest(node)) this.sfx.click();
+      return;
+    }
+    this.requestAttack();
+  }
+  _enemyNear(x2, z2, r) {
+    let best = null, bd = r * r;
+    for (const e of this.enemyMgr.list) {
+      if (e.dead) continue;
+      const d2 = (e.x - x2) ** 2 + (e.z - z2) ** 2;
+      if (d2 < bd) {
+        bd = d2;
+        best = e;
+      }
+    }
+    return best;
+  }
   // 제작대·화로를 클릭하면 인벤토리의 제작 탭이 열린다 (인벤토리에서 바로 열어도 된다)
   tryOpenStation(b) {
     this.sfx.click();
@@ -821,7 +867,7 @@ export var Game = class {
       } else if (this.buildMgr.hover?.stationKind) {
         this.tryOpenStation(this.buildMgr.hover);
       } else {
-        this.requestAttack();
+        this.clickWorld(pointer);
       }
     }
     if (inp.rightClicked && this.buildMgr.mode) this.setBuildMode(null);

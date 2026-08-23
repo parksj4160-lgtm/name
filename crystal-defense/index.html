@@ -86,12 +86,9 @@
     <div id="inv-list" class="inv-list"></div>
   </div>
 
-  <!-- 모바일 컨트롤 -->
+  <!-- 모바일 컨트롤 — 이동 조이스틱만. 채집·공격은 대상을 직접 탭한다. -->
   <div id="touch" class="hidden">
     <div id="stick"><i></i></div>
-    <div id="touch-buttons">
-      <button id="tb-action">공격</button>
-    </div>
   </div>
 
   <button id="btn-mute" class="corner mute" title="음소거 켜기/끄기">🔊</button>
@@ -101,8 +98,8 @@
     <p class="dim rebind-hint">밑줄 친 키를 클릭하면 원하는 키로 바꿀 수 있다.</p>
     <table>
       <tr><td>이동</td><td><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> / 방향키 (<kbd>Shift</kbd> 달리기)</td></tr>
-      <tr><td>채집</td><td>자원 근처에서 <kbd class="rebind" data-action="harvest">F</kbd> 꾹 누르기. 💠 정수석은 <b>곡괭이를 손에 쥐고 있어야</b> 캘 수 있다</td></tr>
-      <tr><td>공격</td><td>좌클릭 또는 <kbd class="rebind" data-action="attack">Space</kbd></td></tr>
+      <tr><td>💠 정수석</td><td><b>곡괭이를 손에 쥐고 있어야</b> 캘 수 있다 (좌상단 도구 아이콘을 눌러 바로 바꿀 수 있다)</td></tr>
+      <tr><td>공격 · 채집</td><td><b>대상을 직접 클릭</b> — 몬스터를 누르면 때리고, 나무·바위·정수석을 누르면 캔다. 빈 곳을 누르면 그냥 휘두른다. <kbd class="rebind" data-action="attack">Space</kbd> 로도 휘두르고, <kbd class="rebind" data-action="harvest">F</kbd> 를 누르면 가장 가까운 자원을 캔다</td></tr>
       <tr><td>인벤토리</td><td><kbd class="rebind" data-action="inventory">I</kbd> — 건설 · 제작 · 장비를 여기서 전부 고른다</td></tr>
       <tr><td>건설</td><td>인벤토리 <b>건설</b> 탭에서 고르면 배치 모드가 된다 → 좌클릭으로 배치. 벽·타워는 <b>제작대를 먼저 지어야</b> 열린다</td></tr>
       <tr><td>제작</td><td><b>제작대</b>를 지으면 인벤토리 <b>제작</b> 탭에서 ⛏️ 곡괭이 · 🗡️ 칼 · 🏹 활을 만든다. <b>화로</b>를 지으면 광물을 녹여 ⚙️ 철을 얻는다</td></tr>

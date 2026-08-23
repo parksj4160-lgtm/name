@@ -256,8 +256,8 @@ export function enemyStats(type, wave) {
   };
 }
 export var DIFFICULTIES = {
-  normal: { key: "normal", label: "보통", desc: "기본 난이도", startWood: 60, startStone: 30, prepBonus: 0 },
-  easy: { key: "easy", label: "쉬움", desc: "시작 자원 +50% \xB7 준비 시간 +20초", startWood: 90, startStone: 45, prepBonus: 20 }
+  normal: { key: "normal", label: "보통", desc: "맨손으로 시작 \xB7 나무부터 캔다", startWood: 0, startStone: 0, prepBonus: 0 },
+  easy: { key: "easy", label: "쉬움", desc: "준비 시간 +30초 \xB7 시작 자원은 똑같이 0", startWood: 0, startStone: 0, prepBonus: 30 }
 };
 var BASE_PREP_TIME = CFG.wave.prepTime;
 var BASE_FIRST_PREP_TIME = CFG.wave.firstPrepTime;

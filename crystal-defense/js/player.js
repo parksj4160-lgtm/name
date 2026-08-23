@@ -38,7 +38,7 @@ var Player = class {
     this.maxHp = CFG.player.hp;
     this.alive = true;
     this.downTimer = 0;
-    this.res = { wood: 40, stone: 20 };
+    this.res = { wood: 0, stone: 0 };
     this.shards = 0;
     this.tools = {};
     this.equipped = null;
@@ -239,13 +239,21 @@ export var LocalPlayer = class extends Player {
     }
   }
   // 채집 시도/진행. 완료 시 노드를 돌려준다.
+  // 특정 자원을 콕 집어 캐기 시작한다 (클릭/탭으로 고른 것). 성공하면 true.
+  beginHarvest(node) {
+    if (!this.alive || !node || node.depleted) return false;
+    if (node.type === "gem" && !this.holdingPickaxe) return false;
+    if (dist(this.x, this.z, node.x, node.z) > CFG.harvest.range) return false;
+    this.harvesting = { node, t: 0, need: CFG.harvest[node.type].time * this.harvestMult };
+    this.rot = Math.atan2(node.x - this.x, node.z - this.z);
+    return true;
+  }
+  // holding 이 true 면 근처 자원을 자동으로 잡아 캔다 (F 키 유지용).
+  // 이미 캐던 것이 있으면 holding 과 무관하게 계속 캔다 — 클릭으로 시작한 채집이 그대로 이어진다.
   tickHarvest(dt2, world, holding) {
     if (!this.alive) return null;
-    if (!holding) {
-      this.harvesting = null;
-      return null;
-    }
     if (!this.harvesting) {
+      if (!holding) return null;
       const node = world.nearestNode(this.x, this.z, CFG.harvest.range);
       if (!node) return null;
       if (node.type === "gem" && !this.holdingPickaxe) return null;

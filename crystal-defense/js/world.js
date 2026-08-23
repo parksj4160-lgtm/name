@@ -214,6 +214,10 @@ export var World = class {
   nodeById(id) {
     return this.nodes.find((n) => n.id === id);
   }
+  // 화면에서 가리킨 지점 근처의 자원 (클릭 대상 고르기용)
+  nodeNear(x2, z2, range) {
+    return this.nearestNode(x2, z2, range);
+  }
   nearestNode(x2, z2, range) {
     let best = null, bd2 = range * range;
     for (const n of this.nodes) {
