@@ -30,6 +30,7 @@ var MAT2 = {
   cannon: new THREE.MeshStandardMaterial({ color: 5001568, roughness: 0.5, metalness: 0.5 }),
   poison: new THREE.MeshStandardMaterial({ color: 3526479, emissive: 1871706, emissiveIntensity: 0.7, roughness: 0.4 }),
   support: new THREE.MeshStandardMaterial({ color: 14061311, emissive: 6959264, emissiveIntensity: 0.8, roughness: 0.35 }),
+  snare: new THREE.MeshStandardMaterial({ color: 13215862, roughness: 0.8, metalness: 0.1 }),
   workbenchTop: new THREE.MeshStandardMaterial({ color: 12159565, roughness: 0.8 }),
   workbenchLeg: new THREE.MeshStandardMaterial({ color: 5979940, roughness: 0.9 }),
   workbenchTool: new THREE.MeshStandardMaterial({ color: 10137781, roughness: 0.5, metalness: 0.4 }),
@@ -45,7 +46,7 @@ var MAT2 = {
   buffRing: new THREE.MeshBasicMaterial({ color: 14061311, transparent: true, opacity: 0.5, side: THREE.DoubleSide })
 };
 var RANGE_RING_GEO = new THREE.RingGeometry(0.96, 1, 40);
-var PROJECTILE_COLOR = { arrow: 16769162, frost: 8382719, cannon: 16751178, poison: 3526479 };
+var PROJECTILE_COLOR = { arrow: 16769162, frost: 8382719, cannon: 16751178, poison: 3526479, snare: 13215862 };
 var nextId = 1;
 function resetBuildingIds() {
   nextId = 1;
@@ -279,6 +280,12 @@ function buildMesh(key, level) {
     ringG.rotation.x = Math.PI / 2;
     ringG.position.y = -0.3;
     turret.add(ringG);
+  } else if (key === "snare") {
+    const ringA = new THREE.Mesh(GEO2.supportRing, MAT2.snare);
+    ringA.rotation.x = Math.PI / 2;
+    const ringB = new THREE.Mesh(GEO2.supportRing, MAT2.snare);
+    ringB.rotation.z = Math.PI / 2;
+    turret.add(ringA, ringB);
   } else {
     const head = new THREE.Mesh(GEO2.headCannon, MAT2.cannon);
     head.castShadow = true;
@@ -461,12 +468,18 @@ export var BuildManager = class {
     b.refreshBar();
   }
   // 호스트에서만: 타워 조준/사격
-  updateTowers(dt2, enemies, now) {
+  updateTowers(dt2, enemies, now, rangeMult = 1) {
+    const silences = enemies.filter((e) => !e.dead && e.silenceUntil > now);
     for (const b of this.buildings.values()) {
       if (!b.isTower) continue;
       const st = b.stats;
       b.cooldown -= dt2;
-      const target = this._acquire(b, enemies, st.range);
+      b.silenced = silences.some((e) => dist(b.x, b.z, e.x, e.z) <= CFG.bossPattern.silenceRadius);
+      if (b.silenced) {
+        if (b.turret) b.turret.rotation.y += dt2 * 0.4;
+        continue;
+      }
+      const target = this._acquire(b, enemies, st.range * rangeMult);
       if (target && b.turret) {
         const ang = Math.atan2(target.x - b.x, target.z - b.z);
         b.turret.rotation.y = ang;

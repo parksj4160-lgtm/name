@@ -59,9 +59,40 @@ export var SceneManager = class {
     this._night = 0;
     this._nightTarget = 0;
     this.crystalNightMult = 1;
+    this._weatherVal = {
+      rain: { fogNear: 46, fogFar: 100, tint: 5928568 },
+      fog: { fogNear: 22, fogFar: 52, tint: 13291480 }
+    };
+    this._weatherC1 = new THREE.Color();
+    this._weatherC2 = new THREE.Color();
+    this._weather = 0;
+    this._weatherTarget = 0;
+    this._weatherKind = null;
   }
   setNightMode(active) {
     this._nightTarget = active ? 1 : 0;
+  }
+  // kind: "rain" | "fog" | null. null 이면 서서히 걷힌다(마지막 종류는 페이드아웃 동안 기억해 둔다).
+  setWeather(kind) {
+    if (kind) this._weatherKind = kind;
+    this._weatherTarget = kind ? 1 : 0;
+  }
+  resetWeather() {
+    this._weatherTarget = 0;
+    this._weather = 1;
+    this.updateWeather(10);
+  }
+  updateWeather(dt2) {
+    if (this._weather === this._weatherTarget) return;
+    this._weather += (this._weatherTarget - this._weather) * Math.min(1, dt2 * 1.1);
+    if (Math.abs(this._weather - this._weatherTarget) < 1e-3) this._weather = this._weatherTarget;
+    const t2 = this._weather;
+    const d2 = this._day, w2 = this._weatherVal[this._weatherKind || "rain"];
+    const bg = this._weatherC1.copy(this._weatherC1.set(d2.bg)).lerp(this._weatherC2.set(w2.tint), t2);
+    this.scene.background.copy(bg);
+    this.scene.fog.color.copy(bg);
+    this.scene.fog.near = d2.fogNear + (w2.fogNear - d2.fogNear) * t2;
+    this.scene.fog.far = d2.fogFar + (w2.fogFar - d2.fogFar) * t2;
   }
   // 새 판을 시작할 때 이전 판이 밤 웨이브 중이었어도 즉시 낮으로 되돌린다.
   // updateNight() 는 _night === _nightTarget 이면 아무 것도 다시 계산하지 않고 즉시 반환하므로,

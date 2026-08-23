@@ -4,6 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
 <title>크리스탈 디펜스 (Crystal Defense) — 더블클릭 실행판</title>
+
 <style>
 :root {
   --bg: #0b0f1a;
@@ -104,6 +105,11 @@ button.go:disabled { opacity: 0.4; cursor: not-allowed; }
 @keyframes bossPulse {
   0%, 100% { box-shadow: 0 0 0 rgba(255,106,125,0); }
   50% { box-shadow: 0 0 10px rgba(255,106,125,0.5); }
+}
+.preview.special-wave { padding: 3px 6px; border-radius: 6px; background: rgba(255,204,85,0.1); }
+.preview .special-tag {
+  color: var(--warn); font-weight: 700; padding: 1px 6px; border-radius: 5px;
+  background: rgba(255,204,85,0.16); border: 1px solid rgba(255,204,85,0.3);
 }
 
 /* ---------- 파티 ---------- */
@@ -297,6 +303,17 @@ button.ghost { background: transparent; color: var(--dim); }
 .achievements li.on .ai-icon { filter: none; opacity: 1; }
 .achievements .ai-name { font-weight: 700; min-width: 68px; flex: none; }
 .achievements .ai-desc { font-size: 11px; opacity: 0.85; }
+
+/* ---------- 최근 전적 ---------- */
+.history {
+  list-style: none; padding: 8px 10px; margin: 6px 0 0; border-radius: 8px;
+  background: rgba(255,255,255,0.05); max-height: 220px; overflow-y: auto;
+  font-size: 12px; display: flex; flex-direction: column; gap: 6px; text-align: left;
+}
+.history li { display: flex; justify-content: space-between; gap: 8px; color: var(--dim); }
+.history li.win { color: var(--good); }
+.history li .h-left { color: var(--text); }
+.history .empty { color: var(--dim); font-style: italic; }
 #result-achievements {
   list-style: none; padding: 8px 10px; margin: 0 0 12px; border-radius: 8px;
   background: rgba(124,230,160,0.1); border: 1px solid rgba(124,230,160,0.3);
@@ -558,6 +575,7 @@ button.corner.mute.off { opacity: 0.5; }
         <button type="button" class="inv-tab" data-tab="craft">제작</button>
         <button type="button" class="inv-tab" data-tab="skill">스킬</button>
         <button type="button" class="inv-tab" data-tab="gear">장비</button>
+        <button type="button" class="inv-tab" data-tab="crystal">크리스탈</button>
       </div>
       <button id="inv-close" class="mini">닫기 <kbd>Esc</kbd></button>
     </div>
@@ -581,19 +599,25 @@ button.corner.mute.off { opacity: 0.5; }
       <tr><td>공격 · 채집</td><td><b>대상을 직접 클릭(탭)</b> — 몬스터를 누르면 때리고, 나무·바위·정수석을 누르면 캔다. 빈 곳을 누르면 그냥 휘두른다. <kbd class="rebind" data-action="attack">Space</kbd> 로도 휘두르고 <kbd class="rebind" data-action="harvest">F</kbd> 로 가장 가까운 자원을 캔다. 🪨 바위와 💠 정수석은 <b>곡괭이를 손에 쥐어야</b> 캘 수 있다 (나무는 맨손으로 가능 — 좌상단 도구 아이콘을 눌러 바로 교체)</td></tr>
       <tr><td>인벤토리</td><td><kbd class="rebind" data-action="inventory">I</kbd> — 건설 · 제작 · 장비를 여기서 전부 고른다</td></tr>
       <tr><td>건설</td><td>인벤토리 <b>건설</b> 탭에서 고르면 배치 모드가 된다 → 좌클릭으로 배치. 벽·타워는 <b>제작대를 먼저 지어야</b> 열린다</td></tr>
+      <tr><td>🕸️ 덫탑</td><td>피해는 미미하지만 맞은 적을 잠깐 완전히 묶어 이동을 멈춘다(둔화가 아니라 정지). 🦇 박쥐처럼 벽·함정을 무시하는 적도 사거리 안에만 들어오면 그대로 묶인다 — 다른 타워가 명중시킬 시간을 벌어 준다. <b>묶인 적을 다른 타워가 맞추면 추가 피해 35%</b> — 인접 배치 없이 묶인 상태 자체가 조건이라 어떤 타워 조합이든 이득을 본다</td></tr>
       <tr><td>🪤 함정</td><td>벽·타워와 달리 <b>길을 막지 않는다</b> — 적이 지나가는 길목 한복판에 심어 두면, 적이 밟는 순간 큰 피해+둔화를 주고 사라지는 1회용이다. 벽 뒤가 아니라 통로 위에 놓는 게 핵심</td></tr>
       <tr><td>제작</td><td><b>제작대</b>를 지으면 인벤토리 <b>제작</b> 탭에서 ⛏️ 곡괭이 · 🗡️ 칼 · 🏹 활 · 🔱 창 · 🔨 망치 · 💣 폭탄가방을 만든다. 칼은 단단한 일격, 활은 넓은 사거리, 창은 좁고 긴 관통, 망치는 느리지만 사방을 강타. <b>화로</b>를 지으면 광물을 녹여 ⚙️ 철을 얻는다</td></tr>
       <tr><td>💣 폭탄가방</td><td>유일한 원거리 무기 — 손에 들면 공격이 근접 대신 <b>조준한 바닥 지점에 폭탄을 던지는 것</b>으로 바뀐다(사거리 9, 던질 때마다 목재4·광물3 소모). 정수 스킬과 달리 목재·광물로 계속 쓸 수 있다. 🌀 결계 몹처럼 타워가 못 맞추는 원거리 위협이나 멀리서 몰려온 무리에 좋다</td></tr>
       <tr><td>쓰러짐·부활</td><td>체력이 0이 되면 쓰러져 잠시(5초) 조작 불가 상태가 됐다가 크리스탈 옆에서 부활한다. <b>협동 플레이라면 살아있는 아군이 쓰러진 사람 가까이 가면 부활이 3배 빨라진다</b> — 위험을 무릅쓰고 구하러 갈지 판단해야 한다. 혼자 할 땐 영향 없음</td></tr>
+      <tr><td>🤝 장비 건네주기</td><td>우측 상단 파티 목록에서 내가 만든 무기 아이콘을 누르면 그 파티원에게 그대로 넘어간다(나는 잃는다). 자원 공유 설정과 무관하게 항상 가능 — 결계 몹을 상대하는 동료에게 폭탄가방을 건네는 식으로 쓴다. 혼자 할 땐 표시 안 됨</td></tr>
       <tr><td>장비</td><td>인벤토리 <b>장비</b> 탭에서 고르면 손에 든다. ⛏️ 곡괭이도 쥐어야 정수석을 캘 수 있다</td></tr>
-      <tr><td>몬스터</td><td>🧙 주술사는 벽을 무시하고 멀리서 크리스탈을 저격 · 🪓 약탈자는 가장 가까운 건물로 직행해 부순다</td></tr>
+      <tr><td>몬스터</td><td>🧙 주술사는 벽을 무시하고 멀리서 크리스탈을 저격 · 🪓 약탈자는 가장 가까운 건물로 직행해 부순다 · 🦇 박쥐(6웨이브부터)는 벽·함정을 전부 무시하고 하늘로 크리스탈까지 직선 비행한다 — 체력이 낮아 타워로 요격하는 게 사실상 유일한 대응</td></tr>
       <tr><td>변종</td><td>웨이브가 오를수록 몬스터에 접두사가 붙는다: 🛡️ 방패(정면 피해 대폭 감소, 등 뒤를 쳐야 함) · ➗ 분열(죽으면 약한 개체 2마리로) · 💨 질주(주기적으로 폭발적 가속) · 💚 재생(잠시 안 맞으면 체력이 차오름, 끝까지 몰아쳐야 함) · 🌀 결계(타워가 조준 못함, 직접 처치해야 함). 색 틴트 + 머리 위 아이콘으로 항상 표시된다</td></tr>
       <tr><td>⭐ 정예</td><td>3웨이브부터 웨이브당 최대 1마리, 확률적으로 골드빛 정예가 섞여 나온다. 체력·공격력이 크게 세지지만 처치 보상(목재·광물)은 3배 — 등장하면 토스트로 알려주니 그놈부터 집중해서 잡을지 무시할지는 선택</td></tr>
+      <tr><td>☄️ 운석 낙하</td><td>4웨이브부터 전투 중 가끔 바닥에 빨간 경고 링이 뜨고, 2.5초 뒤 그 자리에 큰 범위 피해가 떨어진다. 몬스터 무리를 그 위로 끌어들이면 한 방에 정리할 수 있지만, 내 건물이나 캐릭터가 그 자리에 있으면 그대로 맞는다 — 보급품과 반대로 피해야 할 수도, 이용해야 할 수도 있는 양날의 검</td></tr>
       <tr><td>📦 보급품 투하</td><td>2웨이브부터 전투 중 가끔 상자가 떨어진다(한 번에 최대 1개, 미니맵에 노란 점으로 표시). 가까이 다가가면 자동으로 줍고 자원(목재·광물, 확률로 정수)을 얻는다 — 오래 안 챙기면 사라지니 방어를 잠깐 비우고 달려갈지 말지가 선택</td></tr>
       <tr><td>지형</td><td>판마다 지형이 다르다: 🏔️ 협곡(입구가 좁아 길막기가 잘 먹히지만 자원 부족) · 🌾 개활지(자원은 넉넉하지만 적이 사방에서 온다) · 🗺️ 평지(표준). 좌상단 자원 패널에 항상 표시된다</td></tr>
       <tr><td>🌙 밤 웨이브</td><td>7웨이브마다(엔드리스에서도 반복) 조명이 어두워지고 안개가 짙어져 시야가 좁아진다. 크리스탈 불빛은 오히려 더 밝아져 등대 역할을 한다</td></tr>
+      <tr><td>날씨</td><td>밤이 아닌 웨이브에 가끔 낀다: 🌧️ 비(땅이 젖어 이동 속도 소폭 감소) · 🌫️ 안개(시야가 줄고 타워 사거리 소폭 감소). 웨이브 시작 토스트로 미리 알려준다</td></tr>
       <tr><td>♾️ 축복</td><td>엔드리스 모드에서 3웨이브마다 준비 시간이 멈추고 영구 버프 2개 중 하나를 고른다(공격력\xB7타워 공격력\xB7스킬 비용\xB7즉시 회복). 표준 10웨이브에는 나오지 않는다</td></tr>
-      <tr><td>보스</td><td>5웨이브마다 💀 파괴자와 🧊 서리 군주가 번갈아 등장한다. 체력이 깎일 때마다 <b>잡졸을 소환</b>하고(서리 군주는 전부 🛡️ 방패 변종), 멀리 있으면 <b>크리스탈로 돌진</b>해 지나는 건물을 부순다. 둘 다 <b>예고가 먼저 뜨니</b> 그때 대응할 것</td></tr>
+      <tr><td>💎 크리스탈 강화</td><td>인벤토리 <b>크리스탈</b> 탭에서 정수(💠)로 크리스탈 자체를 영구히 키운다: 💪 강화(최대 체력 +150) · 💚 재생(초당 자동 회복) · ⚡ 오라(주변 적에게 주기 피해). 각 5레벨까지, 레벨이 오를수록 비용도 오른다 — 지킬 대상이 강해지면 후반에 방어선을 좁혀 버티는 선택지가 생긴다</td></tr>
+      <tr><td>특수 웨이브</td><td>3웨이브마다(보스 웨이브 제외) 성격이 다른 웨이브가 섞인다: 🏃 러시(러너 대량, 물량전) · 🏰 공성(브루트+약탈자, 건물이 표적) · ⭐ 정예전(수는 적지만 전부 정예). 준비 시간 웨이브 예고에 노란 배지로 미리 알려준다</td></tr>
+      <tr><td>보스</td><td>5웨이브마다 💀 파괴자 · 🧊 서리 군주 · 🔇 침묵의 군주가 15웨이브 주기로 돌아가며 등장한다. 체력이 깎일 때마다 파괴자·서리 군주는 <b>잡졸을 소환</b>하고(서리 군주는 전부 🛡️ 방패 변종), 침묵의 군주는 대신 <b>발밑에 침묵 장판</b>을 깔아 반경 안 타워를 전부 멈춘다(직접 나가서 막아야 함). 멀리 있으면 셋 다 <b>크리스탈로 돌진</b>해 지나는 건물을 부순다. 전부 <b>예고가 먼저 뜨니</b> 그때 대응할 것</td></tr>
       <tr><td>업그레이드</td><td><kbd class="rebind" data-action="upgrade">U</kbd> 후 건물 클릭</td></tr>
       <tr><td>수리</td><td><kbd class="rebind" data-action="repair">G</kbd> 후 건물 클릭 (손상 비례 자원 소모)</td></tr>
       <tr><td>철거(50% 환급)</td><td><kbd class="rebind" data-action="sell">X</kbd> 후 건물 클릭</td></tr>
@@ -601,11 +625,13 @@ button.corner.mute.off { opacity: 0.5; }
       <tr><td>정수 스킬</td><td>💧 <kbd class="rebind" data-action="shard">R</kbd> 회복(1) · 💥 <kbd class="rebind" data-action="skillBlast">T</kbd> 폭발(2) · 🌀 <kbd class="rebind" data-action="skillChill">Y</kbd> 시간 왜곡(2) · 🛡️ <kbd class="rebind" data-action="skillBarrier">B</kbd> 방벽(3) — 인벤토리 <b>스킬</b> 탭에서도 쓸 수 있다</td></tr>
       <tr><td>카메라</td><td>우클릭 드래그 회전 · 휠 확대/축소</td></tr>
       <tr><td>취소</td><td><kbd class="rebind" data-action="cancel">Esc</kbd> 또는 우클릭</td></tr>
-      <tr><td>음소거</td><td><kbd class="rebind" data-action="mute">M</kbd></td></tr>
+      <tr><td>🎵 배경음악</td><td>준비 시간엔 잔잔하게, 전투엔 긴박하게, 보스 웨이브엔 더 무겁게 — 웨이브 흐름에 맞춰 자동으로 바뀐다. 아래에서 효과음과 별도로 음량 조절 가능</td></tr>
+      <tr><td>음소거</td><td><kbd class="rebind" data-action="mute">M</kbd> (음악·효과음 모두)</td></tr>
       <tr><td>일시정지</td><td><kbd class="rebind" data-action="pause">P</kbd> (싱글 플레이만)</td></tr>
     </table>
     <button id="keybind-reset" class="mini">키 전체 초기화</button>
-    <label class="check vol">음량 <input type="range" id="in-volume" min="0" max="100" step="5" /> <b id="vol-pct">55%</b></label>
+    <label class="check vol">효과음 <input type="range" id="in-volume" min="0" max="100" step="5" /> <b id="vol-pct">55%</b></label>
+    <label class="check vol">음악 <input type="range" id="in-music-volume" min="0" max="100" step="5" /> <b id="music-vol-pct">32%</b></label>
     <label class="check cb"><input type="checkbox" id="chk-colorblind" /> 색약 모드 — 모든 몬스터 위에 종류 아이콘 표시</label>
   </div>
 </div>
@@ -669,6 +695,11 @@ button.corner.mute.off { opacity: 0.5; }
     <details class="settings" open>
       <summary>업적 <span id="ach-count" class="dim"></span></summary>
       <ul id="ach-list" class="achievements"></ul>
+    </details>
+
+    <details class="settings">
+      <summary>최근 전적 <span id="history-count" class="dim"></span></summary>
+      <ul id="history-list" class="history"></ul>
     </details>
 
     <p class="tip">팁: 파밍하러 멀리 나가면 크리스탈이 비어버린다. 웨이브 전에 무엇을 지을지 매번 고민하게 된다.</p>
@@ -10138,6 +10169,7 @@ button.corner.mute.off { opacity: 0.5; }
     skillUser: { name: "\uC815\uC218\uC758 \uD798", icon: "\u{1F4A0}", desc: "\uC815\uC218 \uC561\uD2F0\uBE0C \uC2A4\uD0AC(\uD3ED\uBC1C\xB7\uC2DC\uAC04 \uC65C\uACE1\xB7\uBC29\uBCBD)\uC744 \uCC98\uC74C \uC0AC\uC6A9\uD588\uB2E4" },
     veteran: { name: "\uBC31\uC804\uB178\uC7A5", icon: "\u{1F396}\uFE0F", desc: "10\uD310\uC744 \uD50C\uB808\uC774\uD588\uB2E4" },
     bothBosses: { name: "\uC30D\uB465\uC774 \uCC98\uCE58", icon: "\u2694\uFE0F", desc: "\uD55C \uD310\uC5D0\uC11C \uD30C\uAD34\uC790\uC640 \uC11C\uB9AC \uAD70\uC8FC\uB97C \uB458 \uB2E4 \uCC98\uCE58\uD588\uB2E4" },
+    allBosses: { name: "\uC0BC\uC704\uC77C\uCCB4", icon: "\u{1F451}", desc: "\uD55C \uD310\uC5D0\uC11C \uD30C\uAD34\uC790\xB7\uC11C\uB9AC \uAD70\uC8FC\xB7\uCE68\uBB35\uC758 \uAD70\uC8FC\uB97C \uC804\uBD80 \uCC98\uCE58\uD588\uB2E4" },
     trapMaster: { name: "\uB36B\uC0AC\uB0E5\uAFBC", icon: "\u{1FAA4}", desc: "\uD55C \uD310\uC5D0\uC11C \uD568\uC815\uC744 3\uBC88 \uC774\uC0C1 \uBC1C\uB3D9\uC2DC\uCF30\uB2E4" },
     ironWill: { name: "\uAC15\uCCA0 \uC758\uC9C0", icon: "\u{1F529}", desc: "\uC5B4\uB824\uC6C0 \uB09C\uC774\uB3C4\uB85C 10\uC6E8\uC774\uBE0C\uB97C \uB9C9\uC544\uB0C8\uB2E4" },
     eliteHunter: { name: "\uC815\uC608 \uC0AC\uB0E5\uAFBC", icon: "\u2B50", desc: "\uC815\uC608 \uBAAC\uC2A4\uD130\uB97C 5\uB9C8\uB9AC \uCC98\uCE58\uD588\uB2E4" }
@@ -10166,6 +10198,224 @@ button.corner.mute.off { opacity: 0.5; }
   var MUTE_KEY = "cd.muted";
   var VOL_KEY = "cd.volume";
   var DEFAULT_VOL = 0.55;
+  var MUSIC_VOL_KEY = "cd.music.volume";
+  var DEFAULT_MUSIC_VOL = 0.32;
+  var ROOTS = [110, 87.31, 130.81, 98];
+  var SEMI = Math.pow(2, 1 / 12);
+  var MUSIC_PHASES = {
+    prep: {
+      bpm: 74,
+      roots: ROOTS,
+      bassWave: "triangle",
+      bassPeak: 0.1,
+      bassDur: 0.5,
+      pad: true,
+      padPeak: 0.045,
+      padDur: 3.2,
+      arp: false,
+      kick: false
+    },
+    combat: {
+      bpm: 122,
+      roots: ROOTS,
+      bassWave: "triangle",
+      bassPeak: 0.12,
+      bassDur: 0.32,
+      pad: false,
+      arp: true,
+      arpSteps: 2,
+      arpWave: "square",
+      arpPeak: 0.045,
+      arpDur: 0.15,
+      arpPattern: [1, 1.5, 2, 1.5],
+      dissonant: false,
+      kick: false
+    },
+    boss: {
+      bpm: 136,
+      roots: ROOTS,
+      bassWave: "sawtooth",
+      bassPeak: 0.16,
+      bassDur: 0.28,
+      pad: false,
+      arp: true,
+      arpSteps: 2,
+      arpWave: "sawtooth",
+      arpPeak: 0.055,
+      arpDur: 0.13,
+      arpPattern: [2, 3, 4, 3],
+      dissonant: true,
+      dissonantMult: 3 * SEMI,
+      kick: true,
+      kickPeak: 0.22
+    }
+  };
+  var MUSIC_LOOKAHEAD = 0.6;
+  var MUSIC_TICK_MS = 150;
+  var MusicDirector = class {
+    constructor(sfx) {
+      this.sfx = sfx;
+      this.gain = null;
+      const saved = parseFloat(localStorage.getItem(MUSIC_VOL_KEY));
+      this.volume = Number.isFinite(saved) ? Math.min(1, Math.max(0, saved)) : DEFAULT_MUSIC_VOL;
+      this.phase = null;
+      this._desired = null;
+      this.running = false;
+      this._pendingStart = false;
+      this.nextTime = 0;
+      this.beatIndex = 0;
+      this._timer = null;
+    }
+    _effVol() {
+      return this.sfx.muted ? 0 : this.volume;
+    }
+    _ensure() {
+      const ctx = this.sfx._ensureCtx();
+      if (!ctx) return null;
+      if (!this.gain) {
+        this.gain = ctx.createGain();
+        this.gain.gain.value = this._effVol();
+        this.gain.connect(ctx.destination);
+      }
+      return ctx;
+    }
+    setVolume(v2) {
+      this.volume = Math.min(1, Math.max(0, v2));
+      localStorage.setItem(MUSIC_VOL_KEY, String(this.volume));
+      const ctx = this.sfx.ctx;
+      if (this.gain && ctx) this.gain.gain.setTargetAtTime(this._effVol(), ctx.currentTime, 0.05);
+    }
+    applyMute() {
+      const ctx = this.sfx.ctx;
+      if (this.gain && ctx) this.gain.gain.setTargetAtTime(this._effVol(), ctx.currentTime, 0.05);
+    }
+    setPhase(phase) {
+      if (!MUSIC_PHASES[phase]) return;
+      this._desired = phase;
+    }
+    // ctx 가 아직 없으면(사용자 입력 전) 대기했다가 언락되는 순간 이어서 시작한다
+    onUnlock() {
+      if (this._pendingStart) {
+        this._pendingStart = false;
+        this.start(this._desired || "prep");
+      }
+    }
+    start(phase) {
+      this.setPhase(phase);
+      if (this.running) return;
+      const ctx = this._ensure();
+      if (!ctx) {
+        this._pendingStart = true;
+        return;
+      }
+      this.running = true;
+      this.phase = this._desired;
+      this.beatIndex = 0;
+      this.nextTime = ctx.currentTime + 0.15;
+      this._loop();
+    }
+    stop() {
+      this.running = false;
+      this._pendingStart = false;
+      if (this._timer) {
+        clearTimeout(this._timer);
+        this._timer = null;
+      }
+      const ctx = this.sfx.ctx;
+      if (this.gain && ctx) this.gain.gain.setTargetAtTime(0, ctx.currentTime, 0.4);
+    }
+    _loop() {
+      if (!this.running) return;
+      const ctx = this.sfx.ctx;
+      if (ctx) {
+        while (this.nextTime < ctx.currentTime + MUSIC_LOOKAHEAD) {
+          this._scheduleBeat(this.nextTime);
+          const def = MUSIC_PHASES[this.phase];
+          this.nextTime += 60 / def.bpm;
+          this.beatIndex++;
+          if (this.beatIndex % 4 === 0 && this._desired && this._desired !== this.phase) {
+            this.phase = this._desired;
+          }
+        }
+      }
+      this._timer = setTimeout(() => this._loop(), MUSIC_TICK_MS);
+    }
+    _scheduleBeat(t2) {
+      const def = MUSIC_PHASES[this.phase];
+      const bar = Math.floor(this.beatIndex / 4) % def.roots.length;
+      const beatInBar = this.beatIndex % 4;
+      const root = def.roots[bar];
+      this._pluck(root * 0.5, t2, def);
+      if (def.pad && beatInBar === 0) this._pad(root, t2, def);
+      if (def.kick && (beatInBar === 0 || beatInBar === 2)) this._kick(t2, def);
+      if (def.arp) {
+        const n = def.arpSteps;
+        const beatDur = 60 / def.bpm;
+        for (let i = 0; i < n; i++) {
+          const st = t2 + i * beatDur / n;
+          const idx = (beatInBar * n + i) % def.arpPattern.length;
+          let mult = def.arpPattern[idx];
+          if (def.dissonant && bar % 2 === 1 && idx === def.arpPattern.length - 1) mult = def.dissonantMult;
+          this._blip(root * mult, st, def);
+        }
+      }
+    }
+    _pluck(freq, t2, def) {
+      const ctx = this.sfx.ctx;
+      const osc = ctx.createOscillator();
+      const g2 = ctx.createGain();
+      osc.type = def.bassWave;
+      osc.frequency.setValueAtTime(freq, t2);
+      g2.gain.setValueAtTime(1e-4, t2);
+      g2.gain.exponentialRampToValueAtTime(def.bassPeak, t2 + 0.02);
+      g2.gain.exponentialRampToValueAtTime(1e-4, t2 + def.bassDur);
+      osc.connect(g2).connect(this.gain);
+      osc.start(t2);
+      osc.stop(t2 + def.bassDur + 0.05);
+    }
+    _pad(root, t2, def) {
+      const ctx = this.sfx.ctx;
+      for (const mult of [1, 1.5, 2]) {
+        const osc = ctx.createOscillator();
+        const g2 = ctx.createGain();
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(root * mult, t2);
+        const peak = def.padPeak / mult;
+        g2.gain.setValueAtTime(1e-4, t2);
+        g2.gain.exponentialRampToValueAtTime(peak, t2 + 1.2);
+        g2.gain.exponentialRampToValueAtTime(1e-4, t2 + def.padDur);
+        osc.connect(g2).connect(this.gain);
+        osc.start(t2);
+        osc.stop(t2 + def.padDur + 0.1);
+      }
+    }
+    _kick(t2, def) {
+      const ctx = this.sfx.ctx;
+      const osc = ctx.createOscillator();
+      const g2 = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(110, t2);
+      osc.frequency.exponentialRampToValueAtTime(40, t2 + 0.18);
+      g2.gain.setValueAtTime(def.kickPeak, t2);
+      g2.gain.exponentialRampToValueAtTime(1e-4, t2 + 0.22);
+      osc.connect(g2).connect(this.gain);
+      osc.start(t2);
+      osc.stop(t2 + 0.25);
+    }
+    _blip(freq, t2, def) {
+      const ctx = this.sfx.ctx;
+      const osc = ctx.createOscillator();
+      const g2 = ctx.createGain();
+      osc.type = def.arpWave;
+      osc.frequency.setValueAtTime(freq, t2);
+      g2.gain.setValueAtTime(1e-4, t2);
+      g2.gain.exponentialRampToValueAtTime(def.arpPeak, t2 + 8e-3);
+      g2.gain.exponentialRampToValueAtTime(1e-4, t2 + def.arpDur);
+      osc.connect(g2).connect(this.gain);
+      osc.start(t2);
+      osc.stop(t2 + def.arpDur + 0.03);
+    }
+  };
   var SoundManager = class {
     constructor() {
       this.ctx = null;
@@ -10174,8 +10424,10 @@ button.corner.mute.off { opacity: 0.5; }
       this.volume = Number.isFinite(saved) ? Math.min(1, Math.max(0, saved)) : DEFAULT_VOL;
       this._noiseBuf = null;
       this._lastAt = {};
+      this.music = new MusicDirector(this);
       const unlock2 = () => {
         this._ensureCtx();
+        this.music.onUnlock();
       };
       addEventListener("pointerdown", unlock2, { once: true });
       addEventListener("keydown", unlock2, { once: true });
@@ -10203,6 +10455,7 @@ button.corner.mute.off { opacity: 0.5; }
       this.muted = !this.muted;
       localStorage.setItem(MUTE_KEY, this.muted ? "1" : "0");
       this._applyGain();
+      this.music.applyMute();
       return this.muted;
     }
     // 0..1 음량. 0 으로 내리면 음소거와 같은 효과라 음소거 표시도 함께 맞춰 준다.
@@ -10431,11 +10684,22 @@ button.corner.mute.off { opacity: 0.5; }
       plains: { name: "\uAC1C\uD65C\uC9C0", icon: "\u{1F33E}", portalCount: 6, nodeMult: 1.45, desc: "\uC790\uC6D0\uC774 \uB109\uB109\uD558\uB2E4 \u2014 \uB300\uC2E0 \uC801\uC774 \uC0AC\uBC29\uC5D0\uC11C \uBAB0\uB824\uC628\uB2E4" },
       normal: { name: "\uD3C9\uC9C0", icon: "\u{1F5FA}\uFE0F", portalCount: 4, nodeMult: 1, desc: "\uD45C\uC900 \uC9C0\uD615" }
     },
+    // 비행 몬스터(flyer)가 떠서 이동하는 높이 — 벽·함정을 눈으로도 넘어가는 게 보이게 한다
+    flyHeight: 3.2,
     crystal: {
       hp: 1e3,
       radius: 2.2,
       hitRange: 3.6
       // 몬스터가 크리스탈을 때리기 시작하는 거리
+    },
+    // 크리스탈 강화 — 정수(💠)로 크리스탈 자체를 영구히 키운다. 세 갈래 모두 레벨당 비용이 오르고
+    // 최대 레벨이 있어 무한 스노우볼은 안 된다. 지킬 대상이 강해지면 후반에 방어선을 좁혀 버티는
+    // 선택지가 생긴다는 게 목적.
+    crystalUpgrade: {
+      maxLv: 5,
+      armor: { name: "\uAC15\uD654", icon: "\u{1F4AA}", desc: "\uCD5C\uB300 \uCCB4\uB825 +150 (\uC989\uC2DC \uADF8\uB9CC\uD07C \uD68C\uBCF5\uB3C4 \uB428)", hpPerLv: 150, baseCost: 2, costStep: 1 },
+      regen: { name: "\uC7AC\uC0DD", icon: "\u{1F49A}", desc: "\uB9E4\uCD08 \uCD5C\uB300 \uCCB4\uB825\uC758 0.6% \uB9CC\uD07C \uC790\uB3D9 \uD68C\uBCF5", pctPerLv: 6e-3, baseCost: 2, costStep: 1 },
+      aura: { name: "\uC624\uB77C", icon: "\u26A1", desc: "\uC8FC\uBCC0 \uC801\uC5D0\uAC8C 1\uCD08\uB9C8\uB2E4 \uD53C\uD574\uB97C \uC900\uB2E4", radius: 6.5, dmgPerLv: 12, tickTime: 1, baseCost: 3, costStep: 1 }
     },
     player: {
       speed: 7.4,
@@ -10596,6 +10860,23 @@ button.corner.mute.off { opacity: 0.5; }
         levels: [
           { hp: 30, dmg: 65, slow: 0.5, slowTime: 2, triggerRadius: 1.5, singleUse: true }
         ]
+      },
+      // 피해는 거의 없지만 맞은 적을 잠깐 완전히 묶어 둔다(둔화가 아니라 이동 속도 0).
+      // 🦇 박쥐처럼 벽·함정을 무시하는 적도 사거리 안에만 들어오면 그대로 묶인다 —
+      // 다른 타워들의 화력이 명중할 시간을 벌어 주는 용도.
+      snare: {
+        name: "\uB36B\uD0D1",
+        icon: "\u{1F578}\uFE0F",
+        hotkey: "0",
+        cost: { wood: 45, stone: 20 },
+        hp: 170,
+        blocks: true,
+        desc: "\uC801\uC744 \uBB36\uC5B4 \uC644\uC804\uD788 \uBA48\uCD98\uB2E4(\uC9E7\uC740 \uC2DC\uAC04, \uD53C\uD574\uB294 \uBBF8\uBBF8). \uBE44\uD589 \uBAAC\uC2A4\uD130\uC5D0\uAC8C\uB3C4 \uD1B5\uD55C\uB2E4. \uBB36\uC778 \uC801\uC744 \uB2E4\uB978 \uD0C0\uC6CC\uAC00 \uB9DE\uCD94\uBA74 \uCD94\uAC00 \uD53C\uD574.",
+        levels: [
+          { hp: 170, dmg: 4, range: 9, rate: 0.5, root: 1.4 },
+          { hp: 260, dmg: 6, range: 10.5, rate: 0.6, root: 1.8, cost: { wood: 60, stone: 40 } },
+          { hp: 380, dmg: 9, range: 12, rate: 0.7, root: 2.2, cost: { wood: 110, stone: 90, iron: 5 } }
+        ]
       }
     },
     // 시설에 다가가 클릭하면 열리는 작업창. range 는 상호작용 가능 거리.
@@ -10658,10 +10939,16 @@ button.corner.mute.off { opacity: 0.5; }
       shooter: { name: "\uC8FC\uC220\uC0AC", icon: "\u{1F9D9}", hp: 45, speed: 2.4, dmg: 9, rate: 0.5, radius: 0.5, color: 3526479, bounty: { wood: 3, stone: 2 }, scale: 0.95, ranged: true, atkRange: 11 },
       // 경로상의 벽을 무시하고 가장 가까운 타워로 직행해 부순다 — 타워를 뒤에 숨기는 전략을 견제한다
       raider: { name: "\uC57D\uD0C8\uC790", icon: "\u{1FA93}", hp: 80, speed: 2.6, dmg: 10, rate: 0.8, radius: 0.55, color: 11887901, bounty: { wood: 3, stone: 2 }, scale: 1.05, seeksBuildings: true, buildingDmgMult: 1.8 },
+      // 벽·함정을 전부 무시하고 크리스탈로 직선 비행한다 — 길찾기 자체를 안 쓰므로 벽 중심 방어에 구멍을 낸다.
+      // 대신 체력이 아주 낮아 타워 몇 대만 스치면 죽는다: "타워가 있어야 하는 이유"를 만드는 게 목적
+      flyer: { name: "\uBC15\uC950", icon: "\u{1F987}", hp: 26, speed: 4.6, dmg: 9, rate: 1.1, radius: 0.42, color: 8048895, bounty: { wood: 2, stone: 2 }, scale: 0.8, flies: true },
       boss: { name: "\uD30C\uAD34\uC790", icon: "\u{1F480}", hp: 900, speed: 2.1, dmg: 70, rate: 0.7, radius: 1.4, color: 3092282, bounty: { wood: 30, stone: 30 }, scale: 2.3, boss: true },
       // 5의 배수 웨이브마다 파괴자와 번갈아 등장한다. 소환하는 잡졸이 전부 🛡️ 방패 변종이라(정면 피해 감소)
       // 뒤로 돌아가서 처리해야 하는 다른 압박을 준다 — 돌진/소환 패턴 자체는 파괴자와 동일하다.
-      frostlord: { name: "\uC11C\uB9AC \uAD70\uC8FC", icon: "\u{1F9CA}", hp: 1050, speed: 1.7, dmg: 55, rate: 0.65, radius: 1.5, color: 10479871, bounty: { wood: 32, stone: 38 }, scale: 2.4, boss: true, summonVariant: "shield" }
+      frostlord: { name: "\uC11C\uB9AC \uAD70\uC8FC", icon: "\u{1F9CA}", hp: 1050, speed: 1.7, dmg: 55, rate: 0.65, radius: 1.5, color: 10479871, bounty: { wood: 32, stone: 38 }, scale: 2.4, boss: true, summonVariant: "shield" },
+      // 세 번째 보스(15웨이브 주기로 파괴자·서리 군주와 순환). 소환 대신 자기 발밑에 침묵 장판을 깐다 —
+      // 장판 반경 안의 타워는 조준·사격이 전부 멈춘다(`buildings.js`의 `updateTowers` 참고). 돌진 패턴은 공유.
+      warden: { name: "\uCE68\uBB35\uC758 \uAD70\uC8FC", icon: "\u{1F507}", hp: 1100, speed: 1.8, dmg: 50, rate: 0.65, radius: 1.5, color: 8011711, bounty: { wood: 34, stone: 34 }, scale: 2.35, boss: true, silenceBoss: true }
     },
     // 몬스터 변종 접두사 — 종류를 늘리는 대신 기존 몬스터에 가끔 붙는다. 웨이브가 오를수록 등장 확률이 오른다.
     // 색 틴트 + 머리 위 아이콘으로 항상 표시되어(색약 여부와 무관하게) 눈에 띈다.
@@ -10688,11 +10975,19 @@ button.corner.mute.off { opacity: 0.5; }
       // 화살탑이 이 반경 안에 서리탑을 두면, 이미 둔화된 적을 맞출 때 추가 피해
       frostArrow: { radius: 7, dmgMult: 0.4 },
       // 독탑이 이 반경 안에 다른 독탑을 두면, 독 피해가 이웃 하나당 누적 증가(상한 있음)
-      poisonStack: { radius: 7, dpsMultPerNeighbor: 0.35, max: 1 }
+      poisonStack: { radius: 7, dpsMultPerNeighbor: 0.35, max: 1 },
+      // 덫탑에 묶여(root) 있는 적을 다른 타워가 맞추면 추가 피해 — 덫탑 자신은 제외(묶는 역할에 집중).
+      // frostArrow 처럼 인접 배치가 필요 없다 — 묶인 상태 자체가 트리거라 어떤 타워 조합이든 이득을 본다
+      rootSnare: { dmgMult: 0.35 }
     },
     // 보급품 투하 — 전투 중(웨이브 2부터) 가끔 지도 위에 상자가 떨어진다. 한 번에 최대 1개만 떠 있고,
     // 안 챙기고 놔두면 사라진다. 방어를 잠깐 비우고 달려가서 주울지 말지가 매 순간의 선택이 된다.
     supplyDrop: { minWave: 2, firstDelay: 16, minGap: 30, maxGap: 50, lifetime: 20, pickupRadius: 1.8, reward: { wood: 14, stone: 9 }, shardChance: 0.4 },
+    // 운석 낙하 — 전투 중(4웨이브부터) 가끔 무작위 지점에 경고가 뜨고, 잠깐 뒤 그 자리에 큰 범위
+    // 피해가 떨어진다. 몬스터를 그 자리로 끌어들이면 한 방에 정리하는 이득이 있지만, 내 건물이나
+    // 내 캐릭터가 그 자리에 있으면 그대로 맞는다 — 순수 이득이던 보급품 투하와 반대로 양날의 검이다.
+    // 건물·자원 노드를 피하지 않는다 — 그래서 위험하다.
+    meteor: { minWave: 4, firstDelay: 22, minGap: 40, maxGap: 65, telegraphTime: 2.5, radius: 5, dmg: 150, buildingDmgMult: 0.5, playerDmg: 35 },
     // 엔드리스 축복 — 10웨이브 승리 이후(엔드리스)에만 등장한다. 표준 캠페인 밸런스에는 영향이 없다.
     // n웨이브마다 무작위 2개 중 하나를 골라 영구 적용(응급 처치만 즉시 1회성). 전부 호스트가 계산하는
     // 값(근접 공격력·타워 공격력·스킬 비용·크리스탈 체력)에만 걸려 있어서 별도 동기화 없이 참가자에게도 그대로 반영된다.
@@ -10703,7 +10998,10 @@ button.corner.mute.off { opacity: 0.5; }
       affinity: { name: "\uC815\uC218 \uCE5C\uD654", icon: "\u{1F4A0}", desc: "\uC815\uC218 \uC2A4\uD0AC(\uD3ED\uBC1C\xB7\uC2DC\uAC04 \uC65C\uACE1\xB7\uBC29\uBCBD) \uBE44\uC6A9 -1", kind: "delta", key: "skillCostDelta", value: -1 },
       aid: { name: "\uC751\uAE09 \uCC98\uCE58", icon: "\u2764\uFE0F", desc: "\uD06C\uB9AC\uC2A4\uD0C8 \uCCB4\uB825 300 \uC989\uC2DC \uD68C\uBCF5", kind: "instant" },
       bond: { name: "\uC218\uC815 \uACB0\uC18D", icon: "\u{1F48E}", desc: "\uD06C\uB9AC\uC2A4\uD0C8 \uCD5C\uB300 \uCCB4\uB825 +150", kind: "maxHp", value: 150 },
-      plunder: { name: "\uC57D\uD0C8", icon: "\u{1F4B0}", desc: "\uBAAC\uC2A4\uD130 \uCC98\uCE58 \uBCF4\uC0C1(\uBAA9\uC7AC\xB7\uAD11\uBB3C) +25%", kind: "mult", key: "bounty", value: 1.25 }
+      plunder: { name: "\uC57D\uD0C8", icon: "\u{1F4B0}", desc: "\uBAAC\uC2A4\uD130 \uCC98\uCE58 \uBCF4\uC0C1(\uBAA9\uC7AC\xB7\uAD11\uBB3C) +25%", kind: "mult", key: "bounty", value: 1.25 },
+      // 이번 세션에 추가된 크리스탈 강화(정수로 체력·재생·오라를 사는 시스템)와 맞물리는 축복.
+      // affinity(정수 스킬 비용 -1)와 정확히 같은 구조를 크리스탈 강화 쪽에 그대로 옮겨온 것.
+      growth: { name: "\uC131\uC7A5 \uAC00\uC18D", icon: "\u{1F331}", desc: "\uD06C\uB9AC\uC2A4\uD0C8 \uAC15\uD654 \uBE44\uC6A9 -1 (\uCD5C\uC18C 1)", kind: "delta", key: "crystalUpgradeCostDelta", value: -1 }
     },
     // 보스 전용 패턴. 예고 시간을 반드시 두어서 플레이어가 반응할 수 있게 한다.
     bossPattern: {
@@ -10719,7 +11017,11 @@ button.corner.mute.off { opacity: 0.5; }
       chargeTime: 1.5,
       chargeSpeed: 4.2,
       // 돌진 중 스치는 건물에 주는 피해
-      chargeBuildingDmg: 55
+      chargeBuildingDmg: 55,
+      // 침묵의 군주 전용 — summonAt 임계값마다 소환 대신 침묵 장판을 깐다(summon과 배타적)
+      silenceCast: 1.1,
+      silenceRadius: 8,
+      silenceTime: 4
     },
     wave: {
       goal: 10,
@@ -10758,18 +11060,69 @@ button.corner.mute.off { opacity: 0.5; }
   function needsPickaxe(nodeType) {
     return !!CFG.harvest[nodeType]?.needsPickaxe;
   }
+  function _standardTotal(w2) {
+    let n = 4 + Math.floor(w2 * 1.6);
+    n += 2 + Math.floor(w2 * 1.1);
+    if (w2 >= 3) n += Math.floor((w2 - 1) / 2) + 1;
+    if (w2 >= 4) n += 1 + Math.floor((w2 - 2) / 2);
+    if (w2 >= 5) n += 1 + Math.floor((w2 - 3) / 3);
+    if (w2 >= 6) n += 1 + Math.floor((w2 - 4) / 2);
+    return n;
+  }
+  var SPECIAL_WAVES = {
+    rush: { name: "\uB7EC\uC2DC", icon: "\u{1F3C3}", desc: "\uB7EC\uB108\uAC00 \uB300\uB7C9\uC73C\uB85C \uBAB0\uB824\uC628\uB2E4 \u2014 \uBB3C\uB7C9\uC73C\uB85C \uBC00\uC5B4\uBD99\uC778\uB2E4" },
+    siege: { name: "\uACF5\uC131", icon: "\u{1F3F0}", desc: "\uB290\uB9AC\uC9C0\uB9CC \uB2E8\uB2E8\uD55C \uADFC\uC811\xB7\uD22C\uCC99 \uBD80\uB300 \u2014 \uAC74\uBB3C\uC774 \uD45C\uC801\uC774\uB2E4" },
+    elite: { name: "\uC815\uC608\uC804", icon: "\u2B50", desc: "\uC218\uB294 \uC801\uC9C0\uB9CC \uC804\uBD80 \uAC15\uD654\uB41C \uC815\uC608\uB2E4" }
+  };
+  var SPECIAL_KEYS = Object.keys(SPECIAL_WAVES);
+  function specialWaveKind(w2) {
+    if (w2 < 3 || w2 % 5 === 0 || w2 % 3 !== 0) return null;
+    const occurrence = w2 / 3;
+    return SPECIAL_KEYS[(occurrence - 1) % SPECIAL_KEYS.length];
+  }
+  var BOSS_CYCLE = ["boss", "frostlord", "warden"];
+  function _specialComposition(w2, kind) {
+    const total = _standardTotal(w2);
+    if (kind === "rush") {
+      return [{ type: "runner", count: Math.max(6, Math.round(total * 1.15)) }];
+    }
+    if (kind === "siege") {
+      const otherType = w2 >= 5 ? "raider" : "grunt";
+      return [
+        { type: "brute", count: Math.max(2, Math.round(total * 0.55)) },
+        { type: otherType, count: Math.max(2, Math.round(total * 0.4)) }
+      ];
+    }
+    return [{ type: "grunt", count: Math.max(3, Math.round(total * 0.32)) }];
+  }
   function waveComposition(w2) {
-    const list = [];
-    list.push({ type: "grunt", count: 4 + Math.floor(w2 * 1.6) });
-    if (w2 >= 2) list.push({ type: "runner", count: 2 + Math.floor(w2 * 1.1) });
-    if (w2 >= 3) list.push({ type: "brute", count: Math.floor((w2 - 1) / 2) + 1 });
-    if (w2 >= 4) list.push({ type: "shooter", count: 1 + Math.floor((w2 - 2) / 2) });
-    if (w2 >= 5) list.push({ type: "raider", count: 1 + Math.floor((w2 - 3) / 3) });
+    const special = specialWaveKind(w2);
+    const list = special ? _specialComposition(w2, special) : (() => {
+      const l2 = [];
+      l2.push({ type: "grunt", count: 4 + Math.floor(w2 * 1.6) });
+      if (w2 >= 2) l2.push({ type: "runner", count: 2 + Math.floor(w2 * 1.1) });
+      if (w2 >= 3) l2.push({ type: "brute", count: Math.floor((w2 - 1) / 2) + 1 });
+      if (w2 >= 4) l2.push({ type: "shooter", count: 1 + Math.floor((w2 - 2) / 2) });
+      if (w2 >= 5) l2.push({ type: "raider", count: 1 + Math.floor((w2 - 3) / 3) });
+      if (w2 >= 6) l2.push({ type: "flyer", count: 1 + Math.floor((w2 - 4) / 2) });
+      return l2;
+    })();
     if (w2 % 5 === 0) {
-      const bossType = w2 / 5 % 2 === 0 ? "frostlord" : "boss";
+      const bossType = BOSS_CYCLE[(w2 / 5 - 1) % BOSS_CYCLE.length];
       list.push({ type: bossType, count: Math.floor(w2 / 5) });
     }
     return list;
+  }
+  var WEATHER = {
+    rain: { name: "\uBE44", icon: "\u{1F327}\uFE0F", desc: "\uB545\uC774 \uC816\uC5B4 \uC774\uB3D9\uC774 \uB454\uD574\uC9C4\uB2E4", playerSpeedMult: 0.88 },
+    fog: { name: "\uC548\uAC1C", icon: "\u{1F32B}\uFE0F", desc: "\uC2DC\uC57C\uAC00 \uC904\uACE0 \uD0C0\uC6CC \uC0AC\uAC70\uB9AC\uAC00 \uC9E7\uC544\uC9C4\uB2E4", towerRangeMult: 0.85 }
+  };
+  function weatherOf(w2) {
+    if (w2 < 2 || w2 % CFG.wave.nightEvery === 0) return null;
+    const r = mulberry32(w2 * 7919 + 13)();
+    if (r < 0.16) return "rain";
+    if (r < 0.3) return "fog";
+    return null;
   }
   var BIOME_KEYS = ["canyon", "plains", "normal"];
   function biomeOf(seed) {
@@ -10854,6 +11207,7 @@ button.corner.mute.off { opacity: 0.5; }
     cannon: new sd({ color: 5001568, roughness: 0.5, metalness: 0.5 }),
     poison: new sd({ color: 3526479, emissive: 1871706, emissiveIntensity: 0.7, roughness: 0.4 }),
     support: new sd({ color: 14061311, emissive: 6959264, emissiveIntensity: 0.8, roughness: 0.35 }),
+    snare: new sd({ color: 13215862, roughness: 0.8, metalness: 0.1 }),
     workbenchTop: new sd({ color: 12159565, roughness: 0.8 }),
     workbenchLeg: new sd({ color: 5979940, roughness: 0.9 }),
     workbenchTool: new sd({ color: 10137781, roughness: 0.5, metalness: 0.4 }),
@@ -10869,7 +11223,7 @@ button.corner.mute.off { opacity: 0.5; }
     buffRing: new es({ color: 14061311, transparent: true, opacity: 0.5, side: p })
   };
   var RANGE_RING_GEO = new qu(0.96, 1, 40);
-  var PROJECTILE_COLOR = { arrow: 16769162, frost: 8382719, cannon: 16751178, poison: 3526479 };
+  var PROJECTILE_COLOR = { arrow: 16769162, frost: 8382719, cannon: 16751178, poison: 3526479, snare: 13215862 };
   var nextId = 1;
   function resetBuildingIds() {
     nextId = 1;
@@ -11103,6 +11457,12 @@ button.corner.mute.off { opacity: 0.5; }
       ringG.rotation.x = Math.PI / 2;
       ringG.position.y = -0.3;
       turret.add(ringG);
+    } else if (key === "snare") {
+      const ringA = new Xs(GEO2.supportRing, MAT2.snare);
+      ringA.rotation.x = Math.PI / 2;
+      const ringB = new Xs(GEO2.supportRing, MAT2.snare);
+      ringB.rotation.z = Math.PI / 2;
+      turret.add(ringA, ringB);
     } else {
       const head = new Xs(GEO2.headCannon, MAT2.cannon);
       head.castShadow = true;
@@ -11285,12 +11645,18 @@ button.corner.mute.off { opacity: 0.5; }
       b.refreshBar();
     }
     // 호스트에서만: 타워 조준/사격
-    updateTowers(dt2, enemies, now) {
+    updateTowers(dt2, enemies, now, rangeMult = 1) {
+      const silences = enemies.filter((e) => !e.dead && e.silenceUntil > now);
       for (const b of this.buildings.values()) {
         if (!b.isTower) continue;
         const st = b.stats;
         b.cooldown -= dt2;
-        const target = this._acquire(b, enemies, st.range);
+        b.silenced = silences.some((e) => dist(b.x, b.z, e.x, e.z) <= CFG.bossPattern.silenceRadius);
+        if (b.silenced) {
+          if (b.turret) b.turret.rotation.y += dt2 * 0.4;
+          continue;
+        }
+        const target = this._acquire(b, enemies, st.range * rangeMult);
         if (target && b.turret) {
           const ang = Math.atan2(target.x - b.x, target.z - b.z);
           b.turret.rotation.y = ang;
@@ -11459,6 +11825,7 @@ button.corner.mute.off { opacity: 0.5; }
   var _slowColor = new Kr(2781088);
   var _poisonColor = new Kr(3064149);
   var _regenColor = new Kr(3390720);
+  var _rootColor = new Kr(13215862);
   var _eliteTintColor = new Kr();
   function eliteColor(baseColor) {
     const v = CFG.elite;
@@ -11504,6 +11871,7 @@ button.corner.mute.off { opacity: 0.5; }
       this.attackCd = 0;
       this.slowUntil = 0;
       this.slowFactor = 1;
+      this.rootUntil = 0;
       this.poisonDps = 0;
       this.poisonUntil = 0;
       this.poisonTickCd = 0;
@@ -11526,6 +11894,7 @@ button.corner.mute.off { opacity: 0.5; }
         this.chargeUntil = 0;
         this.chargeCd = CFG.bossPattern.chargeCd * 0.6;
         this.chargeDir = { x: 0, z: 0 };
+        this.silenceUntil = 0;
       }
     }
     get isCasting() {
@@ -11585,6 +11954,15 @@ button.corner.mute.off { opacity: 0.5; }
       this.slowUntil = Math.max(this.slowUntil, now + duration);
       if (this.bodyMat) {
         this.bodyMat.emissive?.setHex(2781088);
+        this.bodyMat.emissiveIntensity = 0.6;
+      }
+    }
+    // 덫탑 전용 — 둔화(비율 감소)와 달리 이동 속도를 완전히 0으로 묶는다. 슬로우와는 별개 상태라
+    // 둘 다 걸려도 root 가 우선한다(simulate() 의 speed 계산에서 처리)
+    applyRoot(duration, now) {
+      this.rootUntil = Math.max(this.rootUntil, now + duration);
+      if (this.bodyMat) {
+        this.bodyMat.emissive?.setHex(13215862);
         this.bodyMat.emissiveIntensity = 0.6;
       }
     }
@@ -11748,7 +12126,8 @@ button.corner.mute.off { opacity: 0.5; }
           }
         }
         const dashMult = e.variant === "dash" && now < e.dashUntil ? CFG.variants.dash.speedMult : 1;
-        const speed = e.st.speed * e.slowFactor * dashMult * (e.isCharging ? CFG.bossPattern.chargeSpeed / e.st.speed : 1);
+        const rootMult = now < e.rootUntil ? 0 : 1;
+        const speed = e.st.speed * e.slowFactor * dashMult * rootMult * (e.isCharging ? CFG.bossPattern.chargeSpeed / e.st.speed : 1);
         e.attackCd -= dt2;
         const dc2 = Math.hypot(e.x, e.z);
         const atkRange = e.st.ranged ? e.st.atkRange : CFG.crystal.hitRange;
@@ -11769,6 +12148,19 @@ button.corner.mute.off { opacity: 0.5; }
             this.onPlayerHit?.(e, p2);
           }
           this._face(e, p2.x, p2.z, dt2);
+          this._applyPosition(e, dt2, now);
+          continue;
+        }
+        if (e.st.flies) {
+          const dx2 = -e.x, dz2 = -e.z;
+          const len2 = Math.hypot(dx2, dz2) || 1;
+          let mx2 = dx2 / len2 * speed, mz2 = dz2 / len2 * speed;
+          const sep2 = this._separation(e);
+          mx2 += sep2.x * speed * 0.6;
+          mz2 += sep2.z * speed * 0.6;
+          e.x += mx2 * dt2;
+          e.z += mz2 * dt2;
+          this._face(e, e.x + mx2, e.z + mz2, dt2);
           this._applyPosition(e, dt2, now);
           continue;
         }
@@ -11841,6 +12233,7 @@ button.corner.mute.off { opacity: 0.5; }
         const kind = e.castKind;
         e.castKind = null;
         if (kind === "summon") this._bossSummon(e);
+        else if (kind === "silence") this._bossSilence(e);
         else this._bossBeginCharge(e);
         return true;
       }
@@ -11856,10 +12249,11 @@ button.corner.mute.off { opacity: 0.5; }
       const ratio = e.hp / e.maxHp;
       if (e.summonsDone < P2.summonAt.length && ratio <= P2.summonAt[e.summonsDone]) {
         e.summonsDone++;
-        e.castKind = "summon";
-        e.castUntil = P2.summonCast;
-        this.fx.ring(e.x, e.z, 16733525, 5);
-        this.onBossTelegraph?.(e, "summon");
+        const silence = !!e.st.silenceBoss;
+        e.castKind = silence ? "silence" : "summon";
+        e.castUntil = silence ? P2.silenceCast : P2.summonCast;
+        this.fx.ring(e.x, e.z, silence ? 8011711 : 16733525, 5);
+        this.onBossTelegraph?.(e, silence ? "silence" : "summon");
         return true;
       }
       e.chargeCd -= dt2;
@@ -11882,6 +12276,14 @@ button.corner.mute.off { opacity: 0.5; }
       }
       this.fx.ring(e.x, e.z, 16733525, 7);
       this.onBossSummon?.(e, P2.summonCount);
+    }
+    // 침묵의 군주 전용 — 자기 발밑에 타워를 멈추는 장판을 깐다 (실제 무력화 판정은 buildings.js 의
+    // updateTowers 가 e.silenceUntil 을 직접 읽어서 한다)
+    _bossSilence(e) {
+      const P2 = CFG.bossPattern;
+      e.silenceUntil = performance.now() / 1e3 + P2.silenceTime;
+      this.fx.ring(e.x, e.z, 8011711, P2.silenceRadius);
+      this.onBossTelegraph?.(e, "silenceGo");
     }
     _bossBeginCharge(e) {
       const P2 = CFG.bossPattern;
@@ -11946,7 +12348,7 @@ button.corner.mute.off { opacity: 0.5; }
     }
     _applyPosition(e, dt2, now) {
       this._settle(e, dt2);
-      e.mesh.position.set(e.x + e._kox, 0, e.z + e._koz);
+      e.mesh.position.set(e.x + e._kox, e.st.flies ? CFG.flyHeight : 0, e.z + e._koz);
       e._bob += dt2 * (6 + e.st.speed);
       if (e.instanced) this._writeInstance(e, now);
       else e.body.position.y = 0.75 + Math.abs(Math.sin(e._bob)) * 0.12;
@@ -11977,6 +12379,7 @@ button.corner.mute.off { opacity: 0.5; }
       this.bodyInst.instanceMatrix.needsUpdate = true;
       let color;
       if (e._flash > 0) color = _flashColor;
+      else if (now !== void 0 && now < e.rootUntil) color = _tmpColor.set(e.tintColor).lerp(_rootColor, 0.7);
       else if (now !== void 0 && now < e.poisonUntil) color = _tmpColor.set(e.tintColor).lerp(_poisonColor, 0.6);
       else if (now !== void 0 && now < e.slowUntil) color = _tmpColor.set(e.tintColor).lerp(_slowColor, 0.6);
       else if (now !== void 0 && this._isRegenActive(e, now)) color = _tmpColor.set(e.tintColor).lerp(_regenColor, 0.55);
@@ -12039,12 +12442,16 @@ button.corner.mute.off { opacity: 0.5; }
         e.hp = hp;
         e.refreshBar();
         if (boss !== e._netBoss) {
+          const prevBoss = e._netBoss;
           e._netBoss = boss;
           if (boss === 1) {
             this.fx.ring(x2, z2, 16755302, 5);
             this.onBossTelegraph?.(e, "netCast");
           } else if (boss === 2) {
             this.onBossTelegraph?.(e, "netCharge");
+          } else if (boss === 0 && prevBoss === 1 && e.st.silenceBoss) {
+            e.silenceUntil = performance.now() / 1e3 + CFG.bossPattern.silenceTime;
+            this.fx.ring(x2, z2, 8011711, CFG.bossPattern.silenceRadius);
           }
         }
       }
@@ -13061,7 +13468,8 @@ button.corner.mute.off { opacity: 0.5; }
         if (moving) {
           this.cancelHarvest();
           const sprint = input.down("shift");
-          const spd = sprint ? CFG.player.sprint : CFG.player.speed;
+          const weatherMult = world.weatherKind === "rain" ? WEATHER.rain.playerSpeedMult : 1;
+          const spd = (sprint ? CFG.player.sprint : CFG.player.speed) * weatherMult;
           const len = Math.hypot(mx, mz);
           mx /= len;
           mz /= len;
@@ -13256,9 +13664,40 @@ button.corner.mute.off { opacity: 0.5; }
       this._night = 0;
       this._nightTarget = 0;
       this.crystalNightMult = 1;
+      this._weatherVal = {
+        rain: { fogNear: 46, fogFar: 100, tint: 5928568 },
+        fog: { fogNear: 22, fogFar: 52, tint: 13291480 }
+      };
+      this._weatherC1 = new Kr();
+      this._weatherC2 = new Kr();
+      this._weather = 0;
+      this._weatherTarget = 0;
+      this._weatherKind = null;
     }
     setNightMode(active) {
       this._nightTarget = active ? 1 : 0;
+    }
+    // kind: "rain" | "fog" | null. null 이면 서서히 걷힌다(마지막 종류는 페이드아웃 동안 기억해 둔다).
+    setWeather(kind) {
+      if (kind) this._weatherKind = kind;
+      this._weatherTarget = kind ? 1 : 0;
+    }
+    resetWeather() {
+      this._weatherTarget = 0;
+      this._weather = 1;
+      this.updateWeather(10);
+    }
+    updateWeather(dt2) {
+      if (this._weather === this._weatherTarget) return;
+      this._weather += (this._weatherTarget - this._weather) * Math.min(1, dt2 * 1.1);
+      if (Math.abs(this._weather - this._weatherTarget) < 1e-3) this._weather = this._weatherTarget;
+      const t2 = this._weather;
+      const d2 = this._day, w2 = this._weatherVal[this._weatherKind || "rain"];
+      const bg = this._weatherC1.copy(this._weatherC1.set(d2.bg)).lerp(this._weatherC2.set(w2.tint), t2);
+      this.scene.background.copy(bg);
+      this.scene.fog.color.copy(bg);
+      this.scene.fog.near = d2.fogNear + (w2.fogNear - d2.fogNear) * t2;
+      this.scene.fog.far = d2.fogFar + (w2.fogFar - d2.fogFar) * t2;
     }
     // 새 판을 시작할 때 이전 판이 밤 웨이브 중이었어도 즉시 낮으로 되돌린다.
     // updateNight() 는 _night === _nightTarget 이면 아무 것도 다시 계산하지 않고 즉시 반환하므로,
@@ -13410,6 +13849,8 @@ button.corner.mute.off { opacity: 0.5; }
       this.spawnedThisWave = 0;
       this.totalThisWave = 0;
       this.endless = false;
+      this._specialKind = null;
+      this._siegePortal = null;
     }
     get displayWave() {
       return Math.min(CFG.wave.goal, this.wave + 1);
@@ -13433,6 +13874,8 @@ button.corner.mute.off { opacity: 0.5; }
       this.spawnedThisWave = 0;
       this.spawnTimer = 0.4;
       this._eliteSpawnedThisWave = false;
+      this._specialKind = specialWaveKind(w2);
+      this._siegePortal = this._specialKind === "siege" ? pick(this.world.portals) : null;
       this.onWaveStart?.(w2, this.totalThisWave);
       return true;
     }
@@ -13448,11 +13891,12 @@ button.corner.mute.off { opacity: 0.5; }
         if (this.spawnTimer <= 0) {
           this.spawnTimer = CFG.wave.spawnGap * (this.queue.length > 20 ? 0.6 : 1);
           const type = this.queue.shift();
-          const portal = pick(this.world.portals);
-          const jitter = 3;
+          const portal = this._siegePortal || pick(this.world.portals);
+          const jitter = this._siegePortal ? 1.6 : 3;
           const isBossType = !!CFG.enemies[type]?.boss;
           let variant = null, statMult = void 0;
-          if (!isBossType && !this._eliteSpawnedThisWave && rollElite(this.wave + 1)) {
+          const forceElite = !isBossType && this._specialKind === "elite";
+          if (!isBossType && (forceElite || !this._eliteSpawnedThisWave && rollElite(this.wave + 1))) {
             this._eliteSpawnedThisWave = true;
             const ec = CFG.elite;
             statMult = { hp: ec.hpMult, scale: ec.scaleMult, dmg: ec.dmgMult, bounty: ec.bountyMult, elite: true };
@@ -13542,7 +13986,8 @@ button.corner.mute.off { opacity: 0.5; }
     gemStump: new su(0.3, 0.36, 0.16, 6),
     crate: new qs(0.95, 0.85, 0.95),
     dropRing: new qu(1.05, 1.3, 28),
-    dropBeam: new su(0.07, 0.07, 6, 6)
+    dropBeam: new su(0.07, 0.07, 6, 6),
+    meteorRing: new qu(0.92, 1, 48)
   };
   var MAT = {
     trunk: new sd({ color: 5979428, roughness: 0.95 }),
@@ -13572,7 +14017,8 @@ button.corner.mute.off { opacity: 0.5; }
     }),
     gemStump: new sd({ color: 5915496, roughness: 0.8 }),
     crate: new sd({ color: 9127211, roughness: 0.85 }),
-    dropGlow: new es({ color: 16759043, transparent: true, opacity: 0.55, side: p, depthWrite: false })
+    dropGlow: new es({ color: 16759043, transparent: true, opacity: 0.55, side: p, depthWrite: false }),
+    meteorWarn: new es({ color: 16729139, transparent: true, opacity: 0.6, side: p, depthWrite: false })
   };
   var World = class {
     constructor(sceneMgr, seed = 1) {
@@ -13585,8 +14031,10 @@ button.corner.mute.off { opacity: 0.5; }
       this.portals = [];
       this.drops = [];
       this.biome = biomeOf(seed);
-      this.crystal = { hp: CFG.crystal.hp, maxHp: CFG.crystal.hp, shieldUntil: 0 };
+      this.crystal = { hp: CFG.crystal.hp, maxHp: CFG.crystal.hp, shieldUntil: 0, armorLv: 0, regenLv: 0, auraLv: 0, _regenAccum: 0, _auraTimer: 0 };
+      this.meteor = null;
       this._build();
+      this._buildMeteorRing();
     }
     dispose() {
       this.sm.scene.remove(this.root);
@@ -13827,6 +14275,34 @@ button.corner.mute.off { opacity: 0.5; }
         }
       }
     }
+    // --- 운석 낙하 경고 ---
+    // 낙하 시점의 실제 피해는 game.js 가 계산한다(호스트 전용). World 는 경고 위치·잔여시간을
+    // 들고 순수하게 그려주기만 한다 — 참가자 화면도 스냅샷으로 받은 같은 값을 넣으면 똑같이 보인다.
+    _buildMeteorRing() {
+      const ring = new Xs(GEO.meteorRing, MAT.meteorWarn);
+      ring.rotation.x = -Math.PI / 2;
+      ring.visible = false;
+      this.scene.add(ring);
+      this.meteorRing = ring;
+    }
+    setMeteor(x2, z2, timeLeft, radius) {
+      this.meteor = { x: x2, z: z2, timeLeft, radius };
+    }
+    clearMeteor() {
+      this.meteor = null;
+      if (this.meteorRing) this.meteorRing.visible = false;
+    }
+    updateMeteorVisual(now) {
+      if (!this.meteor) {
+        if (this.meteorRing) this.meteorRing.visible = false;
+        return;
+      }
+      const r = this.meteorRing;
+      r.visible = true;
+      r.position.set(this.meteor.x, 0.06, this.meteor.z);
+      r.scale.setScalar(this.meteor.radius);
+      r.material.opacity = 0.3 + Math.abs(Math.sin(now * 7)) * 0.45;
+    }
     // --- 보급품 투하 ---
     spawnDrop(id, x2, z2) {
       const g2 = new Wl();
@@ -13925,6 +14401,7 @@ button.corner.mute.off { opacity: 0.5; }
       }
       this.updateNodes(now);
       this.updateDrops(dt2, now);
+      this.updateMeteorVisual(now);
     }
   };
 
@@ -13992,15 +14469,21 @@ button.corner.mute.off { opacity: 0.5; }
       this._bossActive = false;
       this._bossWaveDamaged = false;
       this.sm.resetNight();
+      this.sm.resetWeather();
+      this.world.weatherKind = null;
       this._seenVariant = false;
       this._seenSynergy = false;
+      this._seenRootSynergy = false;
       this._seenTrap = false;
       this._seenDash = false;
       this._seenBomb = false;
-      this.boonMult = { atk: 1, towerDmg: 1, skillCostDelta: 0, bounty: 1 };
+      this.boonMult = { atk: 1, towerDmg: 1, skillCostDelta: 0, bounty: 1, crystalUpgradeCostDelta: 0 };
       this.pendingBoon = null;
       this._dropTimer = CFG.supplyDrop.firstDelay;
       this._dropIdSeq = 1;
+      this._meteorTimer = CFG.meteor.firstDelay;
+      this._meteorPending = null;
+      this.world.clearMeteor();
       this.buildMode = null;
       this.paused = false;
       this.running = true;
@@ -14010,6 +14493,7 @@ button.corner.mute.off { opacity: 0.5; }
     }
     dispose() {
       if (!this.grid) return;
+      this.sfx.music.stop();
       this.buildMgr?.clearAll();
       this.enemyMgr?.clearAll();
       for (const p2 of this.players.values()) this.sm.scene.remove(p2.mesh);
@@ -14052,22 +14536,39 @@ button.corner.mute.off { opacity: 0.5; }
         const now = performance.now() / 1e3;
         const frostSynergy = b.key === "arrow" && this.buildMgr.hasNearbyFrost(b);
         for (const e of targets) {
+          const wasRooted = b.key !== "snare" && now < e.rootUntil;
           if (st.slow) e.applySlow(st.slow, st.slowTime, now);
           if (st.poisonDps) e.applyPoison(st.poisonDps, st.poisonTime, now);
-          const base = frostSynergy && now < e.slowUntil ? st.dmg * (1 + CFG.synergy.frostArrow.dmgMult) : st.dmg;
+          if (st.root) e.applyRoot(st.root, now);
+          let base = st.dmg;
+          if (frostSynergy && now < e.slowUntil) base *= 1 + CFG.synergy.frostArrow.dmgMult;
+          if (wasRooted) {
+            base *= 1 + CFG.synergy.rootSnare.dmgMult;
+            if (!this._seenRootSynergy) {
+              this._seenRootSynergy = true;
+              this.ui?.toast("\u{1F578}\uFE0F\u2694\uFE0F \uC2DC\uB108\uC9C0 \uBC1C\uB3D9! \uB36B\uD0D1\uC5D0 \uBB36\uC778 \uC801\uC744 \uB2E4\uB978 \uD0C0\uC6CC\uAC00 \uB9DE\uCD94\uBA74 \uCD94\uAC00 \uD53C\uD574", "good");
+            }
+          }
           this._hurtEnemy(e, Math.round(base * this.boonMult.towerDmg), b.key === "frost" ? "frost" : "tower", b.x, b.z);
         }
         this.sfx.towerHit(b.key);
       };
       this.enemyMgr.onBossTelegraph = (e, kind) => {
+        const nm = `${CFG.enemies[e.type]?.icon || "\u{1F480}"} ${CFG.enemies[e.type]?.name || "\uBCF4\uC2A4"}`;
         if (kind === "summon") {
-          this.ui?.toast("\u{1F480} \uD30C\uAD34\uC790\uAC00 \uBB34\uC5B8\uAC00\uB97C \uBD80\uB978\uB2E4!", "warn");
+          this.ui?.toast(`${nm}\uAC00 \uBB34\uC5B8\uAC00\uB97C \uBD80\uB978\uB2E4!`, "warn");
           this.sfx.bossWaveStart();
+        } else if (kind === "silence") {
+          this.ui?.toast(`${nm}\uAC00 \uBC1C\uBC11\uC5D0 \uCE68\uBB35 \uC7A5\uD310\uC744 \uC900\uBE44\uD55C\uB2E4 \u2014 \uD0C0\uC6CC\uAC00 \uBA48\uCD9C \uAC83\uC774\uB2E4!`, "warn");
+          this.sfx.bossWaveStart();
+        } else if (kind === "silenceGo") {
+          this.ui?.toast(`\u{1F507} \uCE68\uBB35 \uC7A5\uD310 \uBC1C\uB3D9! \uBC18\uACBD \uC548\uC758 \uD0C0\uC6CC\uAC00 \uBA48\uCDC4\uB2E4 \u2014 \uC9C1\uC811 \uB9C9\uC544\uB77C`, "bad");
+          this.fx.ring(e.x, e.z, 8011711, CFG.bossPattern.silenceRadius);
         } else if (kind === "charge") {
-          this.ui?.toast("\u{1F480} \uD30C\uAD34\uC790\uAC00 \uB3CC\uC9C4 \uC790\uC138\uB97C \uC7A1\uB294\uB2E4 \u2014 \uAE38\uC744 \uBE44\uCF1C\uB77C!", "warn");
+          this.ui?.toast(`${nm}\uAC00 \uB3CC\uC9C4 \uC790\uC138\uB97C \uC7A1\uB294\uB2E4 \u2014 \uAE38\uC744 \uBE44\uCF1C\uB77C!`, "warn");
           this.sfx.bossWaveStart();
         } else if (kind === "netCast") {
-          this.ui?.toast("\u{1F480} \uD30C\uAD34\uC790\uAC00 \uBB34\uC5B8\uAC00\uB97C \uC900\uBE44\uD55C\uB2E4 \u2014 \uC870\uC2EC!", "warn");
+          this.ui?.toast(`${nm}\uAC00 \uBB34\uC5B8\uAC00\uB97C \uC900\uBE44\uD55C\uB2E4 \u2014 \uC870\uC2EC!`, "warn");
           this.sfx.bossWaveStart();
         } else {
           this.ui?.shake();
@@ -14103,7 +14604,9 @@ button.corner.mute.off { opacity: 0.5; }
       };
       this.enemyMgr.onSpawn = (e) => {
         if (e.elite) {
-          this.ui?.toast(`\u2B50 \uC815\uC608 ${CFG.enemies[e.type].name} \uB4F1\uC7A5! \uCCB4\uB825\xB7\uACF5\uACA9\uB825\uC774 \uD6E8\uC52C \uC138\uC9C0\uB9CC \uCC98\uCE58 \uBCF4\uC0C1\uC740 3\uBC30\uB2E4`, "warn");
+          if (specialWaveKind(this.wave.wave + 1) !== "elite") {
+            this.ui?.toast(`\u2B50 \uC815\uC608 ${CFG.enemies[e.type].name} \uB4F1\uC7A5! \uCCB4\uB825\xB7\uACF5\uACA9\uB825\uC774 \uD6E8\uC52C \uC138\uC9C0\uB9CC \uCC98\uCE58 \uBCF4\uC0C1\uC740 3\uBC30\uB2E4`, "warn");
+          }
           return;
         }
         if (!e.variant || this._seenVariant) return;
@@ -14149,10 +14652,8 @@ button.corner.mute.off { opacity: 0.5; }
         else this.net.send("hurt", { to: p2.id, dmg: e.st.dmg });
       };
       this.wave.onWaveStart = (w2, total) => {
+        this.ui?.toast(this._waveStartLabel(w2, total), "warn");
         const bossEntry = waveComposition(w2).find((c2) => CFG.enemies[c2.type]?.boss);
-        const isNight = w2 % CFG.wave.nightEvery === 0;
-        const label = bossEntry ? `\u26A0\uFE0F \uC6E8\uC774\uBE0C ${w2} \uC2DC\uC791! \uBCF4\uC2A4 \uB4F1\uC7A5! ${CFG.enemies[bossEntry.type].icon} ${CFG.enemies[bossEntry.type].name} \u2014 \uBAAC\uC2A4\uD130 ${total}\uB9C8\uB9AC` : `\uC6E8\uC774\uBE0C ${w2} \uC2DC\uC791! \uBAAC\uC2A4\uD130 ${total}\uB9C8\uB9AC`;
-        this.ui?.toast(isNight ? `\u{1F319} ${label} \u2014 \uBC24\uC774\uB77C \uC2DC\uC57C\uAC00 \uC881\uB2E4` : label, "warn");
         this.fx.ring(0, 0, 16734834, 10);
         if (bossEntry) this.sfx.bossWaveStart();
         else this.sfx.waveStart();
@@ -14226,7 +14727,7 @@ button.corner.mute.off { opacity: 0.5; }
         if (!b.isTrap) continue;
         const st = b.stats;
         for (const e of this.enemyMgr.list) {
-          if (e.dead) continue;
+          if (e.dead || e.st.flies) continue;
           if (dist(b.x, b.z, e.x, e.z) <= st.triggerRadius) {
             this._triggerTrap(b, e, st);
             break;
@@ -14246,6 +14747,52 @@ button.corner.mute.off { opacity: 0.5; }
       if (!this._seenTrap) {
         this._seenTrap = true;
         this.ui?.toast("\u{1FAA4} \uD568\uC815 \uBC1C\uB3D9! \uD070 \uD53C\uD574\uB97C \uC8FC\uACE0 \uC0AC\uB77C\uC84C\uB2E4 \u2014 \uB2E4\uC2DC \uC124\uCE58\uD574\uC57C \uD55C\uB2E4", "good");
+      }
+    }
+    // 운석 낙하: 전투 중(4웨이브부터) 가끔 경고 후 큰 범위 피해가 떨어진다 (호스트 전용 — 위치·잔여
+    // 시간은 스냅샷으로 퍼지고, 참가자 화면은 world.setMeteor() 로 같은 경고 링을 그린다)
+    _updateMeteor(dt2) {
+      const c2 = CFG.meteor;
+      if (this.wave.phase !== PHASE.COMBAT || this.wave.wave + 1 < c2.minWave) return;
+      if (this._meteorPending) {
+        this._meteorPending.timeLeft -= dt2;
+        this.world.setMeteor(this._meteorPending.x, this._meteorPending.z, this._meteorPending.timeLeft, c2.radius);
+        if (this._meteorPending.timeLeft <= 0) this._impactMeteor();
+        return;
+      }
+      this._meteorTimer -= dt2;
+      if (this._meteorTimer > 0) return;
+      this._meteorTimer = c2.minGap + Math.random() * (c2.maxGap - c2.minGap);
+      const inner = CFG.world.coreRadius + 3, outer = CFG.world.buildRadius - 2;
+      const a = Math.random() * Math.PI * 2, r = inner + Math.random() * (outer - inner);
+      this._meteorPending = { x: Math.cos(a) * r, z: Math.sin(a) * r, timeLeft: c2.telegraphTime };
+      this.world.setMeteor(this._meteorPending.x, this._meteorPending.z, c2.telegraphTime, c2.radius);
+      this.ui?.toast("\u2604\uFE0F \uB099\uD558 \uACBD\uACE0! \uD45C\uC2DC\uB41C \uC790\uB9AC\uC5D0\uC11C \uBC97\uC5B4\uB098\uB77C \u2014 \uBAAC\uC2A4\uD130\uB97C \uB04C\uC5B4\uB4E4\uC774\uBA74 \uD55C \uBC29\uC5D0 \uC815\uB9AC\uD560 \uC218\uB3C4 \uC788\uB2E4", "warn");
+    }
+    _impactMeteor() {
+      const c2 = CFG.meteor;
+      const { x, z } = this._meteorPending;
+      this._meteorPending = null;
+      this.world.clearMeteor();
+      this.fx.burst(x, 1.5, z, 16729139, 26, 8);
+      this.fx.ring(x, z, 16729139, c2.radius);
+      this.ui?.shake();
+      this.sfx.bossDeath();
+      for (const e of this.enemyMgr.list) {
+        if (e.dead) continue;
+        if (dist(e.x, e.z, x, z) <= c2.radius) this._hurtEnemy(e, c2.dmg, "player", x, z);
+      }
+      for (const b of [...this.buildMgr.buildings.values()]) {
+        if (dist(b.x, b.z, x, z) <= c2.radius) {
+          const destroyed = b.damage(Math.round(c2.dmg * c2.buildingDmgMult));
+          if (destroyed) this.buildMgr.remove(b.id);
+        }
+      }
+      for (const p2 of this.players.values()) {
+        if (dist(p2.x, p2.z, x, z) <= c2.radius) {
+          if (p2.id === this.local.id) this._hurtLocal(c2.playerDmg);
+          else this.net.send("hurt", { to: p2.id, dmg: c2.playerDmg });
+        }
       }
     }
     // 보급품 투하: 전투 중 한 번에 최대 1개, 주기적으로 등장한다 (호스트 전용 — 결과는 스냅샷으로 퍼진다)
@@ -14324,6 +14871,9 @@ button.corner.mute.off { opacity: 0.5; }
           if (this.stats.bossKillsSeen.includes("boss") && this.stats.bossKillsSeen.includes("frostlord")) {
             this._unlockAchievement("bothBosses");
           }
+          if (["boss", "frostlord", "warden"].every((t2) => this.stats.bossKillsSeen.includes(t2))) {
+            this._unlockAchievement("allBosses");
+          }
         } else {
           this.sfx.enemyDeath();
         }
@@ -14381,6 +14931,7 @@ button.corner.mute.off { opacity: 0.5; }
       this.wave.phase = PHASE.WON;
       this.result = "win";
       this.sfx.win();
+      this.sfx.music.stop();
       if (this.difficulty === "hard") this._unlockAchievement("ironWill");
       if (!this.net.online) Game.clearLocalSave();
       this.ui?.showResult(true, this.stats, this.wave.wave);
@@ -14389,8 +14940,40 @@ button.corner.mute.off { opacity: 0.5; }
       this.wave.lose();
       this.result = "lose";
       this.sfx.lose();
+      this.sfx.music.stop();
       if (!this.net.online) Game.clearLocalSave();
       this.ui?.showResult(false, this.stats, this.wave.wave);
+    }
+    // 웨이브 시작 토스트 문구. 웨이브 번호만으로 계산되는 순수 함수들(waveComposition·
+    // specialWaveKind)만 쓰기 때문에 호스트든 참가자든 같은 값을 넣으면 항상 같은 문구가 나온다 —
+    // 참가자 화면(net.on("waveStarted"))에서도 별도 동기화 없이 그대로 재사용한다.
+    _waveStartLabel(w2, total) {
+      const bossEntry = waveComposition(w2).find((c2) => CFG.enemies[c2.type]?.boss);
+      let base;
+      if (bossEntry) base = `\u26A0\uFE0F \uC6E8\uC774\uBE0C ${w2} \uC2DC\uC791! \uBCF4\uC2A4 \uB4F1\uC7A5! ${CFG.enemies[bossEntry.type].icon} ${CFG.enemies[bossEntry.type].name} \u2014 \uBAAC\uC2A4\uD130 ${total}\uB9C8\uB9AC`;
+      else {
+        const kind = specialWaveKind(w2);
+        base = kind ? `${SPECIAL_WAVES[kind].icon} \uC6E8\uC774\uBE0C ${w2} \uC2DC\uC791! ${SPECIAL_WAVES[kind].name} \uC6E8\uC774\uBE0C \u2014 ${SPECIAL_WAVES[kind].desc} (\uBAAC\uC2A4\uD130 ${total}\uB9C8\uB9AC)` : `\uC6E8\uC774\uBE0C ${w2} \uC2DC\uC791! \uBAAC\uC2A4\uD130 ${total}\uB9C8\uB9AC`;
+      }
+      if (w2 % CFG.wave.nightEvery === 0) return `\u{1F319} ${base} \u2014 \uBC24\uC774\uB77C \uC2DC\uC57C\uAC00 \uC881\uB2E4`;
+      const weatherKind = weatherOf(w2);
+      if (weatherKind) return `${WEATHER[weatherKind].icon} ${base} \u2014 ${WEATHER[weatherKind].desc}`;
+      return base;
+    }
+    // 웨이브 단계마다 배경음악 페이즈를 맞춘다. wave.phase 는 호스트·참가자 모두
+    // 스냅샷으로 동기화되는 값이라 이 로직만으로 양쪽 화면이 독립적으로 올바르게 전환된다.
+    _updateMusicPhase() {
+      const ph2 = this.wave.phase;
+      if (ph2 === PHASE.PREP) {
+        this.sfx.music.start("prep");
+        return;
+      }
+      if (ph2 === PHASE.COMBAT) {
+        const isBoss = waveComposition(this.wave.wave + 1).some((c2) => CFG.enemies[c2.type]?.boss);
+        this.sfx.music.start(isBoss ? "boss" : "combat");
+        return;
+      }
+      this.sfx.music.stop();
     }
     // ---------------------------------------------------------------- 행동 (요청 → 호스트 처리)
     requestBuild(key, gx, gz) {
@@ -14790,6 +15373,60 @@ button.corner.mute.off { opacity: 0.5; }
       this.fx.ring(0, 0, 9109440, 8);
       this.fx.float(`+${Math.round(s2.healPct * 100)}%`, 0, 5, 0, "good");
     }
+    // 크리스탈 강화 트랙(armor/regen/aura) 다음 레벨의 정수 비용
+    _crystalUpgradeCost(kind) {
+      const def = CFG.crystalUpgrade[kind];
+      const lv = this.world.crystal[kind + "Lv"] || 0;
+      return { shard: Math.max(1, def.baseCost + def.costStep * lv + this.boonMult.crystalUpgradeCostDelta) };
+    }
+    requestCrystalUpgrade(kind) {
+      this.sfx.shard();
+      if (this.isHost) this.hostCrystalUpgrade(this.local.id, kind);
+      else this.net.send("crystalUpgrade", { kind });
+    }
+    hostCrystalUpgrade(playerId, kind) {
+      const def = CFG.crystalUpgrade[kind];
+      if (!def) return;
+      const c2 = this.world.crystal;
+      const lvKey = kind + "Lv";
+      if (c2[lvKey] >= CFG.crystalUpgrade.maxLv) {
+        this._notify(playerId, "\uC774\uBBF8 \uCD5C\uB300 \uB808\uBCA8\uC785\uB2C8\uB2E4", "bad");
+        return;
+      }
+      const cost = this._crystalUpgradeCost(kind);
+      const pool = this._poolOf(playerId);
+      if (!canAfford(pool, cost)) {
+        this._notify(playerId, "\uC218\uC815 \uC815\uC218\uAC00 \uBD80\uC871\uD569\uB2C8\uB2E4", "bad");
+        return;
+      }
+      payCost(pool, cost);
+      c2[lvKey]++;
+      if (kind === "armor") {
+        c2.maxHp += def.hpPerLv;
+        c2.hp += def.hpPerLv;
+      }
+      this.fx.ring(0, 0, 16763904, 6.5);
+      this.fx.float(`${def.icon} ${def.name} Lv.${c2[lvKey]}`, 0, 5, 0, "good");
+    }
+    // 재생·오라 강화 효과를 매 프레임 적용한다 (호스트만 계산, hp 변화는 스냅샷으로 참가자에게 전파됨)
+    _updateCrystalUpgrades(dt2) {
+      if (!this.isHost) return;
+      const c2 = this.world.crystal;
+      const u2 = CFG.crystalUpgrade;
+      if (c2.regenLv > 0 && c2.hp < c2.maxHp) {
+        this.world.healCrystal(c2.maxHp * u2.regen.pctPerLv * c2.regenLv * dt2);
+      }
+      if (c2.auraLv > 0) {
+        c2._auraTimer -= dt2;
+        if (c2._auraTimer <= 0) {
+          c2._auraTimer = u2.aura.tickTime;
+          const dmg = u2.aura.dmgPerLv * c2.auraLv;
+          const targets = this.enemyMgr.list.filter((e) => !e.dead && dist(e.x, e.z, 0, 0) <= u2.aura.radius);
+          for (const e of targets) this._hurtEnemy(e, dmg, "player", 0, 0);
+          if (targets.length) this.fx.ring(0, 0, 6739199, u2.aura.radius);
+        }
+      }
+    }
     requestSkillBlast() {
       this.sfx.shard();
       if (this.isHost) this.hostSkillBlast(this.local.id);
@@ -14877,6 +15514,30 @@ button.corner.mute.off { opacity: 0.5; }
       to2.wood += wood;
       to2.stone += stone;
       this._notify(toId, `\uC790\uC6D0\uC744 \uBC1B\uC558\uB2E4 \u{1FAB5}${wood} \u{1FAA8}${stone}`, "good");
+    }
+    // 협동 전용 — 만든 도구(칼·활·창·망치·폭탄가방)를 파티원에게 그대로 넘긴다.
+    // 자원과 달리 shared 여부와 무관하게 항상 개인 소유라 언제든 넘길 수 있다.
+    requestGiveWeapon(toId, key) {
+      this.sfx.click();
+      if (this.isHost) this.hostGiveWeapon(this.local.id, toId, key);
+      else this.net.send("giveWeapon", { to: toId, key });
+    }
+    hostGiveWeapon(fromId, toId, key) {
+      const from = this.players.get(fromId), to2 = this.players.get(toId);
+      if (!from || !to2 || !CFG.craft[key]) return;
+      if (!from.tools[key]) {
+        this._notify(fromId, "\uADF8 \uB3C4\uAD6C\uB97C \uAC16\uACE0 \uC788\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4", "bad");
+        return;
+      }
+      if (to2.tools[key]) {
+        this._notify(fromId, `${to2.name}\uC740(\uB294) \uC774\uBBF8 \uAC16\uACE0 \uC788\uC2B5\uB2C8\uB2E4`, "bad");
+        return;
+      }
+      from.tools[key] = false;
+      if (from.equipped === key) from.equipped = null;
+      to2.tools[key] = true;
+      const def = CFG.craft[key];
+      this._notify(toId, `${def.icon} ${def.name}\uC744(\uB97C) \uBC1B\uC558\uB2E4 \u2014 \uC778\uBCA4\uD1A0\uB9AC \uC7A5\uBE44 \uD0ED\uC5D0\uC11C \uC190\uC5D0 \uC958 \uC218 \uC788\uB2E4`, "good");
     }
     _notify(playerId, text, kind) {
       if (playerId === this.local.id) {
@@ -14978,6 +15639,9 @@ button.corner.mute.off { opacity: 0.5; }
       net.on("shard", (d2, from) => {
         if (this.isHost) this.hostShard(from);
       });
+      net.on("crystalUpgrade", (d2, from) => {
+        if (this.isHost) this.hostCrystalUpgrade(from, d2.kind);
+      });
       net.on("skillBlast", (d2, from) => {
         if (this.isHost) this.hostSkillBlast(from);
       });
@@ -14989,6 +15653,9 @@ button.corner.mute.off { opacity: 0.5; }
       });
       net.on("give", (d2, from) => {
         if (this.isHost) this.hostGive(from, d2.to, d2.wood, d2.stone);
+      });
+      net.on("giveWeapon", (d2, from) => {
+        if (this.isHost) this.hostGiveWeapon(from, d2.to, d2.key);
       });
       net.on("hurt", (d2) => {
         if (d2.to === net.selfId) this._hurtLocal(d2.dmg);
@@ -15018,7 +15685,9 @@ button.corner.mute.off { opacity: 0.5; }
       });
       net.on("waveStarted", () => {
         if (!this.isHost) {
-          this.ui?.toast("\uC6E8\uC774\uBE0C \uC2DC\uC791!", "warn");
+          const w2 = this.wave.wave + 1;
+          const total = waveComposition(w2).reduce((s2, c2) => s2 + c2.count, 0);
+          this.ui?.toast(this._waveStartLabel(w2, total), "warn");
           this.sfx.waveStart();
         }
       });
@@ -15050,6 +15719,10 @@ button.corner.mute.off { opacity: 0.5; }
         w: this.wave.snapshot(),
         c: Math.round(this.world.crystal.hp),
         cm: Math.round(this.world.crystal.maxHp),
+        ca: this.world.crystal.armorLv,
+        cr: this.world.crystal.regenLv,
+        cx: this.world.crystal.auraLv,
+        mt: this._meteorPending ? [Math.round(this._meteorPending.x * 10) / 10, Math.round(this._meteorPending.z * 10) / 10, Math.round(this._meteorPending.timeLeft * 10) / 10] : null,
         r: this.shared ? { team: this.pools.team } : { byId: this.pools.byId },
         p: players,
         sh: this.shared
@@ -15064,12 +15737,17 @@ button.corner.mute.off { opacity: 0.5; }
       this.wave.applySnapshot(s2.w);
       const prevHp = this.world.crystal.hp;
       if (s2.cm) this.world.crystal.maxHp = s2.cm;
+      if (s2.ca !== void 0) this.world.crystal.armorLv = s2.ca;
+      if (s2.cr !== void 0) this.world.crystal.regenLv = s2.cr;
+      if (s2.cx !== void 0) this.world.crystal.auraLv = s2.cx;
       this.world.crystal.hp = s2.c;
       if (s2.c < prevHp) {
         this.ui?.shake();
         this.fx.burst(0, 3.2, 0, 6545663, 8, 4);
         this.sfx.crystalHit();
       }
+      if (s2.mt) this.world.setMeteor(s2.mt[0], s2.mt[1], s2.mt[2], CFG.meteor.radius);
+      else this.world.clearMeteor();
       if (s2.r.team) this.pools.team = s2.r.team;
       if (s2.r.byId) this.pools.byId = s2.r.byId;
       for (const [id, pd2] of Object.entries(s2.p || {})) {
@@ -15118,6 +15796,8 @@ button.corner.mute.off { opacity: 0.5; }
         this.enemyMgr.simulate(dt2, now, [...this.players.values()], this.buildMgr);
         this._updateTraps();
         this._updateSupplyDrops(dt2);
+        this._updateMeteor(dt2);
+        this._updateCrystalUpgrades(dt2);
       } else {
         this.enemyMgr.interpolate(dt2);
       }
@@ -15130,9 +15810,15 @@ button.corner.mute.off { opacity: 0.5; }
           }
         }
       }
-      if (!over) this.buildMgr.updateTowers(dt2, this.enemyMgr.list, now);
+      const weatherKind = this.wave.phase === PHASE.COMBAT ? weatherOf(this.wave.wave + 1) : null;
+      this.world.weatherKind = weatherKind;
+      this.sm.setWeather(weatherKind);
+      this.sm.updateWeather(dt2);
+      const rangeMult = weatherKind === "fog" ? WEATHER.fog.towerRangeMult : 1;
+      if (!over) this.buildMgr.updateTowers(dt2, this.enemyMgr.list, now, rangeMult);
       this.sm.setNightMode(this.wave.phase === PHASE.COMBAT && (this.wave.wave + 1) % CFG.wave.nightEvery === 0);
       this.sm.updateNight(dt2);
+      this._updateMusicPhase();
       this.world.update(dt2, now);
       this.projectiles.update(dt2);
       this.fx.update(dt2);
@@ -15297,6 +15983,9 @@ button.corner.mute.off { opacity: 0.5; }
       this.world.applyNodeSnapshot(s2.n);
       this.wave.applySnapshot(s2.w);
       if (s2.cm) this.world.crystal.maxHp = s2.cm;
+      if (s2.ca !== void 0) this.world.crystal.armorLv = s2.ca;
+      if (s2.cr !== void 0) this.world.crystal.regenLv = s2.cr;
+      if (s2.cx !== void 0) this.world.crystal.auraLv = s2.cx;
       this.world.crystal.hp = s2.c;
       if (s2.r.team) this.pools.team = s2.r.team;
       if (s2.r.byId) this.pools.byId = s2.r.byId;
@@ -15379,6 +16068,8 @@ button.corner.mute.off { opacity: 0.5; }
         tutorialText: $2("tutorial-text"),
         achList: $2("ach-list"),
         achCount: $2("ach-count"),
+        historyList: $2("history-list"),
+        historyCount: $2("history-count"),
         boonOverlay: $2("boon-overlay"),
         boonChoices: $2("boon-choices")
       };
@@ -15388,6 +16079,7 @@ button.corner.mute.off { opacity: 0.5; }
       this._bindTouch();
       this._toastTimers = [];
       this.refreshAchievements();
+      this.refreshHistory();
     }
     // ------------------------------------------------------------- 인벤토리
     // 건설 · 제작 · 장비를 한 창에서 고른다. 예전 하단 단축키 바를 대체한다.
@@ -15500,6 +16192,25 @@ button.corner.mute.off { opacity: 0.5; }
           };
         });
       }
+      if (tab === "crystal") {
+        const c2 = g2.world.crystal;
+        const pool = g2.myPool;
+        return Object.entries(CFG.crystalUpgrade).filter(([key]) => key !== "maxLv").map(([key, def]) => {
+          const lv = c2[key + "Lv"] || 0;
+          const maxed = lv >= CFG.crystalUpgrade.maxLv;
+          const cost = g2._crystalUpgradeCost(key);
+          return {
+            key,
+            icon: def.icon,
+            name: `${def.name} Lv.${lv}/${CFG.crystalUpgrade.maxLv}`,
+            desc: def.desc,
+            cost: maxed ? null : cost,
+            state: maxed ? "owned" : canAfford(pool, cost) ? "" : "poor",
+            note: maxed ? "\uCD5C\uB300 \uB808\uBCA8" : null,
+            action: () => g2.requestCrystalUpgrade(key)
+          };
+        });
+      }
       const held = g2.local.heldWeapon;
       const rows = [{
         key: "none",
@@ -15532,7 +16243,8 @@ button.corner.mute.off { opacity: 0.5; }
         build: "\uC9C0\uC744 \uAC83\uC744 \uACE0\uB974\uBA74 \uBC30\uCE58 \uBAA8\uB4DC\uAC00 \uB41C\uB2E4. \uBCBD\xB7\uD0C0\uC6CC\uB294 \uC81C\uC791\uB300\uB97C \uBA3C\uC800 \uC9C0\uC5B4\uC57C \uC5F4\uB9B0\uB2E4.",
         craft: "\uC81C\uC791\uB300\uB97C \uC9C0\uC73C\uBA74 \uB3C4\uAD6C\uC640 \uBB34\uAE30\uB97C, \uD654\uB85C\uB97C \uC9C0\uC73C\uBA74 \uCCA0\uC744 \uB9CC\uB4E4 \uC218 \uC788\uB2E4.",
         skill: "\uC815\uC218(\u{1F4A0})\uB97C \uD68C\uBCF5 \uB300\uC2E0 \uC804\uD22C\uC5D0 \uC4F4\uB2E4. \uD68C\uBCF5\uACFC \uACBD\uC7C1\uD558\uB2C8 \uC0C1\uD669\uC5D0 \uB9DE\uAC8C \uACE0\uB97C \uAC83.",
-        gear: "\uC190\uC5D0 \uB4E4 \uAC83\uC744 \uACE0\uB978\uB2E4. \uB4E0 \uAC83\uC758 \uD6A8\uACFC\uB9CC \uC801\uC6A9\uB418\uACE0, \uC815\uC218\uC11D\uC740 \uACE1\uAD2D\uC774\uB97C \uC950\uC5B4\uC57C \uCE94\uB2E4."
+        gear: "\uC190\uC5D0 \uB4E4 \uAC83\uC744 \uACE0\uB978\uB2E4. \uB4E0 \uAC83\uC758 \uD6A8\uACFC\uB9CC \uC801\uC6A9\uB418\uACE0, \uC815\uC218\uC11D\uC740 \uACE1\uAD2D\uC774\uB97C \uC950\uC5B4\uC57C \uCE94\uB2E4.",
+        crystal: "\uC815\uC218(\u{1F4A0})\uB85C \uD06C\uB9AC\uC2A4\uD0C8 \uC790\uCCB4\uB97C \uC601\uAD6C\uD788 \uAC15\uD654\uD55C\uB2E4. \uAC01 \uD2B8\uB799 5\uB808\uBCA8\uAE4C\uC9C0, \uB808\uBCA8\uC774 \uC624\uB97C\uC218\uB85D \uBE44\uC6A9\uB3C4 \uC624\uB978\uB2E4."
       };
       this.el.invDesc.textContent = DESC[this._invTab];
       for (const t2 of this.el.invTabs.querySelectorAll(".inv-tab")) {
@@ -15604,6 +16316,7 @@ button.corner.mute.off { opacity: 0.5; }
       if (st.splash) parts.push(`\uBC94\uC704 <b>${st.splash}</b>`);
       if (st.slow) parts.push(`\uB454\uD654 <b>${Math.round(st.slow * 100)}%</b>`);
       if (st.poisonDps) parts.push(`\uB3C5 <b>${st.poisonDps}</b>/\uCD08`);
+      if (st.root) parts.push(`\uBB36\uAE30 <b>${st.root}</b>\uCD08`);
       if (st.buffMult) parts.push(`\uC8FC\uBCC0 \uD0C0\uC6CC \uACF5\uACA9\uB825 <b>+${Math.round(st.buffMult * 100)}%</b> (\uBC94\uC704 ${st.buffRadius})`);
       if (st.triggerRadius) parts.push(`\uAC10\uC9C0 \uBC18\uACBD <b>${st.triggerRadius}</b>`);
       if (st.singleUse) parts.push(`1\uD68C\uC6A9`);
@@ -15640,6 +16353,7 @@ button.corner.mute.off { opacity: 0.5; }
       diff("\uB454\uD654", cur.slow, next.slow);
       diff("\uBC94\uC704", cur.splash, next.splash);
       diff("\uB3C5 \uD53C\uD574", cur.poisonDps, next.poisonDps);
+      diff("\uBB36\uAE30", cur.root, next.root, "\uCD08");
       diff("\uBC84\uD504", cur.buffMult, next.buffMult);
       diff("\uBC84\uD504 \uBC94\uC704", cur.buffRadius, next.buffRadius);
       const ok = canAfford(g2.myPool, next.cost);
@@ -15919,6 +16633,19 @@ button.corner.mute.off { opacity: 0.5; }
       };
       slider.onchange = () => sfx.click();
       this._syncVolume = sync;
+      this._bindMusicVolume();
+    }
+    // 배경음악 전용 음량 슬라이더 — 효과음과 별도로 조절, 전체 음소거(M)는 둘 다에 적용된다
+    _bindMusicVolume() {
+      const music = this.game.sfx.music;
+      const slider = $2("in-music-volume"), pct = $2("music-vol-pct");
+      if (!slider) return;
+      slider.value = String(Math.round(music.volume * 100));
+      pct.textContent = `${Math.round(music.volume * 100)}%`;
+      slider.oninput = () => {
+        music.setVolume(slider.valueAsNumber / 100);
+        pct.textContent = `${slider.value}%`;
+      };
     }
     _bindTouch() {
       const isTouch = matchMedia("(pointer: coarse)").matches;
@@ -16074,6 +16801,7 @@ button.corner.mute.off { opacity: 0.5; }
         log.classList.add("hidden");
       }
       const rec = this._recordStats(win, stats, win ? CFG.wave.goal : wave);
+      this._recordHistory(win, stats, win ? CFG.wave.goal : wave);
       $2("result-record").innerHTML = `
 <li class="${rec.isNewBest ? "new-best" : ""}">\u{1F3C6} \uC5ED\uB300 \uCD5C\uACE0 \uC6E8\uC774\uBE0C <b>${rec.bestWave}</b>${rec.isNewBest ? " \u2014 \uC2E0\uAE30\uB85D!" : ""}</li>
 <li>\u2694\uFE0F \uB204\uC801 \uCC98\uCE58 <b>${rec.totalKills}</b></li>
@@ -16091,6 +16819,7 @@ button.corner.mute.off { opacity: 0.5; }
         achEl.classList.add("hidden");
       }
       this.refreshAchievements();
+      this.refreshHistory();
     }
     // 로비의 업적 목록을 채운다 — 전체 달성 현황을 항상 볼 수 있게
     refreshAchievements() {
@@ -16135,6 +16864,52 @@ button.corner.mute.off { opacity: 0.5; }
       rec.wins = (rec.wins || 0) + (win ? 1 : 0);
       localStorage.setItem("cd.record", JSON.stringify(rec));
       return { ...rec, isNewBest };
+    }
+    // 최근 10판의 웨이브·시간·처치·지형·난이도를 남긴다 — 나아진 걸 판마다 체감할 수 있게
+    _recordHistory(win, stats, finalWave) {
+      let hist;
+      try {
+        hist = JSON.parse(localStorage.getItem("cd.history") || "[]");
+      } catch {
+        hist = [];
+      }
+      if (!Array.isArray(hist)) hist = [];
+      hist.unshift({
+        ts: Date.now(),
+        win,
+        wave: finalWave,
+        time: stats.time,
+        kills: stats.kills,
+        biome: this.game.world?.biome || null,
+        difficulty: this.game.difficulty || "normal"
+      });
+      hist = hist.slice(0, 10);
+      localStorage.setItem("cd.history", JSON.stringify(hist));
+      return hist;
+    }
+    // 로비의 최근 전적 목록을 채운다
+    refreshHistory() {
+      const list = this.el.historyList;
+      if (!list) return;
+      let hist;
+      try {
+        hist = JSON.parse(localStorage.getItem("cd.history") || "[]");
+      } catch {
+        hist = [];
+      }
+      if (!Array.isArray(hist)) hist = [];
+      this.el.historyCount.textContent = hist.length ? `${hist.length}\uD310` : "";
+      if (!hist.length) {
+        list.innerHTML = `<li class="empty">\uC544\uC9C1 \uAE30\uB85D\uC774 \uC5C6\uB2E4 \u2014 \uCCAB \uD310\uC744 \uD50C\uB808\uC774\uD574 \uBCF4\uC790</li>`;
+        return;
+      }
+      list.innerHTML = hist.map((h2) => {
+        const biome2 = h2.biome && CFG.biomes[h2.biome] ? CFG.biomes[h2.biome] : null;
+        const diffName = DIFFICULTIES[h2.difficulty]?.label || h2.difficulty;
+        const left = `${h2.win ? "\u{1F3C6} \uC2B9\uB9AC" : "\u{1F4A5} \uD328\uBC30"} \xB7 \uC6E8\uC774\uBE0C ${h2.wave}`;
+        const right = `${fmtTime(h2.time)} \xB7 \uCC98\uCE58 ${h2.kills}${biome2 ? ` \xB7 ${biome2.icon}${biome2.name}` : ""} \xB7 ${diffName}`;
+        return `<li class="${h2.win ? "win" : ""}"><span class="h-left">${left}</span><span>${right}</span></li>`;
+      }).join("");
     }
     toast(text, kind = "") {
       const el2 = document.createElement("div");
@@ -16297,19 +17072,25 @@ button.corner.mute.off { opacity: 0.5; }
       this._previewWave = wave;
       const comp = waveComposition(wave);
       const hasBoss = comp.some((c2) => CFG.enemies[c2.type]?.boss);
-      this.el.wavePreview.innerHTML = comp.map(
+      const special = specialWaveKind(wave);
+      const specialTag = special ? `<span class="special-tag">${SPECIAL_WAVES[special].icon} ${SPECIAL_WAVES[special].name}</span>` : "";
+      this.el.wavePreview.innerHTML = specialTag + comp.map(
         (c2) => `<span class="${CFG.enemies[c2.type]?.boss ? "boss" : ""}">${CFG.enemies[c2.type].icon}<b>${c2.count}</b></span>`
       ).join("");
       this.el.wavePreview.classList.toggle("boss-wave", hasBoss);
+      this.el.wavePreview.classList.toggle("special-wave", !!special);
+      this.el.wavePreview.title = special ? SPECIAL_WAVES[special].desc : "";
       this.el.wavePreview.classList.remove("hidden");
     }
     _updateParty() {
       const g2 = this.game;
       const list = this.el.partyList;
       const ids = [...g2.players.keys()].join(",");
-      if (this._partyIds !== ids || this._partyShared !== g2.shared) {
+      const toolsSig = Object.keys(CFG.craft).filter((k2) => g2.local.tools[k2]).join(",");
+      if (this._partyIds !== ids || this._partyShared !== g2.shared || this._partyToolsSig !== toolsSig) {
         this._partyIds = ids;
         this._partyShared = g2.shared;
+        this._partyToolsSig = toolsSig;
         list.innerHTML = "";
         for (const p2 of g2.players.values()) {
           const li2 = document.createElement("li");
@@ -16330,6 +17111,18 @@ button.corner.mute.off { opacity: 0.5; }
             give2.textContent = "\u{1FAA8}10";
             give2.onclick = () => g2.requestGive(p2.id, 0, 10);
             li2.append(give, give2);
+          }
+          if (!p2.isLocal) {
+            for (const key of Object.keys(CFG.craft)) {
+              if (!g2.local.tools[key] || p2.tools?.[key]) continue;
+              const r = CFG.craft[key];
+              const giveW = document.createElement("button");
+              giveW.className = "give";
+              giveW.title = `${r.name} \uAC74\uB124\uC8FC\uAE30`;
+              giveW.textContent = r.icon;
+              giveW.onclick = () => g2.requestGiveWeapon(p2.id, key);
+              li2.append(giveW);
+            }
           }
           list.appendChild(li2);
         }

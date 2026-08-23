@@ -23,6 +23,7 @@ var _flashColor = new THREE.Color(16777215);
 var _slowColor = new THREE.Color(2781088);
 var _poisonColor = new THREE.Color(3064149);
 var _regenColor = new THREE.Color(3390720);
+var _rootColor = new THREE.Color(13215862);
 var _eliteTintColor = new THREE.Color();
 function eliteColor(baseColor) {
   const v = CFG.elite;
@@ -68,6 +69,7 @@ var Enemy = class {
     this.attackCd = 0;
     this.slowUntil = 0;
     this.slowFactor = 1;
+    this.rootUntil = 0;
     this.poisonDps = 0;
     this.poisonUntil = 0;
     this.poisonTickCd = 0;
@@ -90,6 +92,7 @@ var Enemy = class {
       this.chargeUntil = 0;
       this.chargeCd = CFG.bossPattern.chargeCd * 0.6;
       this.chargeDir = { x: 0, z: 0 };
+      this.silenceUntil = 0;
     }
   }
   get isCasting() {
@@ -149,6 +152,15 @@ var Enemy = class {
     this.slowUntil = Math.max(this.slowUntil, now + duration);
     if (this.bodyMat) {
       this.bodyMat.emissive?.setHex(2781088);
+      this.bodyMat.emissiveIntensity = 0.6;
+    }
+  }
+  // 덫탑 전용 — 둔화(비율 감소)와 달리 이동 속도를 완전히 0으로 묶는다. 슬로우와는 별개 상태라
+  // 둘 다 걸려도 root 가 우선한다(simulate() 의 speed 계산에서 처리)
+  applyRoot(duration, now) {
+    this.rootUntil = Math.max(this.rootUntil, now + duration);
+    if (this.bodyMat) {
+      this.bodyMat.emissive?.setHex(13215862);
       this.bodyMat.emissiveIntensity = 0.6;
     }
   }
@@ -312,7 +324,8 @@ export var EnemyManager = class {
         }
       }
       const dashMult = e.variant === "dash" && now < e.dashUntil ? CFG.variants.dash.speedMult : 1;
-      const speed = e.st.speed * e.slowFactor * dashMult * (e.isCharging ? CFG.bossPattern.chargeSpeed / e.st.speed : 1);
+      const rootMult = now < e.rootUntil ? 0 : 1;
+      const speed = e.st.speed * e.slowFactor * dashMult * rootMult * (e.isCharging ? CFG.bossPattern.chargeSpeed / e.st.speed : 1);
       e.attackCd -= dt2;
       const dc2 = Math.hypot(e.x, e.z);
       const atkRange = e.st.ranged ? e.st.atkRange : CFG.crystal.hitRange;
@@ -333,6 +346,19 @@ export var EnemyManager = class {
           this.onPlayerHit?.(e, p2);
         }
         this._face(e, p2.x, p2.z, dt2);
+        this._applyPosition(e, dt2, now);
+        continue;
+      }
+      if (e.st.flies) {
+        const dx2 = -e.x, dz2 = -e.z;
+        const len2 = Math.hypot(dx2, dz2) || 1;
+        let mx2 = dx2 / len2 * speed, mz2 = dz2 / len2 * speed;
+        const sep2 = this._separation(e);
+        mx2 += sep2.x * speed * 0.6;
+        mz2 += sep2.z * speed * 0.6;
+        e.x += mx2 * dt2;
+        e.z += mz2 * dt2;
+        this._face(e, e.x + mx2, e.z + mz2, dt2);
         this._applyPosition(e, dt2, now);
         continue;
       }
@@ -405,6 +431,7 @@ export var EnemyManager = class {
       const kind = e.castKind;
       e.castKind = null;
       if (kind === "summon") this._bossSummon(e);
+      else if (kind === "silence") this._bossSilence(e);
       else this._bossBeginCharge(e);
       return true;
     }
@@ -420,10 +447,11 @@ export var EnemyManager = class {
     const ratio = e.hp / e.maxHp;
     if (e.summonsDone < P2.summonAt.length && ratio <= P2.summonAt[e.summonsDone]) {
       e.summonsDone++;
-      e.castKind = "summon";
-      e.castUntil = P2.summonCast;
-      this.fx.ring(e.x, e.z, 16733525, 5);
-      this.onBossTelegraph?.(e, "summon");
+      const silence = !!e.st.silenceBoss;
+      e.castKind = silence ? "silence" : "summon";
+      e.castUntil = silence ? P2.silenceCast : P2.summonCast;
+      this.fx.ring(e.x, e.z, silence ? 8011711 : 16733525, 5);
+      this.onBossTelegraph?.(e, silence ? "silence" : "summon");
       return true;
     }
     e.chargeCd -= dt2;
@@ -446,6 +474,14 @@ export var EnemyManager = class {
     }
     this.fx.ring(e.x, e.z, 16733525, 7);
     this.onBossSummon?.(e, P2.summonCount);
+  }
+  // 침묵의 군주 전용 — 자기 발밑에 타워를 멈추는 장판을 깐다 (실제 무력화 판정은 buildings.js 의
+  // updateTowers 가 e.silenceUntil 을 직접 읽어서 한다)
+  _bossSilence(e) {
+    const P2 = CFG.bossPattern;
+    e.silenceUntil = performance.now() / 1e3 + P2.silenceTime;
+    this.fx.ring(e.x, e.z, 8011711, P2.silenceRadius);
+    this.onBossTelegraph?.(e, "silenceGo");
   }
   _bossBeginCharge(e) {
     const P2 = CFG.bossPattern;
@@ -510,7 +546,7 @@ export var EnemyManager = class {
   }
   _applyPosition(e, dt2, now) {
     this._settle(e, dt2);
-    e.mesh.position.set(e.x + e._kox, 0, e.z + e._koz);
+    e.mesh.position.set(e.x + e._kox, e.st.flies ? CFG.flyHeight : 0, e.z + e._koz);
     e._bob += dt2 * (6 + e.st.speed);
     if (e.instanced) this._writeInstance(e, now);
     else e.body.position.y = 0.75 + Math.abs(Math.sin(e._bob)) * 0.12;
@@ -541,6 +577,7 @@ export var EnemyManager = class {
     this.bodyInst.instanceMatrix.needsUpdate = true;
     let color;
     if (e._flash > 0) color = _flashColor;
+    else if (now !== void 0 && now < e.rootUntil) color = _tmpColor.set(e.tintColor).lerp(_rootColor, 0.7);
     else if (now !== void 0 && now < e.poisonUntil) color = _tmpColor.set(e.tintColor).lerp(_poisonColor, 0.6);
     else if (now !== void 0 && now < e.slowUntil) color = _tmpColor.set(e.tintColor).lerp(_slowColor, 0.6);
     else if (now !== void 0 && this._isRegenActive(e, now)) color = _tmpColor.set(e.tintColor).lerp(_regenColor, 0.55);
@@ -603,12 +640,16 @@ export var EnemyManager = class {
       e.hp = hp;
       e.refreshBar();
       if (boss !== e._netBoss) {
+        const prevBoss = e._netBoss;
         e._netBoss = boss;
         if (boss === 1) {
           this.fx.ring(x2, z2, 16755302, 5);
           this.onBossTelegraph?.(e, "netCast");
         } else if (boss === 2) {
           this.onBossTelegraph?.(e, "netCharge");
+        } else if (boss === 0 && prevBoss === 1 && e.st.silenceBoss) {
+          e.silenceUntil = performance.now() / 1e3 + CFG.bossPattern.silenceTime;
+          this.fx.ring(x2, z2, 8011711, CFG.bossPattern.silenceRadius);
         }
       }
     }

@@ -7,6 +7,7 @@ export var ACHIEVEMENTS = {
   skillUser: { name: "정수의 힘", icon: "💠", desc: "정수 액티브 스킬(폭발\xB7시간 왜곡\xB7방벽)을 처음 사용했다" },
   veteran: { name: "백전노장", icon: "🎖️", desc: "10판을 플레이했다" },
   bothBosses: { name: "쌍둥이 처치", icon: "⚔️", desc: "한 판에서 파괴자와 서리 군주를 둘 다 처치했다" },
+  allBosses: { name: "삼위일체", icon: "👑", desc: "한 판에서 파괴자\xB7서리 군주\xB7침묵의 군주를 전부 처치했다" },
   trapMaster: { name: "덫사냥꾼", icon: "🪤", desc: "한 판에서 함정을 3번 이상 발동시켰다" },
   ironWill: { name: "강철 의지", icon: "🔩", desc: "어려움 난이도로 10웨이브를 막아냈다" },
   eliteHunter: { name: "정예 사냥꾼", icon: "⭐", desc: "정예 몬스터를 5마리 처치했다" }

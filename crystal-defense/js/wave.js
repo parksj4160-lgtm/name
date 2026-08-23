@@ -1,4 +1,4 @@
-import { CFG, rollElite, rollVariant, waveComposition, waveReward } from './config.js';
+import { CFG, rollElite, rollVariant, specialWaveKind, waveComposition, waveReward } from './config.js';
 import { pick } from './utils.js';
 
 export var PHASE = { PREP: "prep", COMBAT: "combat", WON: "won", LOST: "lost" };
@@ -19,6 +19,8 @@ export var WaveDirector = class {
     this.spawnedThisWave = 0;
     this.totalThisWave = 0;
     this.endless = false;
+    this._specialKind = null;
+    this._siegePortal = null;
   }
   get displayWave() {
     return Math.min(CFG.wave.goal, this.wave + 1);
@@ -42,6 +44,8 @@ export var WaveDirector = class {
     this.spawnedThisWave = 0;
     this.spawnTimer = 0.4;
     this._eliteSpawnedThisWave = false;
+    this._specialKind = specialWaveKind(w2);
+    this._siegePortal = this._specialKind === "siege" ? pick(this.world.portals) : null;
     this.onWaveStart?.(w2, this.totalThisWave);
     return true;
   }
@@ -57,11 +61,12 @@ export var WaveDirector = class {
       if (this.spawnTimer <= 0) {
         this.spawnTimer = CFG.wave.spawnGap * (this.queue.length > 20 ? 0.6 : 1);
         const type = this.queue.shift();
-        const portal = pick(this.world.portals);
-        const jitter = 3;
+        const portal = this._siegePortal || pick(this.world.portals);
+        const jitter = this._siegePortal ? 1.6 : 3;
         const isBossType = !!CFG.enemies[type]?.boss;
         let variant = null, statMult = void 0;
-        if (!isBossType && !this._eliteSpawnedThisWave && rollElite(this.wave + 1)) {
+        const forceElite = !isBossType && this._specialKind === "elite";
+        if (!isBossType && (forceElite || !this._eliteSpawnedThisWave && rollElite(this.wave + 1))) {
           this._eliteSpawnedThisWave = true;
           const ec = CFG.elite;
           statMult = { hp: ec.hpMult, scale: ec.scaleMult, dmg: ec.dmgMult, bounty: ec.bountyMult, elite: true };

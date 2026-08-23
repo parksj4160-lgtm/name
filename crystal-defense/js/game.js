@@ -2,7 +2,7 @@ import * as THREE from '../vendor/three.module.js';
 import { ACHIEVEMENTS, unlock } from './achievements.js';
 import { SoundManager } from './audio.js';
 import { BuildManager } from './buildings.js';
-import { CFG, DIFFICULTIES, applyDifficulty, waveComposition, needsPickaxe } from './config.js';
+import { CFG, DIFFICULTIES, SPECIAL_WAVES, WEATHER, applyDifficulty, needsPickaxe, specialWaveKind, waveComposition, weatherOf } from './config.js';
 import { EnemyManager } from './enemy.js';
 import { Fx, ProjectilePool } from './fx.js';
 import { BuildGrid } from './grid.js';
@@ -78,15 +78,21 @@ export var Game = class {
     this._bossActive = false;
     this._bossWaveDamaged = false;
     this.sm.resetNight();
+    this.sm.resetWeather();
+    this.world.weatherKind = null;
     this._seenVariant = false;
     this._seenSynergy = false;
+    this._seenRootSynergy = false;
     this._seenTrap = false;
     this._seenDash = false;
     this._seenBomb = false;
-    this.boonMult = { atk: 1, towerDmg: 1, skillCostDelta: 0, bounty: 1 };
+    this.boonMult = { atk: 1, towerDmg: 1, skillCostDelta: 0, bounty: 1, crystalUpgradeCostDelta: 0 };
     this.pendingBoon = null;
     this._dropTimer = CFG.supplyDrop.firstDelay;
     this._dropIdSeq = 1;
+    this._meteorTimer = CFG.meteor.firstDelay;
+    this._meteorPending = null;
+    this.world.clearMeteor();
     this.buildMode = null;
     this.paused = false;
     this.running = true;
@@ -96,6 +102,7 @@ export var Game = class {
   }
   dispose() {
     if (!this.grid) return;
+    this.sfx.music.stop();
     this.buildMgr?.clearAll();
     this.enemyMgr?.clearAll();
     for (const p2 of this.players.values()) this.sm.scene.remove(p2.mesh);
@@ -138,22 +145,39 @@ export var Game = class {
       const now = performance.now() / 1e3;
       const frostSynergy = b.key === "arrow" && this.buildMgr.hasNearbyFrost(b);
       for (const e of targets) {
+        const wasRooted = b.key !== "snare" && now < e.rootUntil;
         if (st.slow) e.applySlow(st.slow, st.slowTime, now);
         if (st.poisonDps) e.applyPoison(st.poisonDps, st.poisonTime, now);
-        const base = frostSynergy && now < e.slowUntil ? st.dmg * (1 + CFG.synergy.frostArrow.dmgMult) : st.dmg;
+        if (st.root) e.applyRoot(st.root, now);
+        let base = st.dmg;
+        if (frostSynergy && now < e.slowUntil) base *= 1 + CFG.synergy.frostArrow.dmgMult;
+        if (wasRooted) {
+          base *= 1 + CFG.synergy.rootSnare.dmgMult;
+          if (!this._seenRootSynergy) {
+            this._seenRootSynergy = true;
+            this.ui?.toast("🕸️⚔️ 시너지 발동! 덫탑에 묶인 적을 다른 타워가 맞추면 추가 피해", "good");
+          }
+        }
         this._hurtEnemy(e, Math.round(base * this.boonMult.towerDmg), b.key === "frost" ? "frost" : "tower", b.x, b.z);
       }
       this.sfx.towerHit(b.key);
     };
     this.enemyMgr.onBossTelegraph = (e, kind) => {
+      const nm = `${CFG.enemies[e.type]?.icon || "💀"} ${CFG.enemies[e.type]?.name || "보스"}`;
       if (kind === "summon") {
-        this.ui?.toast("💀 파괴자가 무언가를 부른다!", "warn");
+        this.ui?.toast(`${nm}가 무언가를 부른다!`, "warn");
         this.sfx.bossWaveStart();
+      } else if (kind === "silence") {
+        this.ui?.toast(`${nm}가 발밑에 침묵 장판을 준비한다 — 타워가 멈출 것이다!`, "warn");
+        this.sfx.bossWaveStart();
+      } else if (kind === "silenceGo") {
+        this.ui?.toast(`🔇 침묵 장판 발동! 반경 안의 타워가 멈췄다 — 직접 막아라`, "bad");
+        this.fx.ring(e.x, e.z, 8011711, CFG.bossPattern.silenceRadius);
       } else if (kind === "charge") {
-        this.ui?.toast("💀 파괴자가 돌진 자세를 잡는다 — 길을 비켜라!", "warn");
+        this.ui?.toast(`${nm}가 돌진 자세를 잡는다 — 길을 비켜라!`, "warn");
         this.sfx.bossWaveStart();
       } else if (kind === "netCast") {
-        this.ui?.toast("💀 파괴자가 무언가를 준비한다 — 조심!", "warn");
+        this.ui?.toast(`${nm}가 무언가를 준비한다 — 조심!`, "warn");
         this.sfx.bossWaveStart();
       } else {
         this.ui?.shake();
@@ -189,7 +213,9 @@ export var Game = class {
     };
     this.enemyMgr.onSpawn = (e) => {
       if (e.elite) {
-        this.ui?.toast(`⭐ 정예 ${CFG.enemies[e.type].name} 등장! 체력\xB7공격력이 훨씬 세지만 처치 보상은 3배다`, "warn");
+        if (specialWaveKind(this.wave.wave + 1) !== "elite") {
+          this.ui?.toast(`⭐ 정예 ${CFG.enemies[e.type].name} 등장! 체력\xB7공격력이 훨씬 세지만 처치 보상은 3배다`, "warn");
+        }
         return;
       }
       if (!e.variant || this._seenVariant) return;
@@ -235,10 +261,8 @@ export var Game = class {
       else this.net.send("hurt", { to: p2.id, dmg: e.st.dmg });
     };
     this.wave.onWaveStart = (w2, total) => {
+      this.ui?.toast(this._waveStartLabel(w2, total), "warn");
       const bossEntry = waveComposition(w2).find((c2) => CFG.enemies[c2.type]?.boss);
-      const isNight = w2 % CFG.wave.nightEvery === 0;
-      const label = bossEntry ? `⚠️ 웨이브 ${w2} 시작! 보스 등장! ${CFG.enemies[bossEntry.type].icon} ${CFG.enemies[bossEntry.type].name} — 몬스터 ${total}마리` : `웨이브 ${w2} 시작! 몬스터 ${total}마리`;
-      this.ui?.toast(isNight ? `🌙 ${label} — 밤이라 시야가 좁다` : label, "warn");
       this.fx.ring(0, 0, 16734834, 10);
       if (bossEntry) this.sfx.bossWaveStart();
       else this.sfx.waveStart();
@@ -312,7 +336,7 @@ export var Game = class {
       if (!b.isTrap) continue;
       const st = b.stats;
       for (const e of this.enemyMgr.list) {
-        if (e.dead) continue;
+        if (e.dead || e.st.flies) continue;
         if (dist(b.x, b.z, e.x, e.z) <= st.triggerRadius) {
           this._triggerTrap(b, e, st);
           break;
@@ -332,6 +356,52 @@ export var Game = class {
     if (!this._seenTrap) {
       this._seenTrap = true;
       this.ui?.toast("🪤 함정 발동! 큰 피해를 주고 사라졌다 — 다시 설치해야 한다", "good");
+    }
+  }
+  // 운석 낙하: 전투 중(4웨이브부터) 가끔 경고 후 큰 범위 피해가 떨어진다 (호스트 전용 — 위치·잔여
+  // 시간은 스냅샷으로 퍼지고, 참가자 화면은 world.setMeteor() 로 같은 경고 링을 그린다)
+  _updateMeteor(dt2) {
+    const c2 = CFG.meteor;
+    if (this.wave.phase !== PHASE.COMBAT || this.wave.wave + 1 < c2.minWave) return;
+    if (this._meteorPending) {
+      this._meteorPending.timeLeft -= dt2;
+      this.world.setMeteor(this._meteorPending.x, this._meteorPending.z, this._meteorPending.timeLeft, c2.radius);
+      if (this._meteorPending.timeLeft <= 0) this._impactMeteor();
+      return;
+    }
+    this._meteorTimer -= dt2;
+    if (this._meteorTimer > 0) return;
+    this._meteorTimer = c2.minGap + Math.random() * (c2.maxGap - c2.minGap);
+    const inner = CFG.world.coreRadius + 3, outer = CFG.world.buildRadius - 2;
+    const a = Math.random() * Math.PI * 2, r = inner + Math.random() * (outer - inner);
+    this._meteorPending = { x: Math.cos(a) * r, z: Math.sin(a) * r, timeLeft: c2.telegraphTime };
+    this.world.setMeteor(this._meteorPending.x, this._meteorPending.z, c2.telegraphTime, c2.radius);
+    this.ui?.toast("☄️ 낙하 경고! 표시된 자리에서 벗어나라 — 몬스터를 끌어들이면 한 방에 정리할 수도 있다", "warn");
+  }
+  _impactMeteor() {
+    const c2 = CFG.meteor;
+    const { x, z } = this._meteorPending;
+    this._meteorPending = null;
+    this.world.clearMeteor();
+    this.fx.burst(x, 1.5, z, 16729139, 26, 8);
+    this.fx.ring(x, z, 16729139, c2.radius);
+    this.ui?.shake();
+    this.sfx.bossDeath();
+    for (const e of this.enemyMgr.list) {
+      if (e.dead) continue;
+      if (dist(e.x, e.z, x, z) <= c2.radius) this._hurtEnemy(e, c2.dmg, "player", x, z);
+    }
+    for (const b of [...this.buildMgr.buildings.values()]) {
+      if (dist(b.x, b.z, x, z) <= c2.radius) {
+        const destroyed = b.damage(Math.round(c2.dmg * c2.buildingDmgMult));
+        if (destroyed) this.buildMgr.remove(b.id);
+      }
+    }
+    for (const p2 of this.players.values()) {
+      if (dist(p2.x, p2.z, x, z) <= c2.radius) {
+        if (p2.id === this.local.id) this._hurtLocal(c2.playerDmg);
+        else this.net.send("hurt", { to: p2.id, dmg: c2.playerDmg });
+      }
     }
   }
   // 보급품 투하: 전투 중 한 번에 최대 1개, 주기적으로 등장한다 (호스트 전용 — 결과는 스냅샷으로 퍼진다)
@@ -410,6 +480,9 @@ export var Game = class {
         if (this.stats.bossKillsSeen.includes("boss") && this.stats.bossKillsSeen.includes("frostlord")) {
           this._unlockAchievement("bothBosses");
         }
+        if (["boss", "frostlord", "warden"].every((t2) => this.stats.bossKillsSeen.includes(t2))) {
+          this._unlockAchievement("allBosses");
+        }
       } else {
         this.sfx.enemyDeath();
       }
@@ -467,6 +540,7 @@ export var Game = class {
     this.wave.phase = PHASE.WON;
     this.result = "win";
     this.sfx.win();
+    this.sfx.music.stop();
     if (this.difficulty === "hard") this._unlockAchievement("ironWill");
     if (!this.net.online) Game.clearLocalSave();
     this.ui?.showResult(true, this.stats, this.wave.wave);
@@ -475,8 +549,40 @@ export var Game = class {
     this.wave.lose();
     this.result = "lose";
     this.sfx.lose();
+    this.sfx.music.stop();
     if (!this.net.online) Game.clearLocalSave();
     this.ui?.showResult(false, this.stats, this.wave.wave);
+  }
+  // 웨이브 시작 토스트 문구. 웨이브 번호만으로 계산되는 순수 함수들(waveComposition·
+  // specialWaveKind)만 쓰기 때문에 호스트든 참가자든 같은 값을 넣으면 항상 같은 문구가 나온다 —
+  // 참가자 화면(net.on("waveStarted"))에서도 별도 동기화 없이 그대로 재사용한다.
+  _waveStartLabel(w2, total) {
+    const bossEntry = waveComposition(w2).find((c2) => CFG.enemies[c2.type]?.boss);
+    let base;
+    if (bossEntry) base = `⚠️ 웨이브 ${w2} 시작! 보스 등장! ${CFG.enemies[bossEntry.type].icon} ${CFG.enemies[bossEntry.type].name} — 몬스터 ${total}마리`;
+    else {
+      const kind = specialWaveKind(w2);
+      base = kind ? `${SPECIAL_WAVES[kind].icon} 웨이브 ${w2} 시작! ${SPECIAL_WAVES[kind].name} 웨이브 — ${SPECIAL_WAVES[kind].desc} (몬스터 ${total}마리)` : `웨이브 ${w2} 시작! 몬스터 ${total}마리`;
+    }
+    if (w2 % CFG.wave.nightEvery === 0) return `🌙 ${base} — 밤이라 시야가 좁다`;
+    const weatherKind = weatherOf(w2);
+    if (weatherKind) return `${WEATHER[weatherKind].icon} ${base} — ${WEATHER[weatherKind].desc}`;
+    return base;
+  }
+  // 웨이브 단계마다 배경음악 페이즈를 맞춘다. wave.phase 는 호스트·참가자 모두
+  // 스냅샷으로 동기화되는 값이라 이 로직만으로 양쪽 화면이 독립적으로 올바르게 전환된다.
+  _updateMusicPhase() {
+    const ph2 = this.wave.phase;
+    if (ph2 === PHASE.PREP) {
+      this.sfx.music.start("prep");
+      return;
+    }
+    if (ph2 === PHASE.COMBAT) {
+      const isBoss = waveComposition(this.wave.wave + 1).some((c2) => CFG.enemies[c2.type]?.boss);
+      this.sfx.music.start(isBoss ? "boss" : "combat");
+      return;
+    }
+    this.sfx.music.stop();
   }
   // ---------------------------------------------------------------- 행동 (요청 → 호스트 처리)
   requestBuild(key, gx, gz) {
@@ -771,12 +877,12 @@ export var Game = class {
     this.requestAttack();
   }
   _enemyNear(x2, z2, r) {
-    let best = null, bd = r * r;
+    let best = null, bd2 = r * r;
     for (const e of this.enemyMgr.list) {
       if (e.dead) continue;
       const d2 = (e.x - x2) ** 2 + (e.z - z2) ** 2;
-      if (d2 < bd) {
-        bd = d2;
+      if (d2 < bd2) {
+        bd2 = d2;
         best = e;
       }
     }
@@ -876,6 +982,60 @@ export var Game = class {
     this.fx.ring(0, 0, 9109440, 8);
     this.fx.float(`+${Math.round(s2.healPct * 100)}%`, 0, 5, 0, "good");
   }
+  // 크리스탈 강화 트랙(armor/regen/aura) 다음 레벨의 정수 비용
+  _crystalUpgradeCost(kind) {
+    const def = CFG.crystalUpgrade[kind];
+    const lv = this.world.crystal[kind + "Lv"] || 0;
+    return { shard: Math.max(1, def.baseCost + def.costStep * lv + this.boonMult.crystalUpgradeCostDelta) };
+  }
+  requestCrystalUpgrade(kind) {
+    this.sfx.shard();
+    if (this.isHost) this.hostCrystalUpgrade(this.local.id, kind);
+    else this.net.send("crystalUpgrade", { kind });
+  }
+  hostCrystalUpgrade(playerId, kind) {
+    const def = CFG.crystalUpgrade[kind];
+    if (!def) return;
+    const c2 = this.world.crystal;
+    const lvKey = kind + "Lv";
+    if (c2[lvKey] >= CFG.crystalUpgrade.maxLv) {
+      this._notify(playerId, "이미 최대 레벨입니다", "bad");
+      return;
+    }
+    const cost = this._crystalUpgradeCost(kind);
+    const pool = this._poolOf(playerId);
+    if (!canAfford(pool, cost)) {
+      this._notify(playerId, "수정 정수가 부족합니다", "bad");
+      return;
+    }
+    payCost(pool, cost);
+    c2[lvKey]++;
+    if (kind === "armor") {
+      c2.maxHp += def.hpPerLv;
+      c2.hp += def.hpPerLv;
+    }
+    this.fx.ring(0, 0, 16763904, 6.5);
+    this.fx.float(`${def.icon} ${def.name} Lv.${c2[lvKey]}`, 0, 5, 0, "good");
+  }
+  // 재생·오라 강화 효과를 매 프레임 적용한다 (호스트만 계산, hp 변화는 스냅샷으로 참가자에게 전파됨)
+  _updateCrystalUpgrades(dt2) {
+    if (!this.isHost) return;
+    const c2 = this.world.crystal;
+    const u2 = CFG.crystalUpgrade;
+    if (c2.regenLv > 0 && c2.hp < c2.maxHp) {
+      this.world.healCrystal(c2.maxHp * u2.regen.pctPerLv * c2.regenLv * dt2);
+    }
+    if (c2.auraLv > 0) {
+      c2._auraTimer -= dt2;
+      if (c2._auraTimer <= 0) {
+        c2._auraTimer = u2.aura.tickTime;
+        const dmg = u2.aura.dmgPerLv * c2.auraLv;
+        const targets = this.enemyMgr.list.filter((e) => !e.dead && dist(e.x, e.z, 0, 0) <= u2.aura.radius);
+        for (const e of targets) this._hurtEnemy(e, dmg, "player", 0, 0);
+        if (targets.length) this.fx.ring(0, 0, 6739199, u2.aura.radius);
+      }
+    }
+  }
   requestSkillBlast() {
     this.sfx.shard();
     if (this.isHost) this.hostSkillBlast(this.local.id);
@@ -963,6 +1123,30 @@ export var Game = class {
     to2.wood += wood;
     to2.stone += stone;
     this._notify(toId, `자원을 받았다 🪵${wood} 🪨${stone}`, "good");
+  }
+  // 협동 전용 — 만든 도구(칼·활·창·망치·폭탄가방)를 파티원에게 그대로 넘긴다.
+  // 자원과 달리 shared 여부와 무관하게 항상 개인 소유라 언제든 넘길 수 있다.
+  requestGiveWeapon(toId, key) {
+    this.sfx.click();
+    if (this.isHost) this.hostGiveWeapon(this.local.id, toId, key);
+    else this.net.send("giveWeapon", { to: toId, key });
+  }
+  hostGiveWeapon(fromId, toId, key) {
+    const from = this.players.get(fromId), to2 = this.players.get(toId);
+    if (!from || !to2 || !CFG.craft[key]) return;
+    if (!from.tools[key]) {
+      this._notify(fromId, "그 도구를 갖고 있지 않습니다", "bad");
+      return;
+    }
+    if (to2.tools[key]) {
+      this._notify(fromId, `${to2.name}은(는) 이미 갖고 있습니다`, "bad");
+      return;
+    }
+    from.tools[key] = false;
+    if (from.equipped === key) from.equipped = null;
+    to2.tools[key] = true;
+    const def = CFG.craft[key];
+    this._notify(toId, `${def.icon} ${def.name}을(를) 받았다 — 인벤토리 장비 탭에서 손에 쥘 수 있다`, "good");
   }
   _notify(playerId, text, kind) {
     if (playerId === this.local.id) {
@@ -1064,6 +1248,9 @@ export var Game = class {
     net.on("shard", (d2, from) => {
       if (this.isHost) this.hostShard(from);
     });
+    net.on("crystalUpgrade", (d2, from) => {
+      if (this.isHost) this.hostCrystalUpgrade(from, d2.kind);
+    });
     net.on("skillBlast", (d2, from) => {
       if (this.isHost) this.hostSkillBlast(from);
     });
@@ -1075,6 +1262,9 @@ export var Game = class {
     });
     net.on("give", (d2, from) => {
       if (this.isHost) this.hostGive(from, d2.to, d2.wood, d2.stone);
+    });
+    net.on("giveWeapon", (d2, from) => {
+      if (this.isHost) this.hostGiveWeapon(from, d2.to, d2.key);
     });
     net.on("hurt", (d2) => {
       if (d2.to === net.selfId) this._hurtLocal(d2.dmg);
@@ -1104,7 +1294,9 @@ export var Game = class {
     });
     net.on("waveStarted", () => {
       if (!this.isHost) {
-        this.ui?.toast("웨이브 시작!", "warn");
+        const w2 = this.wave.wave + 1;
+        const total = waveComposition(w2).reduce((s2, c2) => s2 + c2.count, 0);
+        this.ui?.toast(this._waveStartLabel(w2, total), "warn");
         this.sfx.waveStart();
       }
     });
@@ -1136,6 +1328,10 @@ export var Game = class {
       w: this.wave.snapshot(),
       c: Math.round(this.world.crystal.hp),
       cm: Math.round(this.world.crystal.maxHp),
+      ca: this.world.crystal.armorLv,
+      cr: this.world.crystal.regenLv,
+      cx: this.world.crystal.auraLv,
+      mt: this._meteorPending ? [Math.round(this._meteorPending.x * 10) / 10, Math.round(this._meteorPending.z * 10) / 10, Math.round(this._meteorPending.timeLeft * 10) / 10] : null,
       r: this.shared ? { team: this.pools.team } : { byId: this.pools.byId },
       p: players,
       sh: this.shared
@@ -1150,12 +1346,17 @@ export var Game = class {
     this.wave.applySnapshot(s2.w);
     const prevHp = this.world.crystal.hp;
     if (s2.cm) this.world.crystal.maxHp = s2.cm;
+    if (s2.ca !== void 0) this.world.crystal.armorLv = s2.ca;
+    if (s2.cr !== void 0) this.world.crystal.regenLv = s2.cr;
+    if (s2.cx !== void 0) this.world.crystal.auraLv = s2.cx;
     this.world.crystal.hp = s2.c;
     if (s2.c < prevHp) {
       this.ui?.shake();
       this.fx.burst(0, 3.2, 0, 6545663, 8, 4);
       this.sfx.crystalHit();
     }
+    if (s2.mt) this.world.setMeteor(s2.mt[0], s2.mt[1], s2.mt[2], CFG.meteor.radius);
+    else this.world.clearMeteor();
     if (s2.r.team) this.pools.team = s2.r.team;
     if (s2.r.byId) this.pools.byId = s2.r.byId;
     for (const [id, pd2] of Object.entries(s2.p || {})) {
@@ -1204,6 +1405,8 @@ export var Game = class {
       this.enemyMgr.simulate(dt2, now, [...this.players.values()], this.buildMgr);
       this._updateTraps();
       this._updateSupplyDrops(dt2);
+      this._updateMeteor(dt2);
+      this._updateCrystalUpgrades(dt2);
     } else {
       this.enemyMgr.interpolate(dt2);
     }
@@ -1216,9 +1419,15 @@ export var Game = class {
         }
       }
     }
-    if (!over) this.buildMgr.updateTowers(dt2, this.enemyMgr.list, now);
+    const weatherKind = this.wave.phase === PHASE.COMBAT ? weatherOf(this.wave.wave + 1) : null;
+    this.world.weatherKind = weatherKind;
+    this.sm.setWeather(weatherKind);
+    this.sm.updateWeather(dt2);
+    const rangeMult = weatherKind === "fog" ? WEATHER.fog.towerRangeMult : 1;
+    if (!over) this.buildMgr.updateTowers(dt2, this.enemyMgr.list, now, rangeMult);
     this.sm.setNightMode(this.wave.phase === PHASE.COMBAT && (this.wave.wave + 1) % CFG.wave.nightEvery === 0);
     this.sm.updateNight(dt2);
+    this._updateMusicPhase();
     this.world.update(dt2, now);
     this.projectiles.update(dt2);
     this.fx.update(dt2);
@@ -1383,6 +1592,9 @@ export var Game = class {
     this.world.applyNodeSnapshot(s2.n);
     this.wave.applySnapshot(s2.w);
     if (s2.cm) this.world.crystal.maxHp = s2.cm;
+    if (s2.ca !== void 0) this.world.crystal.armorLv = s2.ca;
+    if (s2.cr !== void 0) this.world.crystal.regenLv = s2.cr;
+    if (s2.cx !== void 0) this.world.crystal.auraLv = s2.cx;
     this.world.crystal.hp = s2.c;
     if (s2.r.team) this.pools.team = s2.r.team;
     if (s2.r.byId) this.pools.byId = s2.r.byId;

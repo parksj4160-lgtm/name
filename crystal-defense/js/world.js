@@ -14,7 +14,8 @@ var GEO = {
   gemStump: new THREE.CylinderGeometry(0.3, 0.36, 0.16, 6),
   crate: new THREE.BoxGeometry(0.95, 0.85, 0.95),
   dropRing: new THREE.RingGeometry(1.05, 1.3, 28),
-  dropBeam: new THREE.CylinderGeometry(0.07, 0.07, 6, 6)
+  dropBeam: new THREE.CylinderGeometry(0.07, 0.07, 6, 6),
+  meteorRing: new THREE.RingGeometry(0.92, 1, 48)
 };
 var MAT = {
   trunk: new THREE.MeshStandardMaterial({ color: 5979428, roughness: 0.95 }),
@@ -44,7 +45,8 @@ var MAT = {
   }),
   gemStump: new THREE.MeshStandardMaterial({ color: 5915496, roughness: 0.8 }),
   crate: new THREE.MeshStandardMaterial({ color: 9127211, roughness: 0.85 }),
-  dropGlow: new THREE.MeshBasicMaterial({ color: 16759043, transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false })
+  dropGlow: new THREE.MeshBasicMaterial({ color: 16759043, transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false }),
+  meteorWarn: new THREE.MeshBasicMaterial({ color: 16729139, transparent: true, opacity: 0.6, side: THREE.DoubleSide, depthWrite: false })
 };
 export var World = class {
   constructor(sceneMgr, seed = 1) {
@@ -57,8 +59,10 @@ export var World = class {
     this.portals = [];
     this.drops = [];
     this.biome = biomeOf(seed);
-    this.crystal = { hp: CFG.crystal.hp, maxHp: CFG.crystal.hp, shieldUntil: 0 };
+    this.crystal = { hp: CFG.crystal.hp, maxHp: CFG.crystal.hp, shieldUntil: 0, armorLv: 0, regenLv: 0, auraLv: 0, _regenAccum: 0, _auraTimer: 0 };
+    this.meteor = null;
     this._build();
+    this._buildMeteorRing();
   }
   dispose() {
     this.sm.scene.remove(this.root);
@@ -299,6 +303,34 @@ export var World = class {
       }
     }
   }
+  // --- 운석 낙하 경고 ---
+  // 낙하 시점의 실제 피해는 game.js 가 계산한다(호스트 전용). World 는 경고 위치·잔여시간을
+  // 들고 순수하게 그려주기만 한다 — 참가자 화면도 스냅샷으로 받은 같은 값을 넣으면 똑같이 보인다.
+  _buildMeteorRing() {
+    const ring = new THREE.Mesh(GEO.meteorRing, MAT.meteorWarn);
+    ring.rotation.x = -Math.PI / 2;
+    ring.visible = false;
+    this.scene.add(ring);
+    this.meteorRing = ring;
+  }
+  setMeteor(x2, z2, timeLeft, radius) {
+    this.meteor = { x: x2, z: z2, timeLeft, radius };
+  }
+  clearMeteor() {
+    this.meteor = null;
+    if (this.meteorRing) this.meteorRing.visible = false;
+  }
+  updateMeteorVisual(now) {
+    if (!this.meteor) {
+      if (this.meteorRing) this.meteorRing.visible = false;
+      return;
+    }
+    const r = this.meteorRing;
+    r.visible = true;
+    r.position.set(this.meteor.x, 0.06, this.meteor.z);
+    r.scale.setScalar(this.meteor.radius);
+    r.material.opacity = 0.3 + Math.abs(Math.sin(now * 7)) * 0.45;
+  }
   // --- 보급품 투하 ---
   spawnDrop(id, x2, z2) {
     const g2 = new THREE.Group();
@@ -397,5 +429,6 @@ export var World = class {
     }
     this.updateNodes(now);
     this.updateDrops(dt2, now);
+    this.updateMeteorVisual(now);
   }
 };

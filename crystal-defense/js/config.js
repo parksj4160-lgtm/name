@@ -18,11 +18,22 @@ export var CFG = {
     plains: { name: "개활지", icon: "🌾", portalCount: 6, nodeMult: 1.45, desc: "자원이 넉넉하다 — 대신 적이 사방에서 몰려온다" },
     normal: { name: "평지", icon: "🗺️", portalCount: 4, nodeMult: 1, desc: "표준 지형" }
   },
+  // 비행 몬스터(flyer)가 떠서 이동하는 높이 — 벽·함정을 눈으로도 넘어가는 게 보이게 한다
+  flyHeight: 3.2,
   crystal: {
     hp: 1e3,
     radius: 2.2,
     hitRange: 3.6
     // 몬스터가 크리스탈을 때리기 시작하는 거리
+  },
+  // 크리스탈 강화 — 정수(💠)로 크리스탈 자체를 영구히 키운다. 세 갈래 모두 레벨당 비용이 오르고
+  // 최대 레벨이 있어 무한 스노우볼은 안 된다. 지킬 대상이 강해지면 후반에 방어선을 좁혀 버티는
+  // 선택지가 생긴다는 게 목적.
+  crystalUpgrade: {
+    maxLv: 5,
+    armor: { name: "강화", icon: "💪", desc: "최대 체력 +150 (즉시 그만큼 회복도 됨)", hpPerLv: 150, baseCost: 2, costStep: 1 },
+    regen: { name: "재생", icon: "💚", desc: "매초 최대 체력의 0.6% 만큼 자동 회복", pctPerLv: 6e-3, baseCost: 2, costStep: 1 },
+    aura: { name: "오라", icon: "⚡", desc: "주변 적에게 1초마다 피해를 준다", radius: 6.5, dmgPerLv: 12, tickTime: 1, baseCost: 3, costStep: 1 }
   },
   player: {
     speed: 7.4,
@@ -183,6 +194,23 @@ export var CFG = {
       levels: [
         { hp: 30, dmg: 65, slow: 0.5, slowTime: 2, triggerRadius: 1.5, singleUse: true }
       ]
+    },
+    // 피해는 거의 없지만 맞은 적을 잠깐 완전히 묶어 둔다(둔화가 아니라 이동 속도 0).
+    // 🦇 박쥐처럼 벽·함정을 무시하는 적도 사거리 안에만 들어오면 그대로 묶인다 —
+    // 다른 타워들의 화력이 명중할 시간을 벌어 주는 용도.
+    snare: {
+      name: "덫탑",
+      icon: "🕸️",
+      hotkey: "0",
+      cost: { wood: 45, stone: 20 },
+      hp: 170,
+      blocks: true,
+      desc: "적을 묶어 완전히 멈춘다(짧은 시간, 피해는 미미). 비행 몬스터에게도 통한다. 묶인 적을 다른 타워가 맞추면 추가 피해.",
+      levels: [
+        { hp: 170, dmg: 4, range: 9, rate: 0.5, root: 1.4 },
+        { hp: 260, dmg: 6, range: 10.5, rate: 0.6, root: 1.8, cost: { wood: 60, stone: 40 } },
+        { hp: 380, dmg: 9, range: 12, rate: 0.7, root: 2.2, cost: { wood: 110, stone: 90, iron: 5 } }
+      ]
     }
   },
   // 시설에 다가가 클릭하면 열리는 작업창. range 는 상호작용 가능 거리.
@@ -245,10 +273,16 @@ export var CFG = {
     shooter: { name: "주술사", icon: "🧙", hp: 45, speed: 2.4, dmg: 9, rate: 0.5, radius: 0.5, color: 3526479, bounty: { wood: 3, stone: 2 }, scale: 0.95, ranged: true, atkRange: 11 },
     // 경로상의 벽을 무시하고 가장 가까운 타워로 직행해 부순다 — 타워를 뒤에 숨기는 전략을 견제한다
     raider: { name: "약탈자", icon: "🪓", hp: 80, speed: 2.6, dmg: 10, rate: 0.8, radius: 0.55, color: 11887901, bounty: { wood: 3, stone: 2 }, scale: 1.05, seeksBuildings: true, buildingDmgMult: 1.8 },
+    // 벽·함정을 전부 무시하고 크리스탈로 직선 비행한다 — 길찾기 자체를 안 쓰므로 벽 중심 방어에 구멍을 낸다.
+    // 대신 체력이 아주 낮아 타워 몇 대만 스치면 죽는다: "타워가 있어야 하는 이유"를 만드는 게 목적
+    flyer: { name: "박쥐", icon: "🦇", hp: 26, speed: 4.6, dmg: 9, rate: 1.1, radius: 0.42, color: 8048895, bounty: { wood: 2, stone: 2 }, scale: 0.8, flies: true },
     boss: { name: "파괴자", icon: "💀", hp: 900, speed: 2.1, dmg: 70, rate: 0.7, radius: 1.4, color: 3092282, bounty: { wood: 30, stone: 30 }, scale: 2.3, boss: true },
     // 5의 배수 웨이브마다 파괴자와 번갈아 등장한다. 소환하는 잡졸이 전부 🛡️ 방패 변종이라(정면 피해 감소)
     // 뒤로 돌아가서 처리해야 하는 다른 압박을 준다 — 돌진/소환 패턴 자체는 파괴자와 동일하다.
-    frostlord: { name: "서리 군주", icon: "🧊", hp: 1050, speed: 1.7, dmg: 55, rate: 0.65, radius: 1.5, color: 10479871, bounty: { wood: 32, stone: 38 }, scale: 2.4, boss: true, summonVariant: "shield" }
+    frostlord: { name: "서리 군주", icon: "🧊", hp: 1050, speed: 1.7, dmg: 55, rate: 0.65, radius: 1.5, color: 10479871, bounty: { wood: 32, stone: 38 }, scale: 2.4, boss: true, summonVariant: "shield" },
+    // 세 번째 보스(15웨이브 주기로 파괴자·서리 군주와 순환). 소환 대신 자기 발밑에 침묵 장판을 깐다 —
+    // 장판 반경 안의 타워는 조준·사격이 전부 멈춘다(`buildings.js`의 `updateTowers` 참고). 돌진 패턴은 공유.
+    warden: { name: "침묵의 군주", icon: "🔇", hp: 1100, speed: 1.8, dmg: 50, rate: 0.65, radius: 1.5, color: 8011711, bounty: { wood: 34, stone: 34 }, scale: 2.35, boss: true, silenceBoss: true }
   },
   // 몬스터 변종 접두사 — 종류를 늘리는 대신 기존 몬스터에 가끔 붙는다. 웨이브가 오를수록 등장 확률이 오른다.
   // 색 틴트 + 머리 위 아이콘으로 항상 표시되어(색약 여부와 무관하게) 눈에 띈다.
@@ -275,11 +309,19 @@ export var CFG = {
     // 화살탑이 이 반경 안에 서리탑을 두면, 이미 둔화된 적을 맞출 때 추가 피해
     frostArrow: { radius: 7, dmgMult: 0.4 },
     // 독탑이 이 반경 안에 다른 독탑을 두면, 독 피해가 이웃 하나당 누적 증가(상한 있음)
-    poisonStack: { radius: 7, dpsMultPerNeighbor: 0.35, max: 1 }
+    poisonStack: { radius: 7, dpsMultPerNeighbor: 0.35, max: 1 },
+    // 덫탑에 묶여(root) 있는 적을 다른 타워가 맞추면 추가 피해 — 덫탑 자신은 제외(묶는 역할에 집중).
+    // frostArrow 처럼 인접 배치가 필요 없다 — 묶인 상태 자체가 트리거라 어떤 타워 조합이든 이득을 본다
+    rootSnare: { dmgMult: 0.35 }
   },
   // 보급품 투하 — 전투 중(웨이브 2부터) 가끔 지도 위에 상자가 떨어진다. 한 번에 최대 1개만 떠 있고,
   // 안 챙기고 놔두면 사라진다. 방어를 잠깐 비우고 달려가서 주울지 말지가 매 순간의 선택이 된다.
   supplyDrop: { minWave: 2, firstDelay: 16, minGap: 30, maxGap: 50, lifetime: 20, pickupRadius: 1.8, reward: { wood: 14, stone: 9 }, shardChance: 0.4 },
+  // 운석 낙하 — 전투 중(4웨이브부터) 가끔 무작위 지점에 경고가 뜨고, 잠깐 뒤 그 자리에 큰 범위
+  // 피해가 떨어진다. 몬스터를 그 자리로 끌어들이면 한 방에 정리하는 이득이 있지만, 내 건물이나
+  // 내 캐릭터가 그 자리에 있으면 그대로 맞는다 — 순수 이득이던 보급품 투하와 반대로 양날의 검이다.
+  // 건물·자원 노드를 피하지 않는다 — 그래서 위험하다.
+  meteor: { minWave: 4, firstDelay: 22, minGap: 40, maxGap: 65, telegraphTime: 2.5, radius: 5, dmg: 150, buildingDmgMult: 0.5, playerDmg: 35 },
   // 엔드리스 축복 — 10웨이브 승리 이후(엔드리스)에만 등장한다. 표준 캠페인 밸런스에는 영향이 없다.
   // n웨이브마다 무작위 2개 중 하나를 골라 영구 적용(응급 처치만 즉시 1회성). 전부 호스트가 계산하는
   // 값(근접 공격력·타워 공격력·스킬 비용·크리스탈 체력)에만 걸려 있어서 별도 동기화 없이 참가자에게도 그대로 반영된다.
@@ -290,7 +332,10 @@ export var CFG = {
     affinity: { name: "정수 친화", icon: "💠", desc: "정수 스킬(폭발\xB7시간 왜곡\xB7방벽) 비용 -1", kind: "delta", key: "skillCostDelta", value: -1 },
     aid: { name: "응급 처치", icon: "❤️", desc: "크리스탈 체력 300 즉시 회복", kind: "instant" },
     bond: { name: "수정 결속", icon: "💎", desc: "크리스탈 최대 체력 +150", kind: "maxHp", value: 150 },
-    plunder: { name: "약탈", icon: "💰", desc: "몬스터 처치 보상(목재\xB7광물) +25%", kind: "mult", key: "bounty", value: 1.25 }
+    plunder: { name: "약탈", icon: "💰", desc: "몬스터 처치 보상(목재\xB7광물) +25%", kind: "mult", key: "bounty", value: 1.25 },
+    // 이번 세션에 추가된 크리스탈 강화(정수로 체력·재생·오라를 사는 시스템)와 맞물리는 축복.
+    // affinity(정수 스킬 비용 -1)와 정확히 같은 구조를 크리스탈 강화 쪽에 그대로 옮겨온 것.
+    growth: { name: "성장 가속", icon: "🌱", desc: "크리스탈 강화 비용 -1 (최소 1)", kind: "delta", key: "crystalUpgradeCostDelta", value: -1 }
   },
   // 보스 전용 패턴. 예고 시간을 반드시 두어서 플레이어가 반응할 수 있게 한다.
   bossPattern: {
@@ -306,7 +351,11 @@ export var CFG = {
     chargeTime: 1.5,
     chargeSpeed: 4.2,
     // 돌진 중 스치는 건물에 주는 피해
-    chargeBuildingDmg: 55
+    chargeBuildingDmg: 55,
+    // 침묵의 군주 전용 — summonAt 임계값마다 소환 대신 침묵 장판을 깐다(summon과 배타적)
+    silenceCast: 1.1,
+    silenceRadius: 8,
+    silenceTime: 4
   },
   wave: {
     goal: 10,
@@ -342,22 +391,72 @@ export var CFG = {
     // 클라이언트 → 호스트 위치 전송 주기
   }
 };
-// 이 자원을 캐려면 곡괭이를 손에 쥐어야 하는가
 export function needsPickaxe(nodeType) {
   return !!CFG.harvest[nodeType]?.needsPickaxe;
 }
+function _standardTotal(w2) {
+  let n = 4 + Math.floor(w2 * 1.6);
+  n += 2 + Math.floor(w2 * 1.1);
+  if (w2 >= 3) n += Math.floor((w2 - 1) / 2) + 1;
+  if (w2 >= 4) n += 1 + Math.floor((w2 - 2) / 2);
+  if (w2 >= 5) n += 1 + Math.floor((w2 - 3) / 3);
+  if (w2 >= 6) n += 1 + Math.floor((w2 - 4) / 2);
+  return n;
+}
+export var SPECIAL_WAVES = {
+  rush: { name: "러시", icon: "🏃", desc: "러너가 대량으로 몰려온다 — 물량으로 밀어붙인다" },
+  siege: { name: "공성", icon: "🏰", desc: "느리지만 단단한 근접\xB7투척 부대 — 건물이 표적이다" },
+  elite: { name: "정예전", icon: "⭐", desc: "수는 적지만 전부 강화된 정예다" }
+};
+var SPECIAL_KEYS = Object.keys(SPECIAL_WAVES);
+export function specialWaveKind(w2) {
+  if (w2 < 3 || w2 % 5 === 0 || w2 % 3 !== 0) return null;
+  const occurrence = w2 / 3;
+  return SPECIAL_KEYS[(occurrence - 1) % SPECIAL_KEYS.length];
+}
+var BOSS_CYCLE = ["boss", "frostlord", "warden"];
+function _specialComposition(w2, kind) {
+  const total = _standardTotal(w2);
+  if (kind === "rush") {
+    return [{ type: "runner", count: Math.max(6, Math.round(total * 1.15)) }];
+  }
+  if (kind === "siege") {
+    const otherType = w2 >= 5 ? "raider" : "grunt";
+    return [
+      { type: "brute", count: Math.max(2, Math.round(total * 0.55)) },
+      { type: otherType, count: Math.max(2, Math.round(total * 0.4)) }
+    ];
+  }
+  return [{ type: "grunt", count: Math.max(3, Math.round(total * 0.32)) }];
+}
 export function waveComposition(w2) {
-  const list = [];
-  list.push({ type: "grunt", count: 4 + Math.floor(w2 * 1.6) });
-  if (w2 >= 2) list.push({ type: "runner", count: 2 + Math.floor(w2 * 1.1) });
-  if (w2 >= 3) list.push({ type: "brute", count: Math.floor((w2 - 1) / 2) + 1 });
-  if (w2 >= 4) list.push({ type: "shooter", count: 1 + Math.floor((w2 - 2) / 2) });
-  if (w2 >= 5) list.push({ type: "raider", count: 1 + Math.floor((w2 - 3) / 3) });
+  const special = specialWaveKind(w2);
+  const list = special ? _specialComposition(w2, special) : (() => {
+    const l2 = [];
+    l2.push({ type: "grunt", count: 4 + Math.floor(w2 * 1.6) });
+    if (w2 >= 2) l2.push({ type: "runner", count: 2 + Math.floor(w2 * 1.1) });
+    if (w2 >= 3) l2.push({ type: "brute", count: Math.floor((w2 - 1) / 2) + 1 });
+    if (w2 >= 4) l2.push({ type: "shooter", count: 1 + Math.floor((w2 - 2) / 2) });
+    if (w2 >= 5) l2.push({ type: "raider", count: 1 + Math.floor((w2 - 3) / 3) });
+    if (w2 >= 6) l2.push({ type: "flyer", count: 1 + Math.floor((w2 - 4) / 2) });
+    return l2;
+  })();
   if (w2 % 5 === 0) {
-    const bossType = w2 / 5 % 2 === 0 ? "frostlord" : "boss";
+    const bossType = BOSS_CYCLE[(w2 / 5 - 1) % BOSS_CYCLE.length];
     list.push({ type: bossType, count: Math.floor(w2 / 5) });
   }
   return list;
+}
+export var WEATHER = {
+  rain: { name: "비", icon: "🌧️", desc: "땅이 젖어 이동이 둔해진다", playerSpeedMult: 0.88 },
+  fog: { name: "안개", icon: "🌫️", desc: "시야가 줄고 타워 사거리가 짧아진다", towerRangeMult: 0.85 }
+};
+export function weatherOf(w2) {
+  if (w2 < 2 || w2 % CFG.wave.nightEvery === 0) return null;
+  const r = mulberry32(w2 * 7919 + 13)();
+  if (r < 0.16) return "rain";
+  if (r < 0.3) return "fog";
+  return null;
 }
 var BIOME_KEYS = ["canyon", "plains", "normal"];
 export function biomeOf(seed) {

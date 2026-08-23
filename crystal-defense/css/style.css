@@ -98,6 +98,11 @@ button.go:disabled { opacity: 0.4; cursor: not-allowed; }
   0%, 100% { box-shadow: 0 0 0 rgba(255,106,125,0); }
   50% { box-shadow: 0 0 10px rgba(255,106,125,0.5); }
 }
+.preview.special-wave { padding: 3px 6px; border-radius: 6px; background: rgba(255,204,85,0.1); }
+.preview .special-tag {
+  color: var(--warn); font-weight: 700; padding: 1px 6px; border-radius: 5px;
+  background: rgba(255,204,85,0.16); border: 1px solid rgba(255,204,85,0.3);
+}
 
 /* ---------- 파티 ---------- */
 #party-panel { right: 14px; top: 14px; min-width: 180px; max-width: 240px; }
@@ -290,6 +295,17 @@ button.ghost { background: transparent; color: var(--dim); }
 .achievements li.on .ai-icon { filter: none; opacity: 1; }
 .achievements .ai-name { font-weight: 700; min-width: 68px; flex: none; }
 .achievements .ai-desc { font-size: 11px; opacity: 0.85; }
+
+/* ---------- 최근 전적 ---------- */
+.history {
+  list-style: none; padding: 8px 10px; margin: 6px 0 0; border-radius: 8px;
+  background: rgba(255,255,255,0.05); max-height: 220px; overflow-y: auto;
+  font-size: 12px; display: flex; flex-direction: column; gap: 6px; text-align: left;
+}
+.history li { display: flex; justify-content: space-between; gap: 8px; color: var(--dim); }
+.history li.win { color: var(--good); }
+.history li .h-left { color: var(--text); }
+.history .empty { color: var(--dim); font-style: italic; }
 #result-achievements {
   list-style: none; padding: 8px 10px; margin: 0 0 12px; border-radius: 8px;
   background: rgba(124,230,160,0.1); border: 1px solid rgba(124,230,160,0.3);

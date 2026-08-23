@@ -1,5 +1,5 @@
 import * as THREE from '../vendor/three.module.js';
-import { CFG, needsPickaxe } from './config.js';
+import { CFG, WEATHER, needsPickaxe } from './config.js';
 import { clamp, dist } from './utils.js';
 
 var GEO4 = {
@@ -237,7 +237,8 @@ export var LocalPlayer = class extends Player {
       if (moving) {
         this.cancelHarvest();
         const sprint = input.down("shift");
-        const spd = sprint ? CFG.player.sprint : CFG.player.speed;
+        const weatherMult = world.weatherKind === "rain" ? WEATHER.rain.playerSpeedMult : 1;
+        const spd = (sprint ? CFG.player.sprint : CFG.player.speed) * weatherMult;
         const len = Math.hypot(mx, mz);
         mx /= len;
         mz /= len;
