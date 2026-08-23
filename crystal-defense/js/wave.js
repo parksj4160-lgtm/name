@@ -71,7 +71,7 @@ export var WaveDirector = class {
           const ec = CFG.elite;
           statMult = { hp: ec.hpMult, scale: ec.scaleMult, dmg: ec.dmgMult, bounty: ec.bountyMult, elite: true };
         } else if (!isBossType) {
-          variant = rollVariant(this.wave + 1);
+          variant = this._specialKind === "ward" ? "ward" : rollVariant(this.wave + 1);
         }
         const spawned = this.enemies.spawn(
           type,

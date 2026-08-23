@@ -312,6 +312,22 @@ export var EnemyManager = class {
           e.bodyMat.emissiveIntensity = 0.5 + Math.sin(now * 5) * 0.15;
         }
       }
+      if (e.st.healAura) {
+        e._healCd = (e._healCd || 0) - dt2;
+        if (e._healCd <= 0) {
+          const ha2 = e.st.healAura;
+          e._healCd = ha2.interval;
+          let healedAny = false;
+          for (const o of list) {
+            if (o === e || o.dead || o.hp >= o.maxHp) continue;
+            if (dist(e.x, e.z, o.x, o.z) > ha2.radius) continue;
+            o.hp = Math.min(o.maxHp, o.hp + o.maxHp * ha2.pct);
+            o.refreshBar();
+            healedAny = true;
+          }
+          if (healedAny) this.onHealPulse?.(e);
+        }
+      }
       if (e.st.boss && this._bossTick(e, dt2, now)) {
         this._applyPosition(e, dt2, now);
         continue;

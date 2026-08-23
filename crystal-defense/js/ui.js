@@ -8,7 +8,7 @@ import { PHASE } from './wave.js';
 var $2 = (id) => document.getElementById(id);
 var TUTORIAL_STEPS = [
   "🌳 나무를 직접 클릭하면 캡니다 (바위는 곡괭이를 만들어 쥐어야 캘 수 있어요)",
-  "🎒 목재 20을 모았으면 <kbd>I</kbd> 로 인벤토리를 열어 🪚 제작대를 지으세요 (벽\xB7타워는 그 다음)",
+  "🎒 목재 20을 모았으면 <kbd>I</kbd> 로 인벤토리를 열어 🪚 제작대를 지으세요 (벽·타워는 그 다음)",
   "준비가 되면 <kbd>Enter</kbd> 로 첫 웨이브를 시작하세요!"
 ];
 export var UI = class {
@@ -156,12 +156,30 @@ export var UI = class {
         key: "smelt",
         icon: "⚙️",
         name: `철 ${CFG.smelt.yield}개 제련`,
-        desc: "광물을 녹인다. 칼\xB7활과 3레벨 업그레이드의 재료.",
+        desc: "광물을 녹인다. 칼·활과 3레벨 업그레이드의 재료.",
         cost: CFG.smelt.cost,
         state: !g2.hasStation("furnace") ? "locked" : canAfford(g2.myPool, CFG.smelt.cost) ? "" : "poor",
         note: !g2.hasStation("furnace") ? "화로 필요" : null,
         action: () => g2.requestSmelt()
       });
+      const hasFurnace = g2.hasStation("furnace");
+      for (const [key, bonus] of Object.entries(CFG.weaponUpgrade.perLv)) {
+        if (!g2.local.tools[key]) continue;
+        const r = CFG.craft[key];
+        const lv = g2.local.weaponLv[key] || 0;
+        const maxed = lv >= CFG.weaponUpgrade.maxLv;
+        const cost = g2._weaponUpgradeCost(key);
+        rows2.push({
+          key: "upgrade:" + key,
+          icon: r.icon,
+          name: `${r.name} 강화 Lv.${lv}/${CFG.weaponUpgrade.maxLv}`,
+          desc: `대미지 +${bonus.dmg} (누적 +${bonus.dmg * lv})`,
+          cost: maxed ? null : cost,
+          state: maxed ? "owned" : !hasFurnace ? "locked" : canAfford(g2.myPool, cost) ? "" : "poor",
+          note: maxed ? "최대 레벨" : !hasFurnace ? "화로 필요" : null,
+          action: () => g2.requestUpgradeWeapon(key)
+        });
+      }
       return rows2;
     }
     if (tab === "skill") {
@@ -219,10 +237,11 @@ export var UI = class {
     }];
     for (const [key, r] of Object.entries(CFG.craft)) {
       const owned = !!g2.local.tools[key];
+      const wlv = g2.local.weaponLv[key] || 0;
       rows.push({
         key,
         icon: r.icon,
-        name: r.name,
+        name: wlv ? `${r.name} 강화 Lv.${wlv}` : r.name,
         desc: r.desc,
         cost: null,
         state: !owned ? "locked" : held === key ? "active" : "",
@@ -236,7 +255,7 @@ export var UI = class {
     if (!this.inventoryOpen) return;
     const rows = this._invRows();
     const DESC = {
-      build: "지을 것을 고르면 배치 모드가 된다. 벽\xB7타워는 제작대를 먼저 지어야 열린다.",
+      build: "지을 것을 고르면 배치 모드가 된다. 벽·타워는 제작대를 먼저 지어야 열린다.",
       craft: "제작대를 지으면 도구와 무기를, 화로를 지으면 철을 만들 수 있다.",
       skill: "정수(💠)를 회복 대신 전투에 쓴다. 회복과 경쟁하니 상황에 맞게 고를 것.",
       gear: "손에 들 것을 고른다. 든 것의 효과만 적용되고, 정수석은 곡괭이를 쥐어야 캔다.",
@@ -246,7 +265,8 @@ export var UI = class {
     for (const t2 of this.el.invTabs.querySelectorAll(".inv-tab")) {
       t2.classList.toggle("on", t2.dataset.tab === this._invTab);
     }
-    if (this._invRendered !== this._invTab) {
+    const rowKeys = rows.map((r) => r.key).join("|");
+    if (this._invRendered !== this._invTab || this._invRenderedKeys !== rowKeys) {
       this.el.invList.innerHTML = "";
       this._invEls = {};
       for (const r of rows) {
@@ -263,12 +283,18 @@ export var UI = class {
         this._invEls[r.key] = btn;
       }
       this._invRendered = this._invTab;
+      this._invRenderedKeys = rowKeys;
     }
     for (const r of rows) {
       const btn = this._invEls[r.key];
       if (!btn) continue;
       const right = r.note || (r.cost ? costText(r.cost) : r.hotkey ? keyLabel(r.hotkey) : "");
       btn.querySelector(".ii-right").textContent = right;
+      const nameEl = btn.querySelector(".ii-body b");
+      if (nameEl.textContent !== r.name) nameEl.textContent = r.name;
+      const descEl = btn.querySelector(".ii-desc");
+      const desc = r.desc || "";
+      if (descEl.textContent !== desc) descEl.textContent = desc;
       btn.className = "inv-item" + (r.state ? " " + r.state : "");
       btn.disabled = r.state === "owned" || r.state === "locked" || r.state === "poor";
     }
@@ -286,7 +312,7 @@ export var UI = class {
       return;
     }
     if (CFG.builds[mode]) {
-      this.el.buildHint.innerHTML = `${this._buildSpec(mode)} — 좌클릭 배치 / 우클릭\xB7Esc 취소`;
+      this.el.buildHint.innerHTML = `${this._buildSpec(mode)} — 좌클릭 배치 / 우클릭·Esc 취소`;
       return;
     }
     const hovered = g2.buildMgr?.hover;
@@ -294,7 +320,7 @@ export var UI = class {
     if (detail) {
       this.el.buildHint.innerHTML = detail;
     } else if (mode === "upgrade") {
-      this.el.buildHint.textContent = "업그레이드할 건물을 클릭하세요 (벽은 내구도, 타워는 공격력\xB7사거리 상승)";
+      this.el.buildHint.textContent = "업그레이드할 건물을 클릭하세요 (벽은 내구도, 타워는 공격력·사거리 상승)";
     } else if (mode === "repair") {
       this.el.buildHint.textContent = "수리할 건물을 클릭하세요 (손상된 비율만큼 자원 소모, 완전 파괴 재건축보다 저렴)";
     } else {
@@ -317,7 +343,7 @@ export var UI = class {
     if (st.triggerRadius) parts.push(`감지 반경 <b>${st.triggerRadius}</b>`);
     if (st.singleUse) parts.push(`1회용`);
     const ok = canAfford(this.game.myPool, def.cost);
-    return `${def.icon} ${def.name} — ${parts.join(" \xB7 ")} \xB7 비용 <b class="${ok ? "" : "lack"}">${costText(def.cost)}</b>`;
+    return `${def.icon} ${def.name} — ${parts.join(" · ")} · 비용 <b class="${ok ? "" : "lack"}">${costText(def.cost)}</b>`;
   }
   // 업그레이드/수리/철거 모드에서 가리킨 건물의 수치를 한 줄로 만든다
   _hoverDetail(mode, b) {
@@ -330,9 +356,9 @@ export var UI = class {
     if (mode === "repair") {
       const cost = g2.buildMgr.repairCost(b);
       const hp = `체력 <b>${Math.ceil(b.hp)}/${b.maxHp}</b>`;
-      if (!cost) return `${name} — ${hp} \xB7 손상 없음`;
+      if (!cost) return `${name} — ${hp} · 손상 없음`;
       const ok2 = canAfford(g2.myPool, cost);
-      return `${name} — ${hp} \xB7 수리 비용 <b class="${ok2 ? "" : "lack"}">${costText(cost)}</b>`;
+      return `${name} — ${hp} · 수리 비용 <b class="${ok2 ? "" : "lack"}">${costText(cost)}</b>`;
     }
     const next = b.def.levels[b.level];
     if (!next) return `${name} — 이미 최대 레벨`;
@@ -353,7 +379,7 @@ export var UI = class {
     diff("버프", cur.buffMult, next.buffMult);
     diff("버프 범위", cur.buffRadius, next.buffRadius);
     const ok = canAfford(g2.myPool, next.cost);
-    return `${name} → <b>Lv.${b.level + 1}</b> \xB7 ${parts.join(" \xB7 ")} \xB7 비용 <b class="${ok ? "" : "lack"}">${costText(next.cost)}</b>`;
+    return `${name} → <b>Lv.${b.level + 1}</b> · ${parts.join(" · ")} · 비용 <b class="${ok ? "" : "lack"}">${costText(next.cost)}</b>`;
   }
   // ---------------------------------------------------------------- 로비
   _bindLobby() {
@@ -695,7 +721,7 @@ export var UI = class {
     this.el.biomeTag.textContent = `${bcfg.icon} ${bcfg.name}`;
     this.el.biomeTag.title = bcfg.desc;
     if (!resumed) {
-      this.toast("크리스탈을 지켜라! 자원\xB7몬스터를 클릭해 캐고 때린다, I로 인벤토리", "good");
+      this.toast("크리스탈을 지켜라! 자원·몬스터를 클릭해 캐고 때린다, I로 인벤토리", "good");
       this.toast(`${bcfg.icon} 지형: ${bcfg.name} — ${bcfg.desc}`, "warn");
     }
     if (resumed || localStorage.getItem("cd.tutorialDone")) {
@@ -790,7 +816,7 @@ export var UI = class {
     const log = $2("result-wavelog");
     if (stats.waveLog && stats.waveLog.length) {
       log.innerHTML = stats.waveLog.map(
-        (w2) => `<li><span>웨이브 ${w2.wave}</span><span>${fmtTime(w2.time)} \xB7 처치 <b>${w2.kills}</b></span></li>`
+        (w2) => `<li><span>웨이브 ${w2.wave}</span><span>${fmtTime(w2.time)} · 처치 <b>${w2.kills}</b></span></li>`
       ).join("");
       log.classList.remove("hidden");
     } else {
@@ -902,8 +928,8 @@ export var UI = class {
     list.innerHTML = hist.map((h2) => {
       const biome2 = h2.biome && CFG.biomes[h2.biome] ? CFG.biomes[h2.biome] : null;
       const diffName = DIFFICULTIES[h2.difficulty]?.label || h2.difficulty;
-      const left = `${h2.win ? "🏆 승리" : "💥 패배"} \xB7 웨이브 ${h2.wave}`;
-      const right = `${fmtTime(h2.time)} \xB7 처치 ${h2.kills}${biome2 ? ` \xB7 ${biome2.icon}${biome2.name}` : ""} \xB7 ${diffName}`;
+      const left = `${h2.win ? "🏆 승리" : "💥 패배"} · 웨이브 ${h2.wave}`;
+      const right = `${fmtTime(h2.time)} · 처치 ${h2.kills}${biome2 ? ` · ${biome2.icon}${biome2.name}` : ""} · ${diffName}`;
       return `<li class="${h2.win ? "win" : ""}"><span class="h-left">${left}</span><span>${right}</span></li>`;
     }).join("");
   }
@@ -948,11 +974,12 @@ export var UI = class {
     this.el.crystalFill.style.transform = `scaleX(${ratio})`;
     const shieldLeft = c2.shieldUntil - performance.now() / 1e3;
     this.el.crystalText.textContent = `${Math.ceil(c2.hp)} / ${c2.maxHp}` + (shieldLeft > 0 ? ` 🛡️${Math.ceil(shieldLeft)}s` : "");
-    const danger = ratio < 0.3 && ratio > 0;
+    const danger = ratio < CFG.crystal.desperation.threshold && ratio > 0;
     this.el.crystalWarning.classList.toggle("hidden", !danger);
     if (danger && !this._crystalWarned) {
       this._crystalWarned = true;
-      this.toast("💎 크리스탈이 위험하다! 수정 정수(R)로 회복하거나 방어선을 지켜라", "bad");
+      const pct = Math.round((CFG.crystal.desperation.dmgMult - 1) * 100);
+      this.toast(`💎 크리스탈이 위험하다! 대신 필사의 반격으로 근접·폭탄 대미지 +${pct}% — 수정 정수(R)로 회복하거나 방어선을 지켜라`, "bad");
       g2.sfx.crystalDanger();
     } else if (!danger) {
       this._crystalWarned = false;
@@ -1014,7 +1041,7 @@ export var UI = class {
     const hunting = g2.wave.phase === PHASE.COMBAT && g2.wave.remaining <= 3;
     for (const e of g2.enemyMgr.list) {
       if (e.dead) continue;
-      const isNotable = hunting || this.colorblind || e.st.boss || e.type === "shooter" || e.type === "raider" || e.elite;
+      const isNotable = hunting || this.colorblind || e.st.boss || e.type === "shooter" || e.type === "raider" || e.type === "healer" || e.elite;
       const slowed = now < e.slowUntil;
       const poisoned = now < e.poisonUntil;
       if (!isNotable && !slowed && !poisoned && !e.variant) continue;

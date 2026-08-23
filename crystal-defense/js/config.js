@@ -23,8 +23,12 @@ export var CFG = {
   crystal: {
     hp: 1e3,
     radius: 2.2,
-    hitRange: 3.6
+    hitRange: 3.6,
     // 몬스터가 크리스탈을 때리기 시작하는 거리
+    // 크리스탈 체력이 이 비율 아래로 떨어지면 "필사의 반격" — 플레이어의 근접·폭탄 대미지가 오른다.
+    // 기존에 있던 위험 경고(화면 가장자리 붉은 맥동 + 토스트)와 같은 문턱값을 그대로 실제 버프로 잇는다.
+    // 타워 대미지에는 적용하지 않는다 — 크리스탈이 위태로울수록 직접 뛰어들 이유를 만드는 게 목적.
+    desperation: { threshold: 0.3, dmgMult: 1.3 }
   },
   // 크리스탈 강화 — 정수(💠)로 크리스탈 자체를 영구히 키운다. 세 갈래 모두 레벨당 비용이 오르고
   // 최대 레벨이 있어 무한 스노우볼은 안 된다. 지킬 대상이 강해지면 후반에 방어선을 좁혀 버티는
@@ -217,6 +221,23 @@ export var CFG = {
   station: { range: 3.6 },
   // 화로 제련: 광물 -> 철
   smelt: { cost: { stone: 6 }, yield: 1 },
+  // 무기 강화 — 화로에서 철을 태워 이미 만든 무기(곡괭이 제외)의 위력을 영구히 올린다.
+  // 크리스탈 강화(정수)와 대칭되는 후반 자원 배출구: 정수는 크리스탈에, 철은 무기에 쓰게 된다.
+  // 레벨당 비용이 오르고 최대 레벨이 있어 크리스탈 강화처럼 무한 스노우볼은 아니다.
+  weaponUpgrade: {
+    maxLv: 3,
+    baseCost: 5,
+    costStep: 4,
+    // 무기별 레벨당 보너스. bow·spear는 원래 대미지 보너스가 없어(사거리·범위만 준다) 강화가
+    // 그 자리를 채워준다. bomb 은 근접 판정이 아니라 투척 대미지(craft.bomb.throw.dmg)에 붙는다.
+    perLv: {
+      sword: { dmg: 8 },
+      bow: { dmg: 10 },
+      spear: { dmg: 8 },
+      hammer: { dmg: 12 },
+      bomb: { dmg: 20 }
+    }
+  },
   // 제작대에서 만드는 것들. 각자 하나씩만 가질 수 있다.
   craft: {
     pickaxe: {
@@ -237,7 +258,7 @@ export var CFG = {
       icon: "🏹",
       cost: { wood: 20, iron: 3 },
       effect: { range: 2.4, arc: 0.5 },
-      desc: "공격 사거리 +2.4 \xB7 범위도 넓어진다."
+      desc: "공격 사거리 +2.4 · 범위도 넓어진다."
     },
     spear: {
       name: "창",
@@ -260,7 +281,7 @@ export var CFG = {
       name: "폭탄가방",
       icon: "💣",
       cost: { wood: 15, stone: 10 },
-      desc: "들면 공격이 근접 대신 조준한 곳에 폭탄을 던지는 것으로 바뀐다. 던질 때마다 목재\xB7광물을 태운다.",
+      desc: "들면 공격이 근접 대신 조준한 곳에 폭탄을 던지는 것으로 바뀐다. 던질 때마다 목재·광물을 태운다.",
       throw: { cost: { wood: 4, stone: 3 }, dmg: 70, radius: 3.2, cd: 1.1, speed: 13, range: 9 }
     }
   },
@@ -276,6 +297,10 @@ export var CFG = {
     // 벽·함정을 전부 무시하고 크리스탈로 직선 비행한다 — 길찾기 자체를 안 쓰므로 벽 중심 방어에 구멍을 낸다.
     // 대신 체력이 아주 낮아 타워 몇 대만 스치면 죽는다: "타워가 있어야 하는 이유"를 만드는 게 목적
     flyer: { name: "박쥐", icon: "🦇", hp: 26, speed: 4.6, dmg: 9, rate: 1.1, radius: 0.42, color: 8048895, bounty: { wood: 2, stone: 2 }, scale: 0.8, flies: true },
+    // 직접 공격은 약하지만(dmg 낮음), 주기적으로 주변 다친 아군을 회복시킨다 — 방치하면 같이
+    // 나온 잡졸들이 안 죽고 계속 버텨서, "다른 놈들보다 이놈부터" 라는 우선순위 판단을 강요한다.
+    // 무리 중 하나가 사라지면 눈에 띄게 편해지는 걸 체감하도록 설계.
+    healer: { name: "치유사", icon: "💉", hp: 85, speed: 2.3, dmg: 6, rate: 0.5, radius: 0.55, color: 4172995, bounty: { wood: 3, stone: 3 }, scale: 1, healAura: { radius: 5, pct: 0.05, interval: 1.5 } },
     boss: { name: "파괴자", icon: "💀", hp: 900, speed: 2.1, dmg: 70, rate: 0.7, radius: 1.4, color: 3092282, bounty: { wood: 30, stone: 30 }, scale: 2.3, boss: true },
     // 5의 배수 웨이브마다 파괴자와 번갈아 등장한다. 소환하는 잡졸이 전부 🛡️ 방패 변종이라(정면 피해 감소)
     // 뒤로 돌아가서 처리해야 하는 다른 압박을 준다 — 돌진/소환 패턴 자체는 파괴자와 동일하다.
@@ -329,13 +354,16 @@ export var CFG = {
   boons: {
     might: { name: "완력", icon: "💪", desc: "근접 공격력 +20%", kind: "mult", key: "atk", value: 1.2 },
     artillery: { name: "포격 강화", icon: "🗼", desc: "모든 타워 공격력 +15%", kind: "mult", key: "towerDmg", value: 1.15 },
-    affinity: { name: "정수 친화", icon: "💠", desc: "정수 스킬(폭발\xB7시간 왜곡\xB7방벽) 비용 -1", kind: "delta", key: "skillCostDelta", value: -1 },
+    affinity: { name: "정수 친화", icon: "💠", desc: "정수 스킬(폭발·시간 왜곡·방벽) 비용 -1", kind: "delta", key: "skillCostDelta", value: -1 },
     aid: { name: "응급 처치", icon: "❤️", desc: "크리스탈 체력 300 즉시 회복", kind: "instant" },
     bond: { name: "수정 결속", icon: "💎", desc: "크리스탈 최대 체력 +150", kind: "maxHp", value: 150 },
-    plunder: { name: "약탈", icon: "💰", desc: "몬스터 처치 보상(목재\xB7광물) +25%", kind: "mult", key: "bounty", value: 1.25 },
+    plunder: { name: "약탈", icon: "💰", desc: "몬스터 처치 보상(목재·광물) +25%", kind: "mult", key: "bounty", value: 1.25 },
     // 이번 세션에 추가된 크리스탈 강화(정수로 체력·재생·오라를 사는 시스템)와 맞물리는 축복.
     // affinity(정수 스킬 비용 -1)와 정확히 같은 구조를 크리스탈 강화 쪽에 그대로 옮겨온 것.
-    growth: { name: "성장 가속", icon: "🌱", desc: "크리스탈 강화 비용 -1 (최소 1)", kind: "delta", key: "crystalUpgradeCostDelta", value: -1 }
+    growth: { name: "성장 가속", icon: "🌱", desc: "크리스탈 강화 비용 -1 (최소 1)", kind: "delta", key: "crystalUpgradeCostDelta", value: -1 },
+    // growth 와 같은 구조를 이번 세션에 추가된 무기 강화 쪽으로도 옮긴 것. 철 비용이 정수보다
+    // 단위가 커서(레벨당 5~13) -1로는 체감이 약해 -3으로 잡았다.
+    forging: { name: "제련술", icon: "⚒️", desc: "무기 강화 비용 -3 (최소 1)", kind: "delta", key: "weaponUpgradeCostDelta", value: -3 }
   },
   // 보스 전용 패턴. 예고 시간을 반드시 두어서 플레이어가 반응할 수 있게 한다.
   bossPattern: {
@@ -401,12 +429,17 @@ function _standardTotal(w2) {
   if (w2 >= 4) n += 1 + Math.floor((w2 - 2) / 2);
   if (w2 >= 5) n += 1 + Math.floor((w2 - 3) / 3);
   if (w2 >= 6) n += 1 + Math.floor((w2 - 4) / 2);
+  if (w2 >= 7) n += 1 + Math.floor((w2 - 5) / 3);
   return n;
 }
 export var SPECIAL_WAVES = {
   rush: { name: "러시", icon: "🏃", desc: "러너가 대량으로 몰려온다 — 물량으로 밀어붙인다" },
-  siege: { name: "공성", icon: "🏰", desc: "느리지만 단단한 근접\xB7투척 부대 — 건물이 표적이다" },
-  elite: { name: "정예전", icon: "⭐", desc: "수는 적지만 전부 강화된 정예다" }
+  siege: { name: "공성", icon: "🏰", desc: "느리지만 단단한 근접·투척 부대 — 건물이 표적이다" },
+  elite: { name: "정예전", icon: "⭐", desc: "수는 적지만 전부 강화된 정예다" },
+  // 이번 웨이브의 몬스터는(정예로 뽑히지 않는 한) 전부 결계(ward)를 두르고 나온다 — 타워가
+  // 아예 조준을 못 하니 트랩·근접·정수 스킬로 직접 정리해야 한다. 평소엔 가끔 섞여 나오는
+  // 변종 하나를 "이번 웨이브 전체의 규칙"으로 확대한 것 — 방어선을 잠깐 내려놓고 뛰어들게 만든다.
+  ward: { name: "결계", icon: "🌀", desc: "몬스터 전부가 결계에 씌워 타워가 조준하지 못한다 — 트랩·근접·정수 스킬로 직접 정리해야 한다" }
 };
 var SPECIAL_KEYS = Object.keys(SPECIAL_WAVES);
 export function specialWaveKind(w2) {
@@ -439,6 +472,7 @@ export function waveComposition(w2) {
     if (w2 >= 4) l2.push({ type: "shooter", count: 1 + Math.floor((w2 - 2) / 2) });
     if (w2 >= 5) l2.push({ type: "raider", count: 1 + Math.floor((w2 - 3) / 3) });
     if (w2 >= 6) l2.push({ type: "flyer", count: 1 + Math.floor((w2 - 4) / 2) });
+    if (w2 >= 7) l2.push({ type: "healer", count: 1 + Math.floor((w2 - 5) / 3) });
     return l2;
   })();
   if (w2 % 5 === 0) {
@@ -489,9 +523,9 @@ export function enemyStats(type, wave) {
   };
 }
 export var DIFFICULTIES = {
-  normal: { key: "normal", label: "보통", desc: "맨손으로 시작 \xB7 나무부터 캔다", startWood: 0, startStone: 0, prepBonus: 0, hpMult: 1, dmgMult: 1 },
-  easy: { key: "easy", label: "쉬움", desc: "준비 시간 +30초 \xB7 시작 자원은 똑같이 0", startWood: 0, startStone: 0, prepBonus: 30, hpMult: 1, dmgMult: 1 },
-  hard: { key: "hard", label: "어려움", desc: "준비 시간 -15초 \xB7 몬스터 체력\xB7공격력 +15% \xB7 시작 자원 0", startWood: 0, startStone: 0, prepBonus: -15, hpMult: 1.15, dmgMult: 1.15 }
+  normal: { key: "normal", label: "보통", desc: "맨손으로 시작 · 나무부터 캔다", startWood: 0, startStone: 0, prepBonus: 0, hpMult: 1, dmgMult: 1 },
+  easy: { key: "easy", label: "쉬움", desc: "준비 시간 +30초 · 시작 자원은 똑같이 0", startWood: 0, startStone: 0, prepBonus: 30, hpMult: 1, dmgMult: 1 },
+  hard: { key: "hard", label: "어려움", desc: "준비 시간 -15초 · 몬스터 체력·공격력 +15% · 시작 자원 0", startWood: 0, startStone: 0, prepBonus: -15, hpMult: 1.15, dmgMult: 1.15 }
 };
 var BASE_PREP_TIME = CFG.wave.prepTime;
 var BASE_FIRST_PREP_TIME = CFG.wave.firstPrepTime;

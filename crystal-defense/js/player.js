@@ -50,6 +50,7 @@ var Player = class {
     this.res = { wood: 0, stone: 0 };
     this.shards = 0;
     this.tools = {};
+    this.weaponLv = {};
     this.equipped = null;
     this.harvestLv = 1;
     this.harvesting = null;
@@ -108,7 +109,14 @@ var Player = class {
     const out = { dmg: base.dmg, range: base.range, arc: base.arc, cd: base.cd };
     const eff = CFG.craft[this.heldWeapon]?.effect;
     if (eff) for (const k2 of Object.keys(eff)) out[k2] += eff[k2];
+    const bonus = CFG.weaponUpgrade.perLv[this.heldWeapon];
+    const lv = this.weaponLv[this.heldWeapon] || 0;
+    if (bonus && lv) for (const k2 of Object.keys(bonus)) out[k2] = (out[k2] || 0) + bonus[k2] * lv;
     return out;
+  }
+  // 지금 손에 든 무기의 강화 레벨 (없으면 0). 폭탄가방은 근접 판정이 아니라 투척 대미지에 따로 적용된다
+  get heldWeaponLv() {
+    return this.weaponLv[this.heldWeapon] || 0;
   }
   damage(amount) {
     if (!this.alive) return false;
@@ -357,6 +365,7 @@ export var RemotePlayer = class extends Player {
     if (s2.held) {
       this.tools[s2.held] = true;
       this.equipped = s2.held;
+      if (s2.heldLv !== void 0) this.weaponLv[s2.held] = s2.heldLv;
     } else {
       this.equipped = null;
     }

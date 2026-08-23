@@ -10172,7 +10172,8 @@ button.corner.mute.off { opacity: 0.5; }
     allBosses: { name: "\uC0BC\uC704\uC77C\uCCB4", icon: "\u{1F451}", desc: "\uD55C \uD310\uC5D0\uC11C \uD30C\uAD34\uC790\xB7\uC11C\uB9AC \uAD70\uC8FC\xB7\uCE68\uBB35\uC758 \uAD70\uC8FC\uB97C \uC804\uBD80 \uCC98\uCE58\uD588\uB2E4" },
     trapMaster: { name: "\uB36B\uC0AC\uB0E5\uAFBC", icon: "\u{1FAA4}", desc: "\uD55C \uD310\uC5D0\uC11C \uD568\uC815\uC744 3\uBC88 \uC774\uC0C1 \uBC1C\uB3D9\uC2DC\uCF30\uB2E4" },
     ironWill: { name: "\uAC15\uCCA0 \uC758\uC9C0", icon: "\u{1F529}", desc: "\uC5B4\uB824\uC6C0 \uB09C\uC774\uB3C4\uB85C 10\uC6E8\uC774\uBE0C\uB97C \uB9C9\uC544\uB0C8\uB2E4" },
-    eliteHunter: { name: "\uC815\uC608 \uC0AC\uB0E5\uAFBC", icon: "\u2B50", desc: "\uC815\uC608 \uBAAC\uC2A4\uD130\uB97C 5\uB9C8\uB9AC \uCC98\uCE58\uD588\uB2E4" }
+    eliteHunter: { name: "\uC815\uC608 \uC0AC\uB0E5\uAFBC", icon: "\u2B50", desc: "\uC815\uC608 \uBAAC\uC2A4\uD130\uB97C 5\uB9C8\uB9AC \uCC98\uCE58\uD588\uB2E4" },
+    weaponMaster: { name: "\uC7A5\uC778\uC758 \uC190\uAE38", icon: "\u{1F6E0}\uFE0F", desc: "\uBB34\uAE30 \uD558\uB098\uB97C \uCD5C\uB300 \uB808\uBCA8\uAE4C\uC9C0 \uAC15\uD654\uD588\uB2E4" }
   };
   var STORE_KEY = "cd.achievements";
   function loadUnlocked() {
@@ -10689,8 +10690,12 @@ button.corner.mute.off { opacity: 0.5; }
     crystal: {
       hp: 1e3,
       radius: 2.2,
-      hitRange: 3.6
+      hitRange: 3.6,
       // 몬스터가 크리스탈을 때리기 시작하는 거리
+      // 크리스탈 체력이 이 비율 아래로 떨어지면 "필사의 반격" — 플레이어의 근접·폭탄 대미지가 오른다.
+      // 기존에 있던 위험 경고(화면 가장자리 붉은 맥동 + 토스트)와 같은 문턱값을 그대로 실제 버프로 잇는다.
+      // 타워 대미지에는 적용하지 않는다 — 크리스탈이 위태로울수록 직접 뛰어들 이유를 만드는 게 목적.
+      desperation: { threshold: 0.3, dmgMult: 1.3 }
     },
     // 크리스탈 강화 — 정수(💠)로 크리스탈 자체를 영구히 키운다. 세 갈래 모두 레벨당 비용이 오르고
     // 최대 레벨이 있어 무한 스노우볼은 안 된다. 지킬 대상이 강해지면 후반에 방어선을 좁혀 버티는
@@ -10883,6 +10888,23 @@ button.corner.mute.off { opacity: 0.5; }
     station: { range: 3.6 },
     // 화로 제련: 광물 -> 철
     smelt: { cost: { stone: 6 }, yield: 1 },
+    // 무기 강화 — 화로에서 철을 태워 이미 만든 무기(곡괭이 제외)의 위력을 영구히 올린다.
+    // 크리스탈 강화(정수)와 대칭되는 후반 자원 배출구: 정수는 크리스탈에, 철은 무기에 쓰게 된다.
+    // 레벨당 비용이 오르고 최대 레벨이 있어 크리스탈 강화처럼 무한 스노우볼은 아니다.
+    weaponUpgrade: {
+      maxLv: 3,
+      baseCost: 5,
+      costStep: 4,
+      // 무기별 레벨당 보너스. bow·spear는 원래 대미지 보너스가 없어(사거리·범위만 준다) 강화가
+      // 그 자리를 채워준다. bomb 은 근접 판정이 아니라 투척 대미지(craft.bomb.throw.dmg)에 붙는다.
+      perLv: {
+        sword: { dmg: 8 },
+        bow: { dmg: 10 },
+        spear: { dmg: 8 },
+        hammer: { dmg: 12 },
+        bomb: { dmg: 20 }
+      }
+    },
     // 제작대에서 만드는 것들. 각자 하나씩만 가질 수 있다.
     craft: {
       pickaxe: {
@@ -10942,6 +10964,10 @@ button.corner.mute.off { opacity: 0.5; }
       // 벽·함정을 전부 무시하고 크리스탈로 직선 비행한다 — 길찾기 자체를 안 쓰므로 벽 중심 방어에 구멍을 낸다.
       // 대신 체력이 아주 낮아 타워 몇 대만 스치면 죽는다: "타워가 있어야 하는 이유"를 만드는 게 목적
       flyer: { name: "\uBC15\uC950", icon: "\u{1F987}", hp: 26, speed: 4.6, dmg: 9, rate: 1.1, radius: 0.42, color: 8048895, bounty: { wood: 2, stone: 2 }, scale: 0.8, flies: true },
+      // 직접 공격은 약하지만(dmg 낮음), 주기적으로 주변 다친 아군을 회복시킨다 — 방치하면 같이
+      // 나온 잡졸들이 안 죽고 계속 버텨서, "다른 놈들보다 이놈부터" 라는 우선순위 판단을 강요한다.
+      // 무리 중 하나가 사라지면 눈에 띄게 편해지는 걸 체감하도록 설계.
+      healer: { name: "\uCE58\uC720\uC0AC", icon: "\u{1F489}", hp: 85, speed: 2.3, dmg: 6, rate: 0.5, radius: 0.55, color: 4172995, bounty: { wood: 3, stone: 3 }, scale: 1, healAura: { radius: 5, pct: 0.05, interval: 1.5 } },
       boss: { name: "\uD30C\uAD34\uC790", icon: "\u{1F480}", hp: 900, speed: 2.1, dmg: 70, rate: 0.7, radius: 1.4, color: 3092282, bounty: { wood: 30, stone: 30 }, scale: 2.3, boss: true },
       // 5의 배수 웨이브마다 파괴자와 번갈아 등장한다. 소환하는 잡졸이 전부 🛡️ 방패 변종이라(정면 피해 감소)
       // 뒤로 돌아가서 처리해야 하는 다른 압박을 준다 — 돌진/소환 패턴 자체는 파괴자와 동일하다.
@@ -11001,7 +11027,10 @@ button.corner.mute.off { opacity: 0.5; }
       plunder: { name: "\uC57D\uD0C8", icon: "\u{1F4B0}", desc: "\uBAAC\uC2A4\uD130 \uCC98\uCE58 \uBCF4\uC0C1(\uBAA9\uC7AC\xB7\uAD11\uBB3C) +25%", kind: "mult", key: "bounty", value: 1.25 },
       // 이번 세션에 추가된 크리스탈 강화(정수로 체력·재생·오라를 사는 시스템)와 맞물리는 축복.
       // affinity(정수 스킬 비용 -1)와 정확히 같은 구조를 크리스탈 강화 쪽에 그대로 옮겨온 것.
-      growth: { name: "\uC131\uC7A5 \uAC00\uC18D", icon: "\u{1F331}", desc: "\uD06C\uB9AC\uC2A4\uD0C8 \uAC15\uD654 \uBE44\uC6A9 -1 (\uCD5C\uC18C 1)", kind: "delta", key: "crystalUpgradeCostDelta", value: -1 }
+      growth: { name: "\uC131\uC7A5 \uAC00\uC18D", icon: "\u{1F331}", desc: "\uD06C\uB9AC\uC2A4\uD0C8 \uAC15\uD654 \uBE44\uC6A9 -1 (\uCD5C\uC18C 1)", kind: "delta", key: "crystalUpgradeCostDelta", value: -1 },
+      // growth 와 같은 구조를 이번 세션에 추가된 무기 강화 쪽으로도 옮긴 것. 철 비용이 정수보다
+      // 단위가 커서(레벨당 5~13) -1로는 체감이 약해 -3으로 잡았다.
+      forging: { name: "\uC81C\uB828\uC220", icon: "\u2692\uFE0F", desc: "\uBB34\uAE30 \uAC15\uD654 \uBE44\uC6A9 -3 (\uCD5C\uC18C 1)", kind: "delta", key: "weaponUpgradeCostDelta", value: -3 }
     },
     // 보스 전용 패턴. 예고 시간을 반드시 두어서 플레이어가 반응할 수 있게 한다.
     bossPattern: {
@@ -11067,12 +11096,17 @@ button.corner.mute.off { opacity: 0.5; }
     if (w2 >= 4) n += 1 + Math.floor((w2 - 2) / 2);
     if (w2 >= 5) n += 1 + Math.floor((w2 - 3) / 3);
     if (w2 >= 6) n += 1 + Math.floor((w2 - 4) / 2);
+    if (w2 >= 7) n += 1 + Math.floor((w2 - 5) / 3);
     return n;
   }
   var SPECIAL_WAVES = {
     rush: { name: "\uB7EC\uC2DC", icon: "\u{1F3C3}", desc: "\uB7EC\uB108\uAC00 \uB300\uB7C9\uC73C\uB85C \uBAB0\uB824\uC628\uB2E4 \u2014 \uBB3C\uB7C9\uC73C\uB85C \uBC00\uC5B4\uBD99\uC778\uB2E4" },
     siege: { name: "\uACF5\uC131", icon: "\u{1F3F0}", desc: "\uB290\uB9AC\uC9C0\uB9CC \uB2E8\uB2E8\uD55C \uADFC\uC811\xB7\uD22C\uCC99 \uBD80\uB300 \u2014 \uAC74\uBB3C\uC774 \uD45C\uC801\uC774\uB2E4" },
-    elite: { name: "\uC815\uC608\uC804", icon: "\u2B50", desc: "\uC218\uB294 \uC801\uC9C0\uB9CC \uC804\uBD80 \uAC15\uD654\uB41C \uC815\uC608\uB2E4" }
+    elite: { name: "\uC815\uC608\uC804", icon: "\u2B50", desc: "\uC218\uB294 \uC801\uC9C0\uB9CC \uC804\uBD80 \uAC15\uD654\uB41C \uC815\uC608\uB2E4" },
+    // 이번 웨이브의 몬스터는(정예로 뽑히지 않는 한) 전부 결계(ward)를 두르고 나온다 — 타워가
+    // 아예 조준을 못 하니 트랩·근접·정수 스킬로 직접 정리해야 한다. 평소엔 가끔 섞여 나오는
+    // 변종 하나를 "이번 웨이브 전체의 규칙"으로 확대한 것 — 방어선을 잠깐 내려놓고 뛰어들게 만든다.
+    ward: { name: "\uACB0\uACC4", icon: "\u{1F300}", desc: "\uBAAC\uC2A4\uD130 \uC804\uBD80\uAC00 \uACB0\uACC4\uC5D0 \uC50C\uC6CC \uD0C0\uC6CC\uAC00 \uC870\uC900\uD558\uC9C0 \uBABB\uD55C\uB2E4 \u2014 \uD2B8\uB7A9\xB7\uADFC\uC811\xB7\uC815\uC218 \uC2A4\uD0AC\uB85C \uC9C1\uC811 \uC815\uB9AC\uD574\uC57C \uD55C\uB2E4" }
   };
   var SPECIAL_KEYS = Object.keys(SPECIAL_WAVES);
   function specialWaveKind(w2) {
@@ -11105,6 +11139,7 @@ button.corner.mute.off { opacity: 0.5; }
       if (w2 >= 4) l2.push({ type: "shooter", count: 1 + Math.floor((w2 - 2) / 2) });
       if (w2 >= 5) l2.push({ type: "raider", count: 1 + Math.floor((w2 - 3) / 3) });
       if (w2 >= 6) l2.push({ type: "flyer", count: 1 + Math.floor((w2 - 4) / 2) });
+      if (w2 >= 7) l2.push({ type: "healer", count: 1 + Math.floor((w2 - 5) / 3) });
       return l2;
     })();
     if (w2 % 5 === 0) {
@@ -12112,6 +12147,22 @@ button.corner.mute.off { opacity: 0.5; }
           if (e.bodyMat) {
             e.bodyMat.emissive?.setHex(3390720);
             e.bodyMat.emissiveIntensity = 0.5 + Math.sin(now * 5) * 0.15;
+          }
+        }
+        if (e.st.healAura) {
+          e._healCd = (e._healCd || 0) - dt2;
+          if (e._healCd <= 0) {
+            const ha2 = e.st.healAura;
+            e._healCd = ha2.interval;
+            let healedAny = false;
+            for (const o of list) {
+              if (o === e || o.dead || o.hp >= o.maxHp) continue;
+              if (dist(e.x, e.z, o.x, o.z) > ha2.radius) continue;
+              o.hp = Math.min(o.maxHp, o.hp + o.maxHp * ha2.pct);
+              o.refreshBar();
+              healedAny = true;
+            }
+            if (healedAny) this.onHealPulse?.(e);
           }
         }
         if (e.st.boss && this._bossTick(e, dt2, now)) {
@@ -13281,6 +13332,7 @@ button.corner.mute.off { opacity: 0.5; }
       this.res = { wood: 0, stone: 0 };
       this.shards = 0;
       this.tools = {};
+      this.weaponLv = {};
       this.equipped = null;
       this.harvestLv = 1;
       this.harvesting = null;
@@ -13339,7 +13391,14 @@ button.corner.mute.off { opacity: 0.5; }
       const out = { dmg: base.dmg, range: base.range, arc: base.arc, cd: base.cd };
       const eff = CFG.craft[this.heldWeapon]?.effect;
       if (eff) for (const k2 of Object.keys(eff)) out[k2] += eff[k2];
+      const bonus = CFG.weaponUpgrade.perLv[this.heldWeapon];
+      const lv = this.weaponLv[this.heldWeapon] || 0;
+      if (bonus && lv) for (const k2 of Object.keys(bonus)) out[k2] = (out[k2] || 0) + bonus[k2] * lv;
       return out;
+    }
+    // 지금 손에 든 무기의 강화 레벨 (없으면 0). 폭탄가방은 근접 판정이 아니라 투척 대미지에 따로 적용된다
+    get heldWeaponLv() {
+      return this.weaponLv[this.heldWeapon] || 0;
     }
     damage(amount) {
       if (!this.alive) return false;
@@ -13588,6 +13647,7 @@ button.corner.mute.off { opacity: 0.5; }
       if (s2.held) {
         this.tools[s2.held] = true;
         this.equipped = s2.held;
+        if (s2.heldLv !== void 0) this.weaponLv[s2.held] = s2.heldLv;
       } else {
         this.equipped = null;
       }
@@ -13901,7 +13961,7 @@ button.corner.mute.off { opacity: 0.5; }
             const ec = CFG.elite;
             statMult = { hp: ec.hpMult, scale: ec.scaleMult, dmg: ec.dmgMult, bounty: ec.bountyMult, elite: true };
           } else if (!isBossType) {
-            variant = rollVariant(this.wave + 1);
+            variant = this._specialKind === "ward" ? "ward" : rollVariant(this.wave + 1);
           }
           const spawned = this.enemies.spawn(
             type,
@@ -14477,7 +14537,7 @@ button.corner.mute.off { opacity: 0.5; }
       this._seenTrap = false;
       this._seenDash = false;
       this._seenBomb = false;
-      this.boonMult = { atk: 1, towerDmg: 1, skillCostDelta: 0, bounty: 1, crystalUpgradeCostDelta: 0 };
+      this.boonMult = { atk: 1, towerDmg: 1, skillCostDelta: 0, bounty: 1, crystalUpgradeCostDelta: 0, weaponUpgradeCostDelta: 0 };
       this.pendingBoon = null;
       this._dropTimer = CFG.supplyDrop.firstDelay;
       this._dropIdSeq = 1;
@@ -14602,12 +14662,19 @@ button.corner.mute.off { opacity: 0.5; }
       this.enemyMgr.onPoisonTick = (e, dmg) => {
         this._hurtEnemy(e, dmg, "poison");
       };
+      this.enemyMgr.onHealPulse = (e) => {
+        this.fx.ring(e.x, e.z, 3390720, CFG.enemies.healer.healAura.radius);
+      };
       this.enemyMgr.onSpawn = (e) => {
         if (e.elite) {
           if (specialWaveKind(this.wave.wave + 1) !== "elite") {
             this.ui?.toast(`\u2B50 \uC815\uC608 ${CFG.enemies[e.type].name} \uB4F1\uC7A5! \uCCB4\uB825\xB7\uACF5\uACA9\uB825\uC774 \uD6E8\uC52C \uC138\uC9C0\uB9CC \uCC98\uCE58 \uBCF4\uC0C1\uC740 3\uBC30\uB2E4`, "warn");
           }
           return;
+        }
+        if (e.type === "healer" && !this._seenHealer) {
+          this._seenHealer = true;
+          this.ui?.toast("\u{1F489} \uCE58\uC720\uC0AC \uB4F1\uC7A5! \uC8FC\uAE30\uC801\uC73C\uB85C \uC8FC\uBCC0 \uC544\uAD70\uC744 \uD68C\uBCF5\uC2DC\uD0A8\uB2E4 \u2014 \uB194\uB450\uBA74 \uBB34\uB9AC \uC804\uCCB4\uAC00 \uC548 \uC8FD\uB294\uB2E4, \uBA3C\uC800 \uB178\uB824\uB77C", "warn");
         }
         if (!e.variant || this._seenVariant) return;
         this._seenVariant = true;
@@ -14714,7 +14781,12 @@ button.corner.mute.off { opacity: 0.5; }
       this.sfx.upgrade();
       this.net.send("boonPicked", { text: msg });
     }
-    _unlockAchievement(key) {
+    // playerId 를 넘기면 그 사람의 개인 행동에 대한 업적이라는 뜻 — 호스트가 참가자 대신 처리하는
+    // 액션(스킬 사용 등)에서 이걸 안 넘기면, 실제로는 참가자가 한 행동인데 호스트 자신의 브라우저에
+    // 업적이 잘못 붙는 사고가 난다(호스트만 _unlockAchievement 를 실행하기 때문). 팀 단위 업적(보스
+    // 처치, 웨이브 클리어 조건 등)은 그대로 playerId 없이 호출한다.
+    _unlockAchievement(key, playerId) {
+      if (playerId !== void 0 && playerId !== this.local.id) return;
       if (!unlock(key)) return;
       const a = ACHIEVEMENTS[key];
       this.stats.newAchievements.push(key);
@@ -15157,12 +15229,13 @@ button.corner.mute.off { opacity: 0.5; }
       }
       payCost(pool, cfg.cost);
       this._trackSpend(cfg.cost, "craft");
+      const dmg = Math.round((cfg.dmg + (CFG.weaponUpgrade.perLv.bomb?.dmg || 0) * this._weaponLvOf("bomb", playerId)) * this._desperationMult);
       const from = new Ui(fromX, 1.1, fromZ);
       const to2 = new Ui(tx, 0.4, tz);
       this.projectiles.fire(from, to2, cfg.speed, 3355443, (pos) => {
         this._bombVFX(pos, cfg.radius);
         const targets = this.enemyMgr.list.filter((e) => !e.dead && dist(e.x, e.z, pos.x, pos.z) <= cfg.radius);
-        for (const e of targets) this._hurtEnemy(e, cfg.dmg, "player", pos.x, pos.z);
+        for (const e of targets) this._hurtEnemy(e, dmg, "player", pos.x, pos.z);
       });
     }
     // 회피 돌진: 순수 로컬 동작(이동의 연장) — 서버 승인이 필요 없다. 무적 여부는 "pos" 동기화에
@@ -15180,9 +15253,15 @@ button.corner.mute.off { opacity: 0.5; }
         this.ui?.toast("\u{1F4A8} \uD68C\uD53C \uB3CC\uC9C4! \uC7A0\uAE50 \uBB34\uC801\uC73C\uB85C \uD280\uC5B4\uB098\uAC04\uB2E4 \u2014 \uBCF4\uC2A4 \uB3CC\uC9C4\uC774\uB098 \uB2E4\uAD6C\uB9AC\uB97C \uD53C\uD558\uAC70\uB098, \uACB0\uACC4 \uBAB9\uC5D0\uAC8C \uC21C\uC2DD\uAC04\uC5D0 \uBD99\uC744 \uB54C \uC368\uB77C", "good");
       }
     }
+    // 크리스탈 체력이 위험 문턱 아래면 "필사의 반격" — 플레이어(근접·폭탄)의 대미지가 오른다.
+    // 타워에는 적용하지 않는다: 위기에서 직접 뛰어들 이유를 만드는 게 목적이라 자동 화력은 제외.
+    get _desperationMult() {
+      const c2 = this.world.crystal;
+      return c2.hp > 0 && c2.hp / c2.maxHp < CFG.crystal.desperation.threshold ? CFG.crystal.desperation.dmgMult : 1;
+    }
     hostAttack(playerId, x2, z2, rot) {
       const a = this.players.get(playerId)?.attackStats ?? CFG.player.attack;
-      const dmg = Math.round(a.dmg * this.boonMult.atk);
+      const dmg = Math.round(a.dmg * this.boonMult.atk * this._desperationMult);
       for (const e of this.enemyMgr.list) {
         if (e.dead) continue;
         const d2 = dist(x2, z2, e.x, e.z);
@@ -15352,6 +15431,54 @@ button.corner.mute.off { opacity: 0.5; }
       if (playerId === this.local.id) this.sfx.upgrade();
       else this.net.send("smeltOk", { to: playerId });
     }
+    // 무기 강화 다음 레벨의 철 비용
+    _weaponUpgradeCost(key) {
+      const lv = this._weaponLvOf(key);
+      return { iron: Math.max(1, CFG.weaponUpgrade.baseCost + CFG.weaponUpgrade.costStep * lv + this.boonMult.weaponUpgradeCostDelta) };
+    }
+    _weaponLvOf(key, playerId = this.local.id) {
+      return this.players.get(playerId)?.weaponLv[key] || 0;
+    }
+    requestUpgradeWeapon(key) {
+      if (this.isHost) this.hostUpgradeWeapon(this.local.id, key);
+      else this.net.send("upgradeWeapon", { key });
+    }
+    hostUpgradeWeapon(playerId, key) {
+      const bonus = CFG.weaponUpgrade.perLv[key];
+      const p2 = this.players.get(playerId);
+      if (!bonus || !p2) return;
+      if (!p2.tools[key]) {
+        this._notify(playerId, "\uBA3C\uC800 \uC81C\uC791\uD574\uC57C \uAC15\uD654\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4", "bad");
+        return;
+      }
+      if (!this.hasStation("furnace")) {
+        this._notify(playerId, "\uD654\uB85C\uAC00 \uC788\uC5B4\uC57C \uAC15\uD654\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4", "bad");
+        return;
+      }
+      const lv = this._weaponLvOf(key, playerId);
+      if (lv >= CFG.weaponUpgrade.maxLv) {
+        this._notify(playerId, "\uC774\uBBF8 \uCD5C\uB300 \uB808\uBCA8\uC785\uB2C8\uB2E4", "bad");
+        return;
+      }
+      const cost = this._weaponUpgradeCost(key);
+      const pool = this._poolOf(playerId);
+      if (!canAfford(pool, cost)) {
+        this._notify(playerId, "\uCCA0\uC774 \uBD80\uC871\uD569\uB2C8\uB2E4", "bad");
+        return;
+      }
+      payCost(pool, cost);
+      this._trackSpend(cost, "craft");
+      p2.weaponLv[key] = lv + 1;
+      if (lv + 1 >= CFG.weaponUpgrade.maxLv) this._unlockAchievement("weaponMaster", playerId);
+      const def = CFG.craft[key];
+      this._notify(playerId, `${def.icon} ${def.name} \uAC15\uD654 Lv.${lv + 1}!`, "good");
+      if (playerId === this.local.id) {
+        this.fx.float(`${def.icon} Lv.${lv + 1}`, this.local.x, 2.2, this.local.z, "good");
+        this.sfx.upgrade();
+      } else {
+        this.net.send("upgradeWeaponOk", { to: playerId, key, lv: lv + 1 });
+      }
+    }
     requestShard() {
       this.sfx.shard();
       if (this.isHost) this.hostShard(this.local.id);
@@ -15447,7 +15574,7 @@ button.corner.mute.off { opacity: 0.5; }
         return;
       }
       pool.shard -= cost;
-      this._unlockAchievement("skillUser");
+      this._unlockAchievement("skillUser", playerId);
       const targets = this.enemyMgr.list.filter((e) => !e.dead && dist(e.x, e.z, p2.x, p2.z) <= s2.radius);
       for (const e of targets) this._hurtEnemy(e, s2.dmg, "player", p2.x, p2.z);
       this.fx.ring(p2.x, p2.z, 16751178, s2.radius);
@@ -15471,7 +15598,7 @@ button.corner.mute.off { opacity: 0.5; }
         return;
       }
       pool.shard -= cost;
-      this._unlockAchievement("skillUser");
+      this._unlockAchievement("skillUser", playerId);
       const now = performance.now() / 1e3;
       const targets = this.enemyMgr.list.filter((e) => !e.dead && dist(e.x, e.z, p2.x, p2.z) <= s2.radius);
       for (const e of targets) e.applySlow(s2.slow, s2.time, now);
@@ -15493,7 +15620,7 @@ button.corner.mute.off { opacity: 0.5; }
         return;
       }
       pool.shard -= cost;
-      this._unlockAchievement("skillUser");
+      this._unlockAchievement("skillUser", playerId);
       this.world.activateShield(s2.time);
       this.fx.ring(0, 0, 16766720, 5);
       this.fx.burst(0, 3.4, 0, 16766720, 20, 6);
@@ -15536,8 +15663,11 @@ button.corner.mute.off { opacity: 0.5; }
       from.tools[key] = false;
       if (from.equipped === key) from.equipped = null;
       to2.tools[key] = true;
+      to2.weaponLv[key] = from.weaponLv[key] || 0;
+      from.weaponLv[key] = 0;
       const def = CFG.craft[key];
-      this._notify(toId, `${def.icon} ${def.name}\uC744(\uB97C) \uBC1B\uC558\uB2E4 \u2014 \uC778\uBCA4\uD1A0\uB9AC \uC7A5\uBE44 \uD0ED\uC5D0\uC11C \uC190\uC5D0 \uC958 \uC218 \uC788\uB2E4`, "good");
+      const lvNote = to2.weaponLv[key] ? ` (\uAC15\uD654 Lv.${to2.weaponLv[key]})` : "";
+      this._notify(toId, `${def.icon} ${def.name}\uC744(\uB97C) \uBC1B\uC558\uB2E4${lvNote} \u2014 \uC778\uBCA4\uD1A0\uB9AC \uC7A5\uBE44 \uD0ED\uC5D0\uC11C \uC190\uC5D0 \uC958 \uC218 \uC788\uB2E4`, "good");
     }
     _notify(playerId, text, kind) {
       if (playerId === this.local.id) {
@@ -15636,6 +15766,9 @@ button.corner.mute.off { opacity: 0.5; }
       net.on("smelt", (d2, from) => {
         if (this.isHost) this.hostSmelt(from);
       });
+      net.on("upgradeWeapon", (d2, from) => {
+        if (this.isHost) this.hostUpgradeWeapon(from, d2.key);
+      });
       net.on("shard", (d2, from) => {
         if (this.isHost) this.hostShard(from);
       });
@@ -15683,6 +15816,12 @@ button.corner.mute.off { opacity: 0.5; }
       net.on("smeltOk", (d2) => {
         if (d2.to === net.selfId) this.sfx.upgrade();
       });
+      net.on("upgradeWeaponOk", (d2) => {
+        if (d2.to === net.selfId) {
+          this.local.weaponLv[d2.key] = d2.lv;
+          this.sfx.upgrade();
+        }
+      });
       net.on("waveStarted", () => {
         if (!this.isHost) {
           const w2 = this.wave.wave + 1;
@@ -15709,7 +15848,7 @@ button.corner.mute.off { opacity: 0.5; }
     _snapshot() {
       const players = {};
       for (const p2 of this.players.values()) {
-        players[p2.id] = { hv: p2.harvestLv, tl: Object.keys(p2.tools).filter((k2) => p2.tools[k2]), eq: p2.equipped || null };
+        players[p2.id] = { hv: p2.harvestLv, tl: Object.keys(p2.tools).filter((k2) => p2.tools[k2]), eq: p2.equipped || null, wl: p2.weaponLv };
       }
       return {
         e: this.enemyMgr.snapshot(),
@@ -15725,16 +15864,49 @@ button.corner.mute.off { opacity: 0.5; }
         mt: this._meteorPending ? [Math.round(this._meteorPending.x * 10) / 10, Math.round(this._meteorPending.z * 10) / 10, Math.round(this._meteorPending.timeLeft * 10) / 10] : null,
         r: this.shared ? { team: this.pools.team } : { byId: this.pools.byId },
         p: players,
-        sh: this.shared
+        sh: this.shared,
+        // 결과 화면(처치·채집·소모·건설 수)과 팀 단위 업적 판정에 쓰는 통계.
+        // 참가자의 this.stats 는 자기 자신이 직접 처리한 것만 쌓이므로(대부분의 집계가 호스트
+        // 전용 코드 경로에서만 늘어난다) 이게 없으면 참가자는 결과 화면에서 전부 0을 본다.
+        // time·newAchievements 는 클라이언트 각자의 것이라 여기 안 실어서 참가자 쪽 값을 덮지 않는다.
+        st: {
+          harvested: this.stats.harvested,
+          built: this.stats.built,
+          kills: this.stats.kills,
+          spentWood: this.stats.spentWood,
+          spentStone: this.stats.spentStone,
+          spentIron: this.stats.spentIron,
+          spentBy: this.stats.spentBy,
+          waveLog: this.stats.waveLog,
+          bossKillsSeen: this.stats.bossKillsSeen,
+          trapsTriggered: this.stats.trapsTriggered,
+          elitesKilled: this.stats.elitesKilled
+        }
       };
     }
     _applySnapshot(s2) {
       this.shared = s2.sh;
+      const prevWave = this.wave.wave;
+      const wasBossCombat = this.wave.phase === PHASE.COMBAT && (this.wave.wave + 1) % 5 === 0;
       this.enemyMgr.applySnapshot(s2.e, s2.w.wave + 1);
       this.buildMgr.applySnapshot(s2.b);
       this.world.applyNodeSnapshot(s2.n);
       if (s2.d) this.world.applyDropSnapshot(s2.d);
       this.wave.applySnapshot(s2.w);
+      if (this.wave.wave === prevWave + 1 && this.wave.phase !== PHASE.LOST) {
+        const reward = waveReward(this.wave.wave);
+        const wonNow = this.wave.phase === PHASE.WON;
+        this.ui?.toast(wonNow ? "\uB9C8\uC9C0\uB9C9 \uC6E8\uC774\uBE0C \uACA9\uD1F4!" : `\uC6E8\uC774\uBE0C ${this.wave.wave} \uD074\uB9AC\uC5B4! \uBCF4\uC0C1 \u{1FAB5}${reward.wood} \u{1FAA8}${reward.stone}${reward.shard ? " \u{1F4A0}1" : ""}`, "good");
+        if (!wonNow) this.sfx.waveClear();
+        const clearedWave = this.wave.wave;
+        const buildings = [...this.buildMgr.buildings.values()];
+        if (clearedWave % 5 === 0 && !this._pBossWaveDamaged) this._unlockAchievement("flawlessBoss");
+        this._pBossWaveDamaged = false;
+        if (clearedWave >= 5 && !buildings.some((b) => b.key === "wall")) this._unlockAchievement("noWall");
+        if (clearedWave >= 3 && !buildings.some((b) => ["arrow", "frost", "cannon", "poison", "support"].includes(b.key))) {
+          this._unlockAchievement("noTower");
+        }
+      }
       const prevHp = this.world.crystal.hp;
       if (s2.cm) this.world.crystal.maxHp = s2.cm;
       if (s2.ca !== void 0) this.world.crystal.armorLv = s2.ca;
@@ -15745,6 +15917,7 @@ button.corner.mute.off { opacity: 0.5; }
         this.ui?.shake();
         this.fx.burst(0, 3.2, 0, 6545663, 8, 4);
         this.sfx.crystalHit();
+        if (wasBossCombat) this._pBossWaveDamaged = true;
       }
       if (s2.mt) this.world.setMeteor(s2.mt[0], s2.mt[1], s2.mt[2], CFG.meteor.radius);
       else this.world.clearMeteor();
@@ -15756,7 +15929,19 @@ button.corner.mute.off { opacity: 0.5; }
           p2.harvestLv = pd2.hv;
           p2.tools = {};
           for (const k2 of pd2.tl || []) p2.tools[k2] = true;
+          p2.weaponLv = pd2.wl || {};
           if (p2 !== this.local) p2.equipped = pd2.eq || null;
+        }
+      }
+      if (s2.st) {
+        Object.assign(this.stats, s2.st);
+        if (this.stats.trapsTriggered >= 3) this._unlockAchievement("trapMaster");
+        if (this.stats.elitesKilled >= 5) this._unlockAchievement("eliteHunter");
+        if (this.stats.bossKillsSeen.includes("boss") && this.stats.bossKillsSeen.includes("frostlord")) {
+          this._unlockAchievement("bothBosses");
+        }
+        if (["boss", "frostlord", "warden"].every((t2) => this.stats.bossKillsSeen.includes(t2))) {
+          this._unlockAchievement("allBosses");
         }
       }
       if (this.wave.phase === PHASE.LOST && !this.result) {
@@ -15765,6 +15950,7 @@ button.corner.mute.off { opacity: 0.5; }
       }
       if (this.wave.phase === PHASE.WON && !this.result) {
         this.result = "win";
+        if (this.difficulty === "hard") this._unlockAchievement("ironWill");
         this.ui?.showResult(true, this.stats, this.wave.wave);
       }
       if ((this.wave.phase === PHASE.PREP || this.wave.phase === PHASE.COMBAT) && this.result === "win") {
@@ -15920,6 +16106,7 @@ button.corner.mute.off { opacity: 0.5; }
           alive: l2.alive,
           harvesting: !!l2.harvesting,
           held: l2.heldWeapon === "default" ? null : l2.heldWeapon,
+          heldLv: l2.heldWeaponLv,
           swing: l2.swing > 0.7,
           invulnerable: l2.invulnerable,
           reviveAssisted: l2.reviveAssisted
@@ -15994,6 +16181,7 @@ button.corner.mute.off { opacity: 0.5; }
         this.local.harvestLv = savedPlayer.hv;
         this.local.tools = {};
         for (const k2 of savedPlayer.tl || []) this.local.tools[k2] = true;
+        this.local.weaponLv = savedPlayer.wl || {};
         this.local.equipped = savedPlayer.eq || null;
       }
       if (save.stats) this.stats = save.stats;
@@ -16166,6 +16354,24 @@ button.corner.mute.off { opacity: 0.5; }
           note: !g2.hasStation("furnace") ? "\uD654\uB85C \uD544\uC694" : null,
           action: () => g2.requestSmelt()
         });
+        const hasFurnace = g2.hasStation("furnace");
+        for (const [key, bonus] of Object.entries(CFG.weaponUpgrade.perLv)) {
+          if (!g2.local.tools[key]) continue;
+          const r = CFG.craft[key];
+          const lv = g2.local.weaponLv[key] || 0;
+          const maxed = lv >= CFG.weaponUpgrade.maxLv;
+          const cost = g2._weaponUpgradeCost(key);
+          rows2.push({
+            key: "upgrade:" + key,
+            icon: r.icon,
+            name: `${r.name} \uAC15\uD654 Lv.${lv}/${CFG.weaponUpgrade.maxLv}`,
+            desc: `\uB300\uBBF8\uC9C0 +${bonus.dmg} (\uB204\uC801 +${bonus.dmg * lv})`,
+            cost: maxed ? null : cost,
+            state: maxed ? "owned" : !hasFurnace ? "locked" : canAfford(g2.myPool, cost) ? "" : "poor",
+            note: maxed ? "\uCD5C\uB300 \uB808\uBCA8" : !hasFurnace ? "\uD654\uB85C \uD544\uC694" : null,
+            action: () => g2.requestUpgradeWeapon(key)
+          });
+        }
         return rows2;
       }
       if (tab === "skill") {
@@ -16223,10 +16429,11 @@ button.corner.mute.off { opacity: 0.5; }
       }];
       for (const [key, r] of Object.entries(CFG.craft)) {
         const owned = !!g2.local.tools[key];
+        const wlv = g2.local.weaponLv[key] || 0;
         rows.push({
           key,
           icon: r.icon,
-          name: r.name,
+          name: wlv ? `${r.name} \uAC15\uD654 Lv.${wlv}` : r.name,
           desc: r.desc,
           cost: null,
           state: !owned ? "locked" : held === key ? "active" : "",
@@ -16250,7 +16457,8 @@ button.corner.mute.off { opacity: 0.5; }
       for (const t2 of this.el.invTabs.querySelectorAll(".inv-tab")) {
         t2.classList.toggle("on", t2.dataset.tab === this._invTab);
       }
-      if (this._invRendered !== this._invTab) {
+      const rowKeys = rows.map((r) => r.key).join("|");
+      if (this._invRendered !== this._invTab || this._invRenderedKeys !== rowKeys) {
         this.el.invList.innerHTML = "";
         this._invEls = {};
         for (const r of rows) {
@@ -16267,12 +16475,18 @@ button.corner.mute.off { opacity: 0.5; }
           this._invEls[r.key] = btn;
         }
         this._invRendered = this._invTab;
+        this._invRenderedKeys = rowKeys;
       }
       for (const r of rows) {
         const btn = this._invEls[r.key];
         if (!btn) continue;
         const right = r.note || (r.cost ? costText(r.cost) : r.hotkey ? keyLabel(r.hotkey) : "");
         btn.querySelector(".ii-right").textContent = right;
+        const nameEl = btn.querySelector(".ii-body b");
+        if (nameEl.textContent !== r.name) nameEl.textContent = r.name;
+        const descEl = btn.querySelector(".ii-desc");
+        const desc = r.desc || "";
+        if (descEl.textContent !== desc) descEl.textContent = desc;
         btn.className = "inv-item" + (r.state ? " " + r.state : "");
         btn.disabled = r.state === "owned" || r.state === "locked" || r.state === "poor";
       }
@@ -16952,11 +17166,12 @@ button.corner.mute.off { opacity: 0.5; }
       this.el.crystalFill.style.transform = `scaleX(${ratio})`;
       const shieldLeft = c2.shieldUntil - performance.now() / 1e3;
       this.el.crystalText.textContent = `${Math.ceil(c2.hp)} / ${c2.maxHp}` + (shieldLeft > 0 ? ` \u{1F6E1}\uFE0F${Math.ceil(shieldLeft)}s` : "");
-      const danger = ratio < 0.3 && ratio > 0;
+      const danger = ratio < CFG.crystal.desperation.threshold && ratio > 0;
       this.el.crystalWarning.classList.toggle("hidden", !danger);
       if (danger && !this._crystalWarned) {
         this._crystalWarned = true;
-        this.toast("\u{1F48E} \uD06C\uB9AC\uC2A4\uD0C8\uC774 \uC704\uD5D8\uD558\uB2E4! \uC218\uC815 \uC815\uC218(R)\uB85C \uD68C\uBCF5\uD558\uAC70\uB098 \uBC29\uC5B4\uC120\uC744 \uC9C0\uCF1C\uB77C", "bad");
+        const pct = Math.round((CFG.crystal.desperation.dmgMult - 1) * 100);
+        this.toast(`\u{1F48E} \uD06C\uB9AC\uC2A4\uD0C8\uC774 \uC704\uD5D8\uD558\uB2E4! \uB300\uC2E0 \uD544\uC0AC\uC758 \uBC18\uACA9\uC73C\uB85C \uADFC\uC811\xB7\uD3ED\uD0C4 \uB300\uBBF8\uC9C0 +${pct}% \u2014 \uC218\uC815 \uC815\uC218(R)\uB85C \uD68C\uBCF5\uD558\uAC70\uB098 \uBC29\uC5B4\uC120\uC744 \uC9C0\uCF1C\uB77C`, "bad");
         g2.sfx.crystalDanger();
       } else if (!danger) {
         this._crystalWarned = false;
@@ -17018,7 +17233,7 @@ button.corner.mute.off { opacity: 0.5; }
       const hunting = g2.wave.phase === PHASE.COMBAT && g2.wave.remaining <= 3;
       for (const e of g2.enemyMgr.list) {
         if (e.dead) continue;
-        const isNotable = hunting || this.colorblind || e.st.boss || e.type === "shooter" || e.type === "raider" || e.elite;
+        const isNotable = hunting || this.colorblind || e.st.boss || e.type === "shooter" || e.type === "raider" || e.type === "healer" || e.elite;
         const slowed = now < e.slowUntil;
         const poisoned = now < e.poisonUntil;
         if (!isNotable && !slowed && !poisoned && !e.variant) continue;

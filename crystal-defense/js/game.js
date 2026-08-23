@@ -2,7 +2,7 @@ import * as THREE from '../vendor/three.module.js';
 import { ACHIEVEMENTS, unlock } from './achievements.js';
 import { SoundManager } from './audio.js';
 import { BuildManager } from './buildings.js';
-import { CFG, DIFFICULTIES, SPECIAL_WAVES, WEATHER, applyDifficulty, needsPickaxe, specialWaveKind, waveComposition, weatherOf } from './config.js';
+import { CFG, DIFFICULTIES, SPECIAL_WAVES, WEATHER, applyDifficulty, needsPickaxe, specialWaveKind, waveComposition, waveReward, weatherOf } from './config.js';
 import { EnemyManager } from './enemy.js';
 import { Fx, ProjectilePool } from './fx.js';
 import { BuildGrid } from './grid.js';
@@ -86,7 +86,7 @@ export var Game = class {
     this._seenTrap = false;
     this._seenDash = false;
     this._seenBomb = false;
-    this.boonMult = { atk: 1, towerDmg: 1, skillCostDelta: 0, bounty: 1, crystalUpgradeCostDelta: 0 };
+    this.boonMult = { atk: 1, towerDmg: 1, skillCostDelta: 0, bounty: 1, crystalUpgradeCostDelta: 0, weaponUpgradeCostDelta: 0 };
     this.pendingBoon = null;
     this._dropTimer = CFG.supplyDrop.firstDelay;
     this._dropIdSeq = 1;
@@ -211,12 +211,19 @@ export var Game = class {
     this.enemyMgr.onPoisonTick = (e, dmg) => {
       this._hurtEnemy(e, dmg, "poison");
     };
+    this.enemyMgr.onHealPulse = (e) => {
+      this.fx.ring(e.x, e.z, 3390720, CFG.enemies.healer.healAura.radius);
+    };
     this.enemyMgr.onSpawn = (e) => {
       if (e.elite) {
         if (specialWaveKind(this.wave.wave + 1) !== "elite") {
-          this.ui?.toast(`⭐ 정예 ${CFG.enemies[e.type].name} 등장! 체력\xB7공격력이 훨씬 세지만 처치 보상은 3배다`, "warn");
+          this.ui?.toast(`⭐ 정예 ${CFG.enemies[e.type].name} 등장! 체력·공격력이 훨씬 세지만 처치 보상은 3배다`, "warn");
         }
         return;
+      }
+      if (e.type === "healer" && !this._seenHealer) {
+        this._seenHealer = true;
+        this.ui?.toast("💉 치유사 등장! 주기적으로 주변 아군을 회복시킨다 — 놔두면 무리 전체가 안 죽는다, 먼저 노려라", "warn");
       }
       if (!e.variant || this._seenVariant) return;
       this._seenVariant = true;
@@ -323,7 +330,12 @@ export var Game = class {
     this.sfx.upgrade();
     this.net.send("boonPicked", { text: msg });
   }
-  _unlockAchievement(key) {
+  // playerId 를 넘기면 그 사람의 개인 행동에 대한 업적이라는 뜻 — 호스트가 참가자 대신 처리하는
+  // 액션(스킬 사용 등)에서 이걸 안 넘기면, 실제로는 참가자가 한 행동인데 호스트 자신의 브라우저에
+  // 업적이 잘못 붙는 사고가 난다(호스트만 _unlockAchievement 를 실행하기 때문). 팀 단위 업적(보스
+  // 처치, 웨이브 클리어 조건 등)은 그대로 playerId 없이 호출한다.
+  _unlockAchievement(key, playerId) {
+    if (playerId !== void 0 && playerId !== this.local.id) return;
     if (!unlock(key)) return;
     const a = ACHIEVEMENTS[key];
     this.stats.newAchievements.push(key);
@@ -702,7 +714,7 @@ export var Game = class {
     this.stats.harvested += amount;
     this._notifyGain(playerId, node.type, amount, node);
     if (node.type === "gem" && pool.shard === amount) {
-      this._notify(playerId, "💠 정수 획득! 인벤토리 스킬 탭에서 회복 외에 폭발\xB7시간 왜곡\xB7방벽도 쓸 수 있다", "good");
+      this._notify(playerId, "💠 정수 획득! 인벤토리 스킬 탭에서 회복 외에 폭발·시간 왜곡·방벽도 쓸 수 있다", "good");
     }
   }
   requestAttack() {
@@ -766,12 +778,13 @@ export var Game = class {
     }
     payCost(pool, cfg.cost);
     this._trackSpend(cfg.cost, "craft");
+    const dmg = Math.round((cfg.dmg + (CFG.weaponUpgrade.perLv.bomb?.dmg || 0) * this._weaponLvOf("bomb", playerId)) * this._desperationMult);
     const from = new THREE.Vector3(fromX, 1.1, fromZ);
     const to2 = new THREE.Vector3(tx, 0.4, tz);
     this.projectiles.fire(from, to2, cfg.speed, 3355443, (pos) => {
       this._bombVFX(pos, cfg.radius);
       const targets = this.enemyMgr.list.filter((e) => !e.dead && dist(e.x, e.z, pos.x, pos.z) <= cfg.radius);
-      for (const e of targets) this._hurtEnemy(e, cfg.dmg, "player", pos.x, pos.z);
+      for (const e of targets) this._hurtEnemy(e, dmg, "player", pos.x, pos.z);
     });
   }
   // 회피 돌진: 순수 로컬 동작(이동의 연장) — 서버 승인이 필요 없다. 무적 여부는 "pos" 동기화에
@@ -789,9 +802,15 @@ export var Game = class {
       this.ui?.toast("💨 회피 돌진! 잠깐 무적으로 튀어나간다 — 보스 돌진이나 다구리를 피하거나, 결계 몹에게 순식간에 붙을 때 써라", "good");
     }
   }
+  // 크리스탈 체력이 위험 문턱 아래면 "필사의 반격" — 플레이어(근접·폭탄)의 대미지가 오른다.
+  // 타워에는 적용하지 않는다: 위기에서 직접 뛰어들 이유를 만드는 게 목적이라 자동 화력은 제외.
+  get _desperationMult() {
+    const c2 = this.world.crystal;
+    return c2.hp > 0 && c2.hp / c2.maxHp < CFG.crystal.desperation.threshold ? CFG.crystal.desperation.dmgMult : 1;
+  }
   hostAttack(playerId, x2, z2, rot) {
     const a = this.players.get(playerId)?.attackStats ?? CFG.player.attack;
-    const dmg = Math.round(a.dmg * this.boonMult.atk);
+    const dmg = Math.round(a.dmg * this.boonMult.atk * this._desperationMult);
     for (const e of this.enemyMgr.list) {
       if (e.dead) continue;
       const d2 = dist(x2, z2, e.x, e.z);
@@ -961,6 +980,54 @@ export var Game = class {
     if (playerId === this.local.id) this.sfx.upgrade();
     else this.net.send("smeltOk", { to: playerId });
   }
+  // 무기 강화 다음 레벨의 철 비용
+  _weaponUpgradeCost(key) {
+    const lv = this._weaponLvOf(key);
+    return { iron: Math.max(1, CFG.weaponUpgrade.baseCost + CFG.weaponUpgrade.costStep * lv + this.boonMult.weaponUpgradeCostDelta) };
+  }
+  _weaponLvOf(key, playerId = this.local.id) {
+    return this.players.get(playerId)?.weaponLv[key] || 0;
+  }
+  requestUpgradeWeapon(key) {
+    if (this.isHost) this.hostUpgradeWeapon(this.local.id, key);
+    else this.net.send("upgradeWeapon", { key });
+  }
+  hostUpgradeWeapon(playerId, key) {
+    const bonus = CFG.weaponUpgrade.perLv[key];
+    const p2 = this.players.get(playerId);
+    if (!bonus || !p2) return;
+    if (!p2.tools[key]) {
+      this._notify(playerId, "먼저 제작해야 강화할 수 있습니다", "bad");
+      return;
+    }
+    if (!this.hasStation("furnace")) {
+      this._notify(playerId, "화로가 있어야 강화할 수 있습니다", "bad");
+      return;
+    }
+    const lv = this._weaponLvOf(key, playerId);
+    if (lv >= CFG.weaponUpgrade.maxLv) {
+      this._notify(playerId, "이미 최대 레벨입니다", "bad");
+      return;
+    }
+    const cost = this._weaponUpgradeCost(key);
+    const pool = this._poolOf(playerId);
+    if (!canAfford(pool, cost)) {
+      this._notify(playerId, "철이 부족합니다", "bad");
+      return;
+    }
+    payCost(pool, cost);
+    this._trackSpend(cost, "craft");
+    p2.weaponLv[key] = lv + 1;
+    if (lv + 1 >= CFG.weaponUpgrade.maxLv) this._unlockAchievement("weaponMaster", playerId);
+    const def = CFG.craft[key];
+    this._notify(playerId, `${def.icon} ${def.name} 강화 Lv.${lv + 1}!`, "good");
+    if (playerId === this.local.id) {
+      this.fx.float(`${def.icon} Lv.${lv + 1}`, this.local.x, 2.2, this.local.z, "good");
+      this.sfx.upgrade();
+    } else {
+      this.net.send("upgradeWeaponOk", { to: playerId, key, lv: lv + 1 });
+    }
+  }
   requestShard() {
     this.sfx.shard();
     if (this.isHost) this.hostShard(this.local.id);
@@ -1056,7 +1123,7 @@ export var Game = class {
       return;
     }
     pool.shard -= cost;
-    this._unlockAchievement("skillUser");
+    this._unlockAchievement("skillUser", playerId);
     const targets = this.enemyMgr.list.filter((e) => !e.dead && dist(e.x, e.z, p2.x, p2.z) <= s2.radius);
     for (const e of targets) this._hurtEnemy(e, s2.dmg, "player", p2.x, p2.z);
     this.fx.ring(p2.x, p2.z, 16751178, s2.radius);
@@ -1080,7 +1147,7 @@ export var Game = class {
       return;
     }
     pool.shard -= cost;
-    this._unlockAchievement("skillUser");
+    this._unlockAchievement("skillUser", playerId);
     const now = performance.now() / 1e3;
     const targets = this.enemyMgr.list.filter((e) => !e.dead && dist(e.x, e.z, p2.x, p2.z) <= s2.radius);
     for (const e of targets) e.applySlow(s2.slow, s2.time, now);
@@ -1102,7 +1169,7 @@ export var Game = class {
       return;
     }
     pool.shard -= cost;
-    this._unlockAchievement("skillUser");
+    this._unlockAchievement("skillUser", playerId);
     this.world.activateShield(s2.time);
     this.fx.ring(0, 0, 16766720, 5);
     this.fx.burst(0, 3.4, 0, 16766720, 20, 6);
@@ -1145,8 +1212,11 @@ export var Game = class {
     from.tools[key] = false;
     if (from.equipped === key) from.equipped = null;
     to2.tools[key] = true;
+    to2.weaponLv[key] = from.weaponLv[key] || 0;
+    from.weaponLv[key] = 0;
     const def = CFG.craft[key];
-    this._notify(toId, `${def.icon} ${def.name}을(를) 받았다 — 인벤토리 장비 탭에서 손에 쥘 수 있다`, "good");
+    const lvNote = to2.weaponLv[key] ? ` (강화 Lv.${to2.weaponLv[key]})` : "";
+    this._notify(toId, `${def.icon} ${def.name}을(를) 받았다${lvNote} — 인벤토리 장비 탭에서 손에 쥘 수 있다`, "good");
   }
   _notify(playerId, text, kind) {
     if (playerId === this.local.id) {
@@ -1245,6 +1315,9 @@ export var Game = class {
     net.on("smelt", (d2, from) => {
       if (this.isHost) this.hostSmelt(from);
     });
+    net.on("upgradeWeapon", (d2, from) => {
+      if (this.isHost) this.hostUpgradeWeapon(from, d2.key);
+    });
     net.on("shard", (d2, from) => {
       if (this.isHost) this.hostShard(from);
     });
@@ -1292,6 +1365,12 @@ export var Game = class {
     net.on("smeltOk", (d2) => {
       if (d2.to === net.selfId) this.sfx.upgrade();
     });
+    net.on("upgradeWeaponOk", (d2) => {
+      if (d2.to === net.selfId) {
+        this.local.weaponLv[d2.key] = d2.lv;
+        this.sfx.upgrade();
+      }
+    });
     net.on("waveStarted", () => {
       if (!this.isHost) {
         const w2 = this.wave.wave + 1;
@@ -1318,7 +1397,7 @@ export var Game = class {
   _snapshot() {
     const players = {};
     for (const p2 of this.players.values()) {
-      players[p2.id] = { hv: p2.harvestLv, tl: Object.keys(p2.tools).filter((k2) => p2.tools[k2]), eq: p2.equipped || null };
+      players[p2.id] = { hv: p2.harvestLv, tl: Object.keys(p2.tools).filter((k2) => p2.tools[k2]), eq: p2.equipped || null, wl: p2.weaponLv };
     }
     return {
       e: this.enemyMgr.snapshot(),
@@ -1334,16 +1413,49 @@ export var Game = class {
       mt: this._meteorPending ? [Math.round(this._meteorPending.x * 10) / 10, Math.round(this._meteorPending.z * 10) / 10, Math.round(this._meteorPending.timeLeft * 10) / 10] : null,
       r: this.shared ? { team: this.pools.team } : { byId: this.pools.byId },
       p: players,
-      sh: this.shared
+      sh: this.shared,
+      // 결과 화면(처치·채집·소모·건설 수)과 팀 단위 업적 판정에 쓰는 통계.
+      // 참가자의 this.stats 는 자기 자신이 직접 처리한 것만 쌓이므로(대부분의 집계가 호스트
+      // 전용 코드 경로에서만 늘어난다) 이게 없으면 참가자는 결과 화면에서 전부 0을 본다.
+      // time·newAchievements 는 클라이언트 각자의 것이라 여기 안 실어서 참가자 쪽 값을 덮지 않는다.
+      st: {
+        harvested: this.stats.harvested,
+        built: this.stats.built,
+        kills: this.stats.kills,
+        spentWood: this.stats.spentWood,
+        spentStone: this.stats.spentStone,
+        spentIron: this.stats.spentIron,
+        spentBy: this.stats.spentBy,
+        waveLog: this.stats.waveLog,
+        bossKillsSeen: this.stats.bossKillsSeen,
+        trapsTriggered: this.stats.trapsTriggered,
+        elitesKilled: this.stats.elitesKilled
+      }
     };
   }
   _applySnapshot(s2) {
     this.shared = s2.sh;
+    const prevWave = this.wave.wave;
+    const wasBossCombat = this.wave.phase === PHASE.COMBAT && (this.wave.wave + 1) % 5 === 0;
     this.enemyMgr.applySnapshot(s2.e, s2.w.wave + 1);
     this.buildMgr.applySnapshot(s2.b);
     this.world.applyNodeSnapshot(s2.n);
     if (s2.d) this.world.applyDropSnapshot(s2.d);
     this.wave.applySnapshot(s2.w);
+    if (this.wave.wave === prevWave + 1 && this.wave.phase !== PHASE.LOST) {
+      const reward = waveReward(this.wave.wave);
+      const wonNow = this.wave.phase === PHASE.WON;
+      this.ui?.toast(wonNow ? "마지막 웨이브 격퇴!" : `웨이브 ${this.wave.wave} 클리어! 보상 🪵${reward.wood} 🪨${reward.stone}${reward.shard ? " 💠1" : ""}`, "good");
+      if (!wonNow) this.sfx.waveClear();
+      const clearedWave = this.wave.wave;
+      const buildings = [...this.buildMgr.buildings.values()];
+      if (clearedWave % 5 === 0 && !this._pBossWaveDamaged) this._unlockAchievement("flawlessBoss");
+      this._pBossWaveDamaged = false;
+      if (clearedWave >= 5 && !buildings.some((b) => b.key === "wall")) this._unlockAchievement("noWall");
+      if (clearedWave >= 3 && !buildings.some((b) => ["arrow", "frost", "cannon", "poison", "support"].includes(b.key))) {
+        this._unlockAchievement("noTower");
+      }
+    }
     const prevHp = this.world.crystal.hp;
     if (s2.cm) this.world.crystal.maxHp = s2.cm;
     if (s2.ca !== void 0) this.world.crystal.armorLv = s2.ca;
@@ -1354,6 +1466,7 @@ export var Game = class {
       this.ui?.shake();
       this.fx.burst(0, 3.2, 0, 6545663, 8, 4);
       this.sfx.crystalHit();
+      if (wasBossCombat) this._pBossWaveDamaged = true;
     }
     if (s2.mt) this.world.setMeteor(s2.mt[0], s2.mt[1], s2.mt[2], CFG.meteor.radius);
     else this.world.clearMeteor();
@@ -1365,7 +1478,19 @@ export var Game = class {
         p2.harvestLv = pd2.hv;
         p2.tools = {};
         for (const k2 of pd2.tl || []) p2.tools[k2] = true;
+        p2.weaponLv = pd2.wl || {};
         if (p2 !== this.local) p2.equipped = pd2.eq || null;
+      }
+    }
+    if (s2.st) {
+      Object.assign(this.stats, s2.st);
+      if (this.stats.trapsTriggered >= 3) this._unlockAchievement("trapMaster");
+      if (this.stats.elitesKilled >= 5) this._unlockAchievement("eliteHunter");
+      if (this.stats.bossKillsSeen.includes("boss") && this.stats.bossKillsSeen.includes("frostlord")) {
+        this._unlockAchievement("bothBosses");
+      }
+      if (["boss", "frostlord", "warden"].every((t2) => this.stats.bossKillsSeen.includes(t2))) {
+        this._unlockAchievement("allBosses");
       }
     }
     if (this.wave.phase === PHASE.LOST && !this.result) {
@@ -1374,6 +1499,7 @@ export var Game = class {
     }
     if (this.wave.phase === PHASE.WON && !this.result) {
       this.result = "win";
+      if (this.difficulty === "hard") this._unlockAchievement("ironWill");
       this.ui?.showResult(true, this.stats, this.wave.wave);
     }
     if ((this.wave.phase === PHASE.PREP || this.wave.phase === PHASE.COMBAT) && this.result === "win") {
@@ -1529,6 +1655,7 @@ export var Game = class {
         alive: l2.alive,
         harvesting: !!l2.harvesting,
         held: l2.heldWeapon === "default" ? null : l2.heldWeapon,
+        heldLv: l2.heldWeaponLv,
         swing: l2.swing > 0.7,
         invulnerable: l2.invulnerable,
         reviveAssisted: l2.reviveAssisted
@@ -1603,6 +1730,7 @@ export var Game = class {
       this.local.harvestLv = savedPlayer.hv;
       this.local.tools = {};
       for (const k2 of savedPlayer.tl || []) this.local.tools[k2] = true;
+      this.local.weaponLv = savedPlayer.wl || {};
       this.local.equipped = savedPlayer.eq || null;
     }
     if (save.stats) this.stats = save.stats;
