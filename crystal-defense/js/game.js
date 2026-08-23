@@ -80,7 +80,7 @@ export var Game = class {
     this.sm.resetNight();
     this.sm.resetWeather();
     this.world.weatherKind = null;
-    this._seenVariant = false;
+    this._seenVariants = /* @__PURE__ */ new Set();
     this._seenSynergy = false;
     this._seenRootSynergy = false;
     this._seenTrap = false;
@@ -225,15 +225,16 @@ export var Game = class {
         this._seenHealer = true;
         this.ui?.toast("💉 치유사 등장! 주기적으로 주변 아군을 회복시킨다 — 놔두면 무리 전체가 안 죽는다, 먼저 노려라", "warn");
       }
-      if (!e.variant || this._seenVariant) return;
-      this._seenVariant = true;
+      if (!e.variant || this._seenVariants.has(e.variant)) return;
+      this._seenVariants.add(e.variant);
       const v = CFG.variants[e.variant];
       const HINTS = {
         shield: "정면 공격은 약해진다 — 등 뒤로 돌아가서 쳐라",
         split: "죽으면 약한 개체 2마리로 갈라진다",
         dash: "가끔 폭발적으로 빨라진다",
         regen: "잠시라도 안 때리면 체력이 도로 차오른다 — 끝까지 몰아쳐라",
-        ward: "타워가 조준하지 못한다 — 직접 달려가서 근접이나 스킬로 처치해야 한다"
+        ward: "타워가 조준하지 못한다 — 직접 달려가서 근접이나 스킬로 처치해야 한다",
+        thorn: "근접으로 때리면 준 피해의 일부를 그대로 돌려받는다 — 무기 강화가 잘 됐을수록 반사도 세진다"
       };
       const hint = HINTS[e.variant] || "";
       this.ui?.toast(`${v.icon} ${v.name} 변종 등장! ${hint}`, "warn");
@@ -811,6 +812,7 @@ export var Game = class {
   hostAttack(playerId, x2, z2, rot) {
     const a = this.players.get(playerId)?.attackStats ?? CFG.player.attack;
     const dmg = Math.round(a.dmg * this.boonMult.atk * this._desperationMult);
+    let thornDmg = 0;
     for (const e of this.enemyMgr.list) {
       if (e.dead) continue;
       const d2 = dist(x2, z2, e.x, e.z);
@@ -819,7 +821,19 @@ export var Game = class {
       let diff = Math.abs((ang - rot + Math.PI) % (Math.PI * 2) - Math.PI);
       if (diff > a.arc) continue;
       this._hurtEnemy(e, dmg, "player", x2, z2);
+      if (e.variant === "thorn") thornDmg += Math.round(dmg * CFG.variants.thorn.reflectPct);
     }
+    if (thornDmg > 0) this._reflectThorns(playerId, thornDmg, x2, z2);
+  }
+  // 가시 변종에게 근접으로 맞힌 만큼 되돌려 받는다 — onPlayerHit(몬스터가 플레이어를 때릴 때)과
+  // 같은 로컬/원격 분기를 그대로 재사용해 새 네트워크 메시지가 필요 없었다
+  _reflectThorns(playerId, dmg, x2, z2) {
+    if (playerId === this.local.id) {
+      this._hurtLocal(dmg);
+    } else {
+      this.net.send("hurt", { to: playerId, dmg });
+    }
+    this.fx.burst(x2, 1, z2, CFG.variants.thorn.tint, 8, 3);
   }
   requestStartWave() {
     if (this.isHost) {

@@ -10989,7 +10989,11 @@ button.corner.mute.off { opacity: 0.5; }
       regen: { name: "\uC7AC\uC0DD", icon: "\u{1F49A}", tint: 3390720, hpPerSec: 0.07, quietTime: 3 },
       // 타워가 조준하지 못한다(자동 사격 대상에서 제외) — 함정·근접 공격·정수 스킬은 그대로 통한다.
       // 타워만 믿고 있으면 절대 안 죽으니 직접 달려가 처리해야 한다
-      ward: { name: "\uACB0\uACC4", icon: "\u{1F300}", tint: 11800063 }
+      ward: { name: "\uACB0\uACC4", icon: "\u{1F300}", tint: 11800063 },
+      // 근접 공격(칼\xB7창\xB7망치 등)으로 때리면 준 피해의 일부를 그대로 되돌려 받는다. 타워\xB7함정\xB7
+      // 폭탄\xB7정수 스킬처럼 거리를 둔 공격에는 안 걸린다 — 무기 강화나 필사의 반격으로 근접 대미지가
+      // 오른 만큼 반사 피해도 커지므로, "닥치고 근접"만으로는 항상 안전하지 않게 만드는 게 목적
+      thorn: { name: "\uAC00\uC2DC", icon: "\u{1F335}", tint: 9127187, reflectPct: 0.4 }
     },
     // 웨이브당 몬스터 1마리가 변종을 달 확률 (보스 제외, 분열체 제외)
     variantChance: { base: 0.05, perWave: 0.012, max: 0.32 },
@@ -14531,7 +14535,7 @@ button.corner.mute.off { opacity: 0.5; }
       this.sm.resetNight();
       this.sm.resetWeather();
       this.world.weatherKind = null;
-      this._seenVariant = false;
+      this._seenVariants = /* @__PURE__ */ new Set();
       this._seenSynergy = false;
       this._seenRootSynergy = false;
       this._seenTrap = false;
@@ -14676,15 +14680,16 @@ button.corner.mute.off { opacity: 0.5; }
           this._seenHealer = true;
           this.ui?.toast("\u{1F489} \uCE58\uC720\uC0AC \uB4F1\uC7A5! \uC8FC\uAE30\uC801\uC73C\uB85C \uC8FC\uBCC0 \uC544\uAD70\uC744 \uD68C\uBCF5\uC2DC\uD0A8\uB2E4 \u2014 \uB194\uB450\uBA74 \uBB34\uB9AC \uC804\uCCB4\uAC00 \uC548 \uC8FD\uB294\uB2E4, \uBA3C\uC800 \uB178\uB824\uB77C", "warn");
         }
-        if (!e.variant || this._seenVariant) return;
-        this._seenVariant = true;
+        if (!e.variant || this._seenVariants.has(e.variant)) return;
+        this._seenVariants.add(e.variant);
         const v = CFG.variants[e.variant];
         const HINTS = {
           shield: "\uC815\uBA74 \uACF5\uACA9\uC740 \uC57D\uD574\uC9C4\uB2E4 \u2014 \uB4F1 \uB4A4\uB85C \uB3CC\uC544\uAC00\uC11C \uCCD0\uB77C",
           split: "\uC8FD\uC73C\uBA74 \uC57D\uD55C \uAC1C\uCCB4 2\uB9C8\uB9AC\uB85C \uAC08\uB77C\uC9C4\uB2E4",
           dash: "\uAC00\uB054 \uD3ED\uBC1C\uC801\uC73C\uB85C \uBE68\uB77C\uC9C4\uB2E4",
           regen: "\uC7A0\uC2DC\uB77C\uB3C4 \uC548 \uB54C\uB9AC\uBA74 \uCCB4\uB825\uC774 \uB3C4\uB85C \uCC28\uC624\uB978\uB2E4 \u2014 \uB05D\uAE4C\uC9C0 \uBAB0\uC544\uCCD0\uB77C",
-          ward: "\uD0C0\uC6CC\uAC00 \uC870\uC900\uD558\uC9C0 \uBABB\uD55C\uB2E4 \u2014 \uC9C1\uC811 \uB2EC\uB824\uAC00\uC11C \uADFC\uC811\uC774\uB098 \uC2A4\uD0AC\uB85C \uCC98\uCE58\uD574\uC57C \uD55C\uB2E4"
+          ward: "\uD0C0\uC6CC\uAC00 \uC870\uC900\uD558\uC9C0 \uBABB\uD55C\uB2E4 \u2014 \uC9C1\uC811 \uB2EC\uB824\uAC00\uC11C \uADFC\uC811\uC774\uB098 \uC2A4\uD0AC\uB85C \uCC98\uCE58\uD574\uC57C \uD55C\uB2E4",
+          thorn: "\uADFC\uC811\uC73C\uB85C \uB54C\uB9AC\uBA74 \uC900 \uD53C\uD574\uC758 \uC77C\uBD80\uB97C \uADF8\uB300\uB85C \uB3CC\uB824\uBC1B\uB294\uB2E4 \u2014 \uBB34\uAE30 \uAC15\uD654\uAC00 \uC798 \uB410\uC744\uC218\uB85D \uBC18\uC0AC\uB3C4 \uC138\uC9C4\uB2E4"
         };
         const hint = HINTS[e.variant] || "";
         this.ui?.toast(`${v.icon} ${v.name} \uBCC0\uC885 \uB4F1\uC7A5! ${hint}`, "warn");
@@ -15262,6 +15267,7 @@ button.corner.mute.off { opacity: 0.5; }
     hostAttack(playerId, x2, z2, rot) {
       const a = this.players.get(playerId)?.attackStats ?? CFG.player.attack;
       const dmg = Math.round(a.dmg * this.boonMult.atk * this._desperationMult);
+      let thornDmg = 0;
       for (const e of this.enemyMgr.list) {
         if (e.dead) continue;
         const d2 = dist(x2, z2, e.x, e.z);
@@ -15270,7 +15276,19 @@ button.corner.mute.off { opacity: 0.5; }
         let diff = Math.abs((ang - rot + Math.PI) % (Math.PI * 2) - Math.PI);
         if (diff > a.arc) continue;
         this._hurtEnemy(e, dmg, "player", x2, z2);
+        if (e.variant === "thorn") thornDmg += Math.round(dmg * CFG.variants.thorn.reflectPct);
       }
+      if (thornDmg > 0) this._reflectThorns(playerId, thornDmg, x2, z2);
+    }
+    // 가시 변종에게 근접으로 맞힌 만큼 되돌려 받는다 — onPlayerHit(몬스터가 플레이어를 때릴 때)과
+    // 같은 로컬/원격 분기를 그대로 재사용해 새 네트워크 메시지가 필요 없었다
+    _reflectThorns(playerId, dmg, x2, z2) {
+      if (playerId === this.local.id) {
+        this._hurtLocal(dmg);
+      } else {
+        this.net.send("hurt", { to: playerId, dmg });
+      }
+      this.fx.burst(x2, 1, z2, CFG.variants.thorn.tint, 8, 3);
     }
     requestStartWave() {
       if (this.isHost) {
