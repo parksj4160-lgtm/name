@@ -343,6 +343,34 @@ export var CFG = {
     // frostArrow 처럼 인접 배치가 필요 없다 — 묶인 상태 자체가 트리거라 어떤 타워 조합이든 이득을 본다
     rootSnare: { dmgMult: 0.35 }
   },
+  // 타워 특화 — 최대 레벨에 도달한 전투 타워는 딱 한 번, 두 갈래 중 하나를 골라 성격을 바꾼다.
+  // 되돌릴 수 없다(철거하고 새로 지어야 한다). 업그레이드가 "같은 타워를 더 세게"였다면 이건
+  // "같은 타워를 다르게" — 같은 화살탑이라도 저격형이냐 연사형이냐에 따라 방어선 구성이 달라진다.
+  // mods 는 해당 레벨 스탯에 곱하고, add 는 없던 속성을 새로 붙인다(splash 를 붙이면 기존 범위
+  // 피해 배관을 그대로 타서 상태이상까지 광역이 된다 — 새 로직 없이 성격이 크게 바뀐다).
+  towerSpec: {
+    cost: { wood: 50, stone: 80, iron: 4 },
+    arrow: {
+      sniper: { name: "저격", icon: "🔭", ring: 16764006, desc: "사거리와 한 방이 크게 늘지만 발사가 느려진다 — 단단한 적\xB7보스에 강하다", mods: { dmg: 2.1, range: 1.35, rate: 0.5 } },
+      rapid: { name: "연사", icon: "⚡", ring: 5891071, desc: "사거리와 한 방을 내주고 발사 속도를 크게 올린다 — 몰려오는 잡졸에 강하다", mods: { dmg: 0.62, range: 0.85, rate: 2 } }
+    },
+    frost: {
+      deepfreeze: { name: "혹한", icon: "🥶", ring: 5891071, desc: "둔화가 더 깊고 훨씬 오래 간다 — 한 놈을 확실히 묶어 둔다", mods: { slow: 1.25, slowTime: 1.6 } },
+      shatter: { name: "서리파편", icon: "💠", ring: 11800063, desc: "명중 지점 주변까지 함께 얼린다 — 무리 전체를 한꺼번에 늦춘다", mods: { dmg: 1.2, slowTime: 0.75 }, add: { splash: 2.8 } }
+    },
+    cannon: {
+      barrage: { name: "융단폭격", icon: "🎇", ring: 16752640, desc: "폭발 범위가 크게 넓어진다(한 방은 약해진다) — 뭉친 무리를 통째로 쓸어담는다", mods: { dmg: 0.7, splash: 1.5, rate: 1.15 } },
+      breaker: { name: "철갑탄", icon: "🛡️", ring: 12105912, desc: "범위를 좁히는 대신 한 방이 훨씬 무거워진다 — 브루트\xB7보스를 부순다", mods: { dmg: 1.75, splash: 0.55 } }
+    },
+    poison: {
+      virulent: { name: "맹독", icon: "☣️", ring: 9419324, desc: "독이 훨씬 빠르게 갉아먹는다(대신 짧다) — 단단한 한 놈을 녹인다", mods: { poisonDps: 1.9, poisonTime: 0.6 } },
+      plague: { name: "역병", icon: "🦠", ring: 4172995, desc: "주변까지 독을 퍼뜨리고 훨씬 오래 간다 — 무리 전체를 서서히 죽인다", mods: { poisonDps: 0.8, poisonTime: 1.5 }, add: { splash: 3.2 } }
+    },
+    snare: {
+      bind: { name: "속박", icon: "⛓️", ring: 16764006, desc: "묶는 시간이 크게 늘어난다 — 위험한 한 놈을 오래 세워 둔다", mods: { root: 1.55, rate: 0.85 } },
+      net: { name: "그물", icon: "🕸️", ring: 11800063, desc: "주변 적까지 함께 묶는다(묶는 시간은 짧다) — 무리를 통째로 세운다", mods: { root: 0.7 }, add: { splash: 3.6 } }
+    }
+  },
   // 보급품 투하 — 전투 중(웨이브 2부터) 가끔 지도 위에 상자가 떨어진다. 한 번에 최대 1개만 떠 있고,
   // 안 챙기고 놔두면 사라진다. 방어를 잠깐 비우고 달려가서 주울지 말지가 매 순간의 선택이 된다.
   supplyDrop: { minWave: 2, firstDelay: 16, minGap: 30, maxGap: 50, lifetime: 20, pickupRadius: 1.8, reward: { wood: 14, stone: 9 }, shardChance: 0.4 },

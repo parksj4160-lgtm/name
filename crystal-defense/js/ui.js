@@ -67,7 +67,12 @@ export var UI = class {
       historyList: $2("history-list"),
       historyCount: $2("history-count"),
       boonOverlay: $2("boon-overlay"),
-      boonChoices: $2("boon-choices")
+      boonChoices: $2("boon-choices"),
+      specOverlay: $2("spec-overlay"),
+      specChoices: $2("spec-choices"),
+      specTitle: $2("spec-title"),
+      specSub: $2("spec-sub"),
+      specCancel: $2("spec-cancel")
     };
     this.mm = this.el.minimap.getContext("2d");
     this._bindLobby();
@@ -121,7 +126,7 @@ export var UI = class {
         };
       });
       for (const [key, icon, name, desc] of [
-        ["upgrade", "⬆️", "업그레이드", "건물을 클릭해 레벨을 올린다"],
+        ["upgrade", "⬆️", "업그레이드", "건물을 클릭해 레벨을 올린다. 최대 레벨 타워는 특화를 고른다"],
         ["repair", "🔧", "수리", "손상된 만큼만 자원을 쓴다"],
         ["sell", "🔨", "철거", "투자한 자원의 50%를 돌려받는다"]
       ]) {
@@ -320,7 +325,7 @@ export var UI = class {
     if (detail) {
       this.el.buildHint.innerHTML = detail;
     } else if (mode === "upgrade") {
-      this.el.buildHint.textContent = "업그레이드할 건물을 클릭하세요 (벽은 내구도, 타워는 공격력·사거리 상승)";
+      this.el.buildHint.textContent = "업그레이드할 건물을 클릭하세요 (벽은 내구도, 타워는 공격력·사거리 상승 — 최대 레벨 타워는 특화 선택)";
     } else if (mode === "repair") {
       this.el.buildHint.textContent = "수리할 건물을 클릭하세요 (손상된 비율만큼 자원 소모, 완전 파괴 재건축보다 저렴)";
     } else {
@@ -361,7 +366,15 @@ export var UI = class {
       return `${name} — ${hp} · 수리 비용 <b class="${ok2 ? "" : "lack"}">${costText(cost)}</b>`;
     }
     const next = b.def.levels[b.level];
-    if (!next) return `${name} — 이미 최대 레벨`;
+    if (!next) {
+      if (b.specDef) return `${name} ${b.specDef.icon} <b>${b.specDef.name}</b> — 특화 완료`;
+      if (b.canSpecialize) {
+        const names = Object.values(CFG.towerSpec[b.key]).map((s2) => `${s2.icon} ${s2.name}`).join(" / ");
+        const ok3 = canAfford(g2.myPool, CFG.towerSpec.cost);
+        return `${name} 최대 — 클릭해 <b>특화</b> 선택 (${names}) · 비용 <b class="${ok3 ? "" : "lack"}">${costText(CFG.towerSpec.cost)}</b>`;
+      }
+      return `${name} — 이미 최대 레벨`;
+    }
     const cur = b.stats;
     const parts = [];
     const diff = (label, a, c2, unit = "") => {
@@ -711,6 +724,7 @@ export var UI = class {
     this.el.result.classList.add("hidden");
     this.el.pauseOverlay.classList.add("hidden");
     this.el.boonOverlay.classList.add("hidden");
+    this.el.specOverlay.classList.add("hidden");
     this._invTab = "build";
     this._invRendered = null;
     this._crystalWarned = false;
@@ -801,6 +815,31 @@ export var UI = class {
   }
   hideBoonChoice() {
     this.el.boonOverlay.classList.add("hidden");
+  }
+  // 최대 레벨 타워를 두 갈래 중 하나로 특화하는 선택창. 축복 선택창과 같은 카드 UI 를 그대로 쓴다.
+  showSpecChoice(b) {
+    const opts = CFG.towerSpec[b.key];
+    if (!opts || !b.canSpecialize) return;
+    const cost = CFG.towerSpec.cost;
+    const afford = canAfford(this.game.myPool, cost);
+    this.el.specTitle.textContent = `${b.def.icon} ${b.def.name} 특화`;
+    this.el.specSub.textContent = `비용 ${costText(cost)} · 되돌릴 수 없다 — 바꾸려면 철거하고 다시 지어야 한다.`;
+    this.el.specChoices.innerHTML = Object.entries(opts).map(([k2, sp]) => `<button type="button" class="boon-card" data-spec="${k2}"${afford ? "" : " disabled"}>
+<span class="bc-icon">${sp.icon}</span>
+<span><span class="bc-name">${sp.name}</span><br><span class="bc-desc">${sp.desc}</span></span>
+</button>`).join("");
+    for (const btn of this.el.specChoices.querySelectorAll(".boon-card")) {
+      btn.onclick = () => {
+        this.hideSpecChoice();
+        this.game.requestSpecialize(b.id, btn.dataset.spec);
+      };
+    }
+    if (!afford) this.toast("특화할 자원이 부족합니다", "bad");
+    this.el.specCancel.onclick = () => this.hideSpecChoice();
+    this.el.specOverlay.classList.remove("hidden");
+  }
+  hideSpecChoice() {
+    this.el.specOverlay.classList.add("hidden");
   }
   showResult(win, stats, wave) {
     this.el.result.classList.remove("hidden");

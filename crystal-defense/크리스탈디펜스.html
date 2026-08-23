@@ -328,6 +328,9 @@ button.ghost { background: transparent; color: var(--dim); }
   padding: 12px 14px; cursor: pointer; font-family: inherit; color: var(--text);
 }
 .boon-card:hover { background: rgba(95,212,255,0.14); border-color: var(--cyan); }
+.boon-card:disabled { opacity: 0.45; cursor: not-allowed; }
+.boon-card:disabled:hover { background: rgba(255,255,255,0.06); border-color: var(--line); }
+#spec-cancel { margin-top: 14px; }
 .boon-card .bc-icon { font-size: 26px; flex: none; }
 .boon-card .bc-name { font-weight: 700; font-size: 15px; }
 .boon-card .bc-desc { font-size: 12px; color: var(--dim); margin-top: 2px; }
@@ -720,6 +723,16 @@ button.corner.mute.off { opacity: 0.5; }
     <h1>♾️ 축복을 골라라</h1>
     <p class="sub">엔드리스 웨이브를 넘길 때마다 둘 중 하나를 고른다. 영구 적용된다.</p>
     <div class="boon-choices" id="boon-choices"></div>
+  </div>
+</div>
+
+<!-- ================= 타워 특화 선택 ================= -->
+<div id="spec-overlay" class="overlay hidden">
+  <div class="card center">
+    <h1 id="spec-title">타워를 특화한다</h1>
+    <p class="sub" id="spec-sub">둘 중 하나를 고른다. 되돌릴 수 없다 — 바꾸려면 철거하고 다시 지어야 한다.</p>
+    <div class="boon-choices" id="spec-choices"></div>
+    <button type="button" class="ghost" id="spec-cancel">취소</button>
   </div>
 </div>
 
@@ -11010,6 +11023,34 @@ button.corner.mute.off { opacity: 0.5; }
       // frostArrow 처럼 인접 배치가 필요 없다 — 묶인 상태 자체가 트리거라 어떤 타워 조합이든 이득을 본다
       rootSnare: { dmgMult: 0.35 }
     },
+    // 타워 특화 — 최대 레벨에 도달한 전투 타워는 딱 한 번, 두 갈래 중 하나를 골라 성격을 바꾼다.
+    // 되돌릴 수 없다(철거하고 새로 지어야 한다). 업그레이드가 "같은 타워를 더 세게"였다면 이건
+    // "같은 타워를 다르게" — 같은 화살탑이라도 저격형이냐 연사형이냐에 따라 방어선 구성이 달라진다.
+    // mods 는 해당 레벨 스탯에 곱하고, add 는 없던 속성을 새로 붙인다(splash 를 붙이면 기존 범위
+    // 피해 배관을 그대로 타서 상태이상까지 광역이 된다 — 새 로직 없이 성격이 크게 바뀐다).
+    towerSpec: {
+      cost: { wood: 50, stone: 80, iron: 4 },
+      arrow: {
+        sniper: { name: "\uC800\uACA9", icon: "\u{1F52D}", ring: 16764006, desc: "\uC0AC\uAC70\uB9AC\uC640 \uD55C \uBC29\uC774 \uD06C\uAC8C \uB298\uC9C0\uB9CC \uBC1C\uC0AC\uAC00 \uB290\uB824\uC9C4\uB2E4 \u2014 \uB2E8\uB2E8\uD55C \uC801\xB7\uBCF4\uC2A4\uC5D0 \uAC15\uD558\uB2E4", mods: { dmg: 2.1, range: 1.35, rate: 0.5 } },
+        rapid: { name: "\uC5F0\uC0AC", icon: "\u26A1", ring: 5891071, desc: "\uC0AC\uAC70\uB9AC\uC640 \uD55C \uBC29\uC744 \uB0B4\uC8FC\uACE0 \uBC1C\uC0AC \uC18D\uB3C4\uB97C \uD06C\uAC8C \uC62C\uB9B0\uB2E4 \u2014 \uBAB0\uB824\uC624\uB294 \uC7A1\uC878\uC5D0 \uAC15\uD558\uB2E4", mods: { dmg: 0.62, range: 0.85, rate: 2 } }
+      },
+      frost: {
+        deepfreeze: { name: "\uD639\uD55C", icon: "\u{1F976}", ring: 5891071, desc: "\uB454\uD654\uAC00 \uB354 \uAE4A\uACE0 \uD6E8\uC52C \uC624\uB798 \uAC04\uB2E4 \u2014 \uD55C \uB188\uC744 \uD655\uC2E4\uD788 \uBB36\uC5B4 \uB454\uB2E4", mods: { slow: 1.25, slowTime: 1.6 } },
+        shatter: { name: "\uC11C\uB9AC\uD30C\uD3B8", icon: "\u{1F4A0}", ring: 11800063, desc: "\uBA85\uC911 \uC9C0\uC810 \uC8FC\uBCC0\uAE4C\uC9C0 \uD568\uAED8 \uC5BC\uB9B0\uB2E4 \u2014 \uBB34\uB9AC \uC804\uCCB4\uB97C \uD55C\uAEBC\uBC88\uC5D0 \uB2A6\uCD98\uB2E4", mods: { dmg: 1.2, slowTime: 0.75 }, add: { splash: 2.8 } }
+      },
+      cannon: {
+        barrage: { name: "\uC735\uB2E8\uD3ED\uACA9", icon: "\u{1F387}", ring: 16752640, desc: "\uD3ED\uBC1C \uBC94\uC704\uAC00 \uD06C\uAC8C \uB113\uC5B4\uC9C4\uB2E4(\uD55C \uBC29\uC740 \uC57D\uD574\uC9C4\uB2E4) \u2014 \uBB49\uCE5C \uBB34\uB9AC\uB97C \uD1B5\uC9F8\uB85C \uC4F8\uC5B4\uB2F4\uB294\uB2E4", mods: { dmg: 0.7, splash: 1.5, rate: 1.15 } },
+        breaker: { name: "\uCCA0\uAC11\uD0C4", icon: "\u{1F6E1}\uFE0F", ring: 12105912, desc: "\uBC94\uC704\uB97C \uC881\uD788\uB294 \uB300\uC2E0 \uD55C \uBC29\uC774 \uD6E8\uC52C \uBB34\uAC70\uC6CC\uC9C4\uB2E4 \u2014 \uBE0C\uB8E8\uD2B8\xB7\uBCF4\uC2A4\uB97C \uBD80\uC21C\uB2E4", mods: { dmg: 1.75, splash: 0.55 } }
+      },
+      poison: {
+        virulent: { name: "\uB9F9\uB3C5", icon: "\u2623\uFE0F", ring: 9419324, desc: "\uB3C5\uC774 \uD6E8\uC52C \uBE60\uB974\uAC8C \uAC09\uC544\uBA39\uB294\uB2E4(\uB300\uC2E0 \uC9E7\uB2E4) \u2014 \uB2E8\uB2E8\uD55C \uD55C \uB188\uC744 \uB179\uC778\uB2E4", mods: { poisonDps: 1.9, poisonTime: 0.6 } },
+        plague: { name: "\uC5ED\uBCD1", icon: "\u{1F9A0}", ring: 4172995, desc: "\uC8FC\uBCC0\uAE4C\uC9C0 \uB3C5\uC744 \uD37C\uB728\uB9AC\uACE0 \uD6E8\uC52C \uC624\uB798 \uAC04\uB2E4 \u2014 \uBB34\uB9AC \uC804\uCCB4\uB97C \uC11C\uC11C\uD788 \uC8FD\uC778\uB2E4", mods: { poisonDps: 0.8, poisonTime: 1.5 }, add: { splash: 3.2 } }
+      },
+      snare: {
+        bind: { name: "\uC18D\uBC15", icon: "\u26D3\uFE0F", ring: 16764006, desc: "\uBB36\uB294 \uC2DC\uAC04\uC774 \uD06C\uAC8C \uB298\uC5B4\uB09C\uB2E4 \u2014 \uC704\uD5D8\uD55C \uD55C \uB188\uC744 \uC624\uB798 \uC138\uC6CC \uB454\uB2E4", mods: { root: 1.55, rate: 0.85 } },
+        net: { name: "\uADF8\uBB3C", icon: "\u{1F578}\uFE0F", ring: 11800063, desc: "\uC8FC\uBCC0 \uC801\uAE4C\uC9C0 \uD568\uAED8 \uBB36\uB294\uB2E4(\uBB36\uB294 \uC2DC\uAC04\uC740 \uC9E7\uB2E4) \u2014 \uBB34\uB9AC\uB97C \uD1B5\uC9F8\uB85C \uC138\uC6B4\uB2E4", mods: { root: 0.7 }, add: { splash: 3.6 } }
+      }
+    },
     // 보급품 투하 — 전투 중(웨이브 2부터) 가끔 지도 위에 상자가 떨어진다. 한 번에 최대 1개만 떠 있고,
     // 안 챙기고 놔두면 사라진다. 방어를 잠깐 비우고 달려가서 주울지 말지가 매 순간의 선택이 된다.
     supplyDrop: { minWave: 2, firstDelay: 16, minGap: 30, maxGap: 50, lifetime: 20, pickupRadius: 1.8, reward: { wood: 14, stone: 9 }, shardChance: 0.4 },
@@ -11278,6 +11319,7 @@ button.corner.mute.off { opacity: 0.5; }
       this.x = x2;
       this.z = z2;
       this.level = 1;
+      this.spec = null;
       this.ownerId = ownerId;
       this.maxHp = def.levels[0].hp;
       this.hp = this.maxHp;
@@ -11287,8 +11329,32 @@ button.corner.mute.off { opacity: 0.5; }
       this.mesh.userData.building = this;
       this._makeBar();
     }
+    // 특화를 고른 타워는 레벨 스탯에 배율\xB7추가 속성을 얹은 값을 쓴다. 매 프레임 조준\xB7사격에서
+    // 읽히므로 레벨\xB7특화가 바뀔 때만 다시 만들고 그 뒤로는 캐시를 돌려준다.
     get stats() {
-      return this.def.levels[this.level - 1];
+      const base = this.def.levels[this.level - 1];
+      if (!this.spec) return base;
+      const sp2 = CFG.towerSpec[this.key]?.[this.spec];
+      if (!sp2) return base;
+      const ck = `${this.level}|${this.spec}`;
+      if (this._specKey === ck) return this._specStats;
+      const out = { ...base };
+      for (const [k2, m] of Object.entries(sp2.mods || {})) {
+        if (typeof out[k2] === "number") out[k2] = out[k2] * m;
+      }
+      for (const [k2, v] of Object.entries(sp2.add || {})) out[k2] = v;
+      if (out.dmg) out.dmg = Math.round(out.dmg);
+      if (out.slow) out.slow = Math.min(0.85, out.slow);
+      this._specKey = ck;
+      this._specStats = out;
+      return out;
+    }
+    // 최대 레벨에 도달한 전투 타워만, 아직 안 골랐을 때 한 번 고를 수 있다
+    get canSpecialize() {
+      return this.isTower && !this.spec && this.level >= this.def.levels.length && !!CFG.towerSpec[this.key];
+    }
+    get specDef() {
+      return this.spec ? CFG.towerSpec[this.key]?.[this.spec] || null : null;
     }
     get isSupport() {
       return this.key === "support";
@@ -11356,6 +11422,22 @@ button.corner.mute.off { opacity: 0.5; }
       this.synergyRing.material.color.setHex(colorHex);
       this.synergyRing.material.opacity = 0.5;
     }
+    // 특화 표시 — 보루 버프(y 0.06)\xB7시너지(y 0.13) 고리와 높이를 달리해 셋이 같이 떠도 안 겹친다.
+    // 고리 색이 곧 특화 종류라, 지어 놓은 방어선을 멀리서 봐도 어떤 갈래인지 바로 읽힌다.
+    showSpecRing() {
+      const sp2 = this.specDef;
+      if (!sp2) return;
+      if (!this.specRing) {
+        const r = new Xs(GEO2.buffRing, MAT2.buffRing.clone());
+        r.rotation.x = -Math.PI / 2;
+        r.position.y = 0.2;
+        this.mesh.add(r);
+        this.specRing = r;
+      }
+      this.specRing.visible = true;
+      this.specRing.material.color.setHex(sp2.ring);
+      this.specRing.material.opacity = 0.62;
+    }
     applyLevel(level) {
       this.level = level;
       const st = this.def.levels[level - 1];
@@ -11375,8 +11457,10 @@ button.corner.mute.off { opacity: 0.5; }
       this.mesh = nm;
       this.buffRing = null;
       this.synergyRing = null;
+      this.specRing = null;
       this._makeBar();
       this.turret = nm.userData.turret;
+      if (this.spec) this.showSpecRing();
     }
     damage(amount) {
       this.hp -= amount;
@@ -11655,6 +11739,15 @@ button.corner.mute.off { opacity: 0.5; }
       this.fx.ring(b.x, b.z, 16769162, 2.4);
       return b;
     }
+    specialize(id, spec) {
+      const b = this.buildings.get(id);
+      if (!b || !b.canSpecialize) return null;
+      if (!CFG.towerSpec[b.key]?.[spec]) return null;
+      b.spec = spec;
+      b.showSpecRing();
+      this.fx.ring(b.x, b.z, CFG.towerSpec[b.key][spec].ring, 3);
+      return b;
+    }
     // 현재 레벨까지 투입된 총 자원 (레벨 1 기본 비용 + 업그레이드 비용 누적)
     investedCost(b) {
       const total = { wood: 0, stone: 0, iron: 0 };
@@ -11668,6 +11761,12 @@ button.corner.mute.off { opacity: 0.5; }
     }
     refund(b) {
       const inv = this.investedCost(b);
+      if (b.spec) {
+        const sc = CFG.towerSpec.cost;
+        inv.wood += sc.wood || 0;
+        inv.stone += sc.stone || 0;
+        inv.iron += sc.iron || 0;
+      }
       return { wood: Math.floor(inv.wood * 0.5), stone: Math.floor(inv.stone * 0.5), iron: Math.floor(inv.iron * 0.5) };
     }
     // 손상 비율에 비례한 수리 비용 (완전 파괴 상태를 100% 재건축하는 것보다 저렴하게)
@@ -11814,13 +11913,13 @@ button.corner.mute.off { opacity: 0.5; }
     snapshot() {
       const out = [];
       for (const b of this.buildings.values()) {
-        out.push([b.id, b.key, b.gx, b.gz, b.level, Math.round(b.hp), b.ownerId || ""]);
+        out.push([b.id, b.key, b.gx, b.gz, b.level, Math.round(b.hp), b.ownerId || "", b.spec || ""]);
       }
       return out;
     }
     applySnapshot(list) {
       const seen = /* @__PURE__ */ new Set();
-      for (const [id, key, gx, gz, level, hp, owner] of list) {
+      for (const [id, key, gx, gz, level, hp, owner, spec] of list) {
         seen.add(id);
         let b = this.buildings.get(id);
         if (!b) b = this.place(key, gx, gz, owner, id);
@@ -11828,6 +11927,11 @@ button.corner.mute.off { opacity: 0.5; }
         if (b.level !== level) {
           b.applyLevel(level);
           this.root.add(b.mesh);
+        }
+        if ((spec || null) !== b.spec) {
+          b.spec = spec || null;
+          if (b.spec) b.showSpecRing();
+          else if (b.specRing) b.specRing.visible = false;
         }
         b.hp = hp;
         b.refreshBar();
@@ -15108,6 +15212,27 @@ button.corner.mute.off { opacity: 0.5; }
       this._trackSpend(cost, "upgrade");
       this.buildMgr.upgrade(id);
     }
+    requestSpecialize(id, spec) {
+      if (this.isHost) this.hostSpecialize(this.local.id, id, spec);
+      else this.net.send("specialize", { id, spec });
+    }
+    hostSpecialize(playerId, id, spec) {
+      const b = this.buildMgr.buildings.get(id);
+      if (!b || !b.canSpecialize) return;
+      const sp2 = CFG.towerSpec[b.key]?.[spec];
+      if (!sp2) return;
+      const cost = CFG.towerSpec.cost;
+      const pool = this._poolOf(playerId);
+      if (!canAfford(pool, cost)) {
+        this._notify(playerId, "\uC790\uC6D0\uC774 \uBD80\uC871\uD569\uB2C8\uB2E4", "bad");
+        return;
+      }
+      payCost(pool, cost);
+      this._trackSpend(cost, "upgrade");
+      this.buildMgr.specialize(id, spec);
+      this._notify(playerId, `${sp2.icon} ${b.def.name} \u2192 ${sp2.name} \uD2B9\uD654 \uC644\uB8CC!`, "good");
+      if (playerId === this.local.id) this.sfx.upgrade();
+    }
     requestSell(id) {
       this.sfx.sell();
       if (this.isHost) this.hostSell(this.local.id, id);
@@ -15748,6 +15873,9 @@ button.corner.mute.off { opacity: 0.5; }
       net.on("upgrade", (d2, from) => {
         if (this.isHost) this.hostUpgrade(from, d2.id);
       });
+      net.on("specialize", (d2, from) => {
+        if (this.isHost) this.hostSpecialize(from, d2.id, d2.spec);
+      });
       net.on("sell", (d2, from) => {
         if (this.isHost) this.hostSell(from, d2.id);
       });
@@ -16069,7 +16197,9 @@ button.corner.mute.off { opacity: 0.5; }
             this.ui?.toast(this.buildMgr.ghostReason, "bad");
           }
         } else if (this.buildMgr.mode === "upgrade") {
-          if (this.buildMgr.hover) this.requestUpgrade(this.buildMgr.hover.id);
+          const h2 = this.buildMgr.hover;
+          if (h2?.canSpecialize) this.ui?.showSpecChoice(h2);
+          else if (h2) this.requestUpgrade(h2.id);
         } else if (this.buildMgr.mode === "repair") {
           if (this.buildMgr.hover) this.requestRepair(this.buildMgr.hover.id);
         } else if (this.buildMgr.mode === "sell") {
@@ -16277,7 +16407,12 @@ button.corner.mute.off { opacity: 0.5; }
         historyList: $2("history-list"),
         historyCount: $2("history-count"),
         boonOverlay: $2("boon-overlay"),
-        boonChoices: $2("boon-choices")
+        boonChoices: $2("boon-choices"),
+        specOverlay: $2("spec-overlay"),
+        specChoices: $2("spec-choices"),
+        specTitle: $2("spec-title"),
+        specSub: $2("spec-sub"),
+        specCancel: $2("spec-cancel")
       };
       this.mm = this.el.minimap.getContext("2d");
       this._bindLobby();
@@ -16331,7 +16466,7 @@ button.corner.mute.off { opacity: 0.5; }
           };
         });
         for (const [key, icon, name, desc] of [
-          ["upgrade", "\u2B06\uFE0F", "\uC5C5\uADF8\uB808\uC774\uB4DC", "\uAC74\uBB3C\uC744 \uD074\uB9AD\uD574 \uB808\uBCA8\uC744 \uC62C\uB9B0\uB2E4"],
+          ["upgrade", "\u2B06\uFE0F", "\uC5C5\uADF8\uB808\uC774\uB4DC", "\uAC74\uBB3C\uC744 \uD074\uB9AD\uD574 \uB808\uBCA8\uC744 \uC62C\uB9B0\uB2E4. \uCD5C\uB300 \uB808\uBCA8 \uD0C0\uC6CC\uB294 \uD2B9\uD654\uB97C \uACE0\uB978\uB2E4"],
           ["repair", "\u{1F527}", "\uC218\uB9AC", "\uC190\uC0C1\uB41C \uB9CC\uD07C\uB9CC \uC790\uC6D0\uC744 \uC4F4\uB2E4"],
           ["sell", "\u{1F528}", "\uCCA0\uAC70", "\uD22C\uC790\uD55C \uC790\uC6D0\uC758 50%\uB97C \uB3CC\uB824\uBC1B\uB294\uB2E4"]
         ]) {
@@ -16530,7 +16665,7 @@ button.corner.mute.off { opacity: 0.5; }
       if (detail) {
         this.el.buildHint.innerHTML = detail;
       } else if (mode === "upgrade") {
-        this.el.buildHint.textContent = "\uC5C5\uADF8\uB808\uC774\uB4DC\uD560 \uAC74\uBB3C\uC744 \uD074\uB9AD\uD558\uC138\uC694 (\uBCBD\uC740 \uB0B4\uAD6C\uB3C4, \uD0C0\uC6CC\uB294 \uACF5\uACA9\uB825\xB7\uC0AC\uAC70\uB9AC \uC0C1\uC2B9)";
+        this.el.buildHint.textContent = "\uC5C5\uADF8\uB808\uC774\uB4DC\uD560 \uAC74\uBB3C\uC744 \uD074\uB9AD\uD558\uC138\uC694 (\uBCBD\uC740 \uB0B4\uAD6C\uB3C4, \uD0C0\uC6CC\uB294 \uACF5\uACA9\uB825\xB7\uC0AC\uAC70\uB9AC \uC0C1\uC2B9 \u2014 \uCD5C\uB300 \uB808\uBCA8 \uD0C0\uC6CC\uB294 \uD2B9\uD654 \uC120\uD0DD)";
       } else if (mode === "repair") {
         this.el.buildHint.textContent = "\uC218\uB9AC\uD560 \uAC74\uBB3C\uC744 \uD074\uB9AD\uD558\uC138\uC694 (\uC190\uC0C1\uB41C \uBE44\uC728\uB9CC\uD07C \uC790\uC6D0 \uC18C\uBAA8, \uC644\uC804 \uD30C\uAD34 \uC7AC\uAC74\uCD95\uBCF4\uB2E4 \uC800\uB834)";
       } else {
@@ -16571,7 +16706,15 @@ button.corner.mute.off { opacity: 0.5; }
         return `${name} \u2014 ${hp} \xB7 \uC218\uB9AC \uBE44\uC6A9 <b class="${ok2 ? "" : "lack"}">${costText(cost)}</b>`;
       }
       const next = b.def.levels[b.level];
-      if (!next) return `${name} \u2014 \uC774\uBBF8 \uCD5C\uB300 \uB808\uBCA8`;
+      if (!next) {
+        if (b.specDef) return `${name} ${b.specDef.icon} <b>${b.specDef.name}</b> \u2014 \uD2B9\uD654 \uC644\uB8CC`;
+        if (b.canSpecialize) {
+          const names = Object.values(CFG.towerSpec[b.key]).map((s2) => `${s2.icon} ${s2.name}`).join(" / ");
+          const ok3 = canAfford(g2.myPool, CFG.towerSpec.cost);
+          return `${name} \uCD5C\uB300 \u2014 \uD074\uB9AD\uD574 <b>\uD2B9\uD654</b> \uC120\uD0DD (${names}) \xB7 \uBE44\uC6A9 <b class="${ok3 ? "" : "lack"}">${costText(CFG.towerSpec.cost)}</b>`;
+        }
+        return `${name} \u2014 \uC774\uBBF8 \uCD5C\uB300 \uB808\uBCA8`;
+      }
       const cur = b.stats;
       const parts = [];
       const diff = (label, a, c2, unit = "") => {
@@ -16921,6 +17064,7 @@ button.corner.mute.off { opacity: 0.5; }
       this.el.result.classList.add("hidden");
       this.el.pauseOverlay.classList.add("hidden");
       this.el.boonOverlay.classList.add("hidden");
+      this.el.specOverlay.classList.add("hidden");
       this._invTab = "build";
       this._invRendered = null;
       this._crystalWarned = false;
@@ -17011,6 +17155,31 @@ button.corner.mute.off { opacity: 0.5; }
     }
     hideBoonChoice() {
       this.el.boonOverlay.classList.add("hidden");
+    }
+    // 최대 레벨 타워를 두 갈래 중 하나로 특화하는 선택창. 축복 선택창과 같은 카드 UI 를 그대로 쓴다.
+    showSpecChoice(b) {
+      const opts = CFG.towerSpec[b.key];
+      if (!opts || !b.canSpecialize) return;
+      const cost = CFG.towerSpec.cost;
+      const afford = canAfford(this.game.myPool, cost);
+      this.el.specTitle.textContent = `${b.def.icon} ${b.def.name} \uD2B9\uD654`;
+      this.el.specSub.textContent = `\uBE44\uC6A9 ${costText(cost)} \xB7 \uB418\uB3CC\uB9B4 \uC218 \uC5C6\uB2E4 \u2014 \uBC14\uAFB8\uB824\uBA74 \uCCA0\uAC70\uD558\uACE0 \uB2E4\uC2DC \uC9C0\uC5B4\uC57C \uD55C\uB2E4.`;
+      this.el.specChoices.innerHTML = Object.entries(opts).map(([k2, sp2]) => `<button type="button" class="boon-card" data-spec="${k2}"${afford ? "" : " disabled"}>
+<span class="bc-icon">${sp2.icon}</span>
+<span><span class="bc-name">${sp2.name}</span><br><span class="bc-desc">${sp2.desc}</span></span>
+</button>`).join("");
+      for (const btn of this.el.specChoices.querySelectorAll(".boon-card")) {
+        btn.onclick = () => {
+          this.hideSpecChoice();
+          this.game.requestSpecialize(b.id, btn.dataset.spec);
+        };
+      }
+      if (!afford) this.toast("\uD2B9\uD654\uD560 \uC790\uC6D0\uC774 \uBD80\uC871\uD569\uB2C8\uB2E4", "bad");
+      this.el.specCancel.onclick = () => this.hideSpecChoice();
+      this.el.specOverlay.classList.remove("hidden");
+    }
+    hideSpecChoice() {
+      this.el.specOverlay.classList.add("hidden");
     }
     showResult(win, stats, wave) {
       this.el.result.classList.remove("hidden");

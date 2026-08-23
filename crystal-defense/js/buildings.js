@@ -62,6 +62,7 @@ var Building = class {
     this.x = x2;
     this.z = z2;
     this.level = 1;
+    this.spec = null;
     this.ownerId = ownerId;
     this.maxHp = def.levels[0].hp;
     this.hp = this.maxHp;
@@ -71,8 +72,33 @@ var Building = class {
     this.mesh.userData.building = this;
     this._makeBar();
   }
+  // 특화를 고른 타워는 레벨 스탯에 배율\xB7추가 속성을 얹은 값을 쓴다. 매 프레임 조준\xB7사격에서
+  // 읽히므로 레벨\xB7특화가 바뀔 때만 다시 만들고 그 뒤로는 캐시를 돌려준다.
   get stats() {
-    return this.def.levels[this.level - 1];
+    const base = this.def.levels[this.level - 1];
+    if (!this.spec) return base;
+    const sp = CFG.towerSpec[this.key]?.[this.spec];
+    if (!sp) return base;
+    const ck = `${this.level}|${this.spec}`;
+    if (this._specKey === ck) return this._specStats;
+    const out = { ...base };
+    for (const [k2, m] of Object.entries(sp.mods || {})) {
+      if (typeof out[k2] === "number") out[k2] = out[k2] * m;
+    }
+    for (const [k2, v] of Object.entries(sp.add || {})) out[k2] = v;
+    if (out.dmg) out.dmg = Math.round(out.dmg);
+    // 둔화는 100% 가 되면 사실상 root 라 덫탑의 자리를 빼앗는다 — 상한을 둔다
+    if (out.slow) out.slow = Math.min(0.85, out.slow);
+    this._specKey = ck;
+    this._specStats = out;
+    return out;
+  }
+  // 최대 레벨에 도달한 전투 타워만, 아직 안 골랐을 때 한 번 고를 수 있다
+  get canSpecialize() {
+    return this.isTower && !this.spec && this.level >= this.def.levels.length && !!CFG.towerSpec[this.key];
+  }
+  get specDef() {
+    return this.spec ? CFG.towerSpec[this.key]?.[this.spec] || null : null;
   }
   get isSupport() {
     return this.key === "support";
@@ -140,6 +166,22 @@ var Building = class {
     this.synergyRing.material.color.setHex(colorHex);
     this.synergyRing.material.opacity = 0.5;
   }
+  // 특화 표시 — 보루 버프(y 0.06)\xB7시너지(y 0.13) 고리와 높이를 달리해 셋이 같이 떠도 안 겹친다.
+  // 고리 색이 곧 특화 종류라, 지어 놓은 방어선을 멀리서 봐도 어떤 갈래인지 바로 읽힌다.
+  showSpecRing() {
+    const sp = this.specDef;
+    if (!sp) return;
+    if (!this.specRing) {
+      const r = new THREE.Mesh(GEO2.buffRing, MAT2.buffRing.clone());
+      r.rotation.x = -Math.PI / 2;
+      r.position.y = 0.2;
+      this.mesh.add(r);
+      this.specRing = r;
+    }
+    this.specRing.visible = true;
+    this.specRing.material.color.setHex(sp.ring);
+    this.specRing.material.opacity = 0.62;
+  }
   applyLevel(level) {
     this.level = level;
     const st = this.def.levels[level - 1];
@@ -159,8 +201,12 @@ var Building = class {
     this.mesh = nm;
     this.buffRing = null;
     this.synergyRing = null;
+    this.specRing = null;
     this._makeBar();
     this.turret = nm.userData.turret;
+    // 메시를 통째로 갈아끼웠으니 고리도 다시 붙인다(원격 클라이언트가 스냅샷으로
+    // 레벨을 맞춘 뒤 특화까지 받은 경우, 이 재부착이 없으면 표시가 사라진다)
+    if (this.spec) this.showSpecRing();
   }
   damage(amount) {
     this.hp -= amount;
@@ -439,6 +485,15 @@ export var BuildManager = class {
     this.fx.ring(b.x, b.z, 16769162, 2.4);
     return b;
   }
+  specialize(id, spec) {
+    const b = this.buildings.get(id);
+    if (!b || !b.canSpecialize) return null;
+    if (!CFG.towerSpec[b.key]?.[spec]) return null;
+    b.spec = spec;
+    b.showSpecRing();
+    this.fx.ring(b.x, b.z, CFG.towerSpec[b.key][spec].ring, 3);
+    return b;
+  }
   // 현재 레벨까지 투입된 총 자원 (레벨 1 기본 비용 + 업그레이드 비용 누적)
   investedCost(b) {
     const total = { wood: 0, stone: 0, iron: 0 };
@@ -452,6 +507,14 @@ export var BuildManager = class {
   }
   refund(b) {
     const inv = this.investedCost(b);
+    // 특화 비용도 투자한 자원이므로 환급 대상에 포함한다. 단 수리비(repairCost)에는 넣지 않는다 —
+    // 수리는 "레벨만큼 지어진 몸체를 고치는 것"이라 특화 여부로 비싸질 이유가 없다.
+    if (b.spec) {
+      const sc = CFG.towerSpec.cost;
+      inv.wood += sc.wood || 0;
+      inv.stone += sc.stone || 0;
+      inv.iron += sc.iron || 0;
+    }
     return { wood: Math.floor(inv.wood * 0.5), stone: Math.floor(inv.stone * 0.5), iron: Math.floor(inv.iron * 0.5) };
   }
   // 손상 비율에 비례한 수리 비용 (완전 파괴 상태를 100% 재건축하는 것보다 저렴하게)
@@ -598,13 +661,13 @@ export var BuildManager = class {
   snapshot() {
     const out = [];
     for (const b of this.buildings.values()) {
-      out.push([b.id, b.key, b.gx, b.gz, b.level, Math.round(b.hp), b.ownerId || ""]);
+      out.push([b.id, b.key, b.gx, b.gz, b.level, Math.round(b.hp), b.ownerId || "", b.spec || ""]);
     }
     return out;
   }
   applySnapshot(list) {
     const seen = /* @__PURE__ */ new Set();
-    for (const [id, key, gx, gz, level, hp, owner] of list) {
+    for (const [id, key, gx, gz, level, hp, owner, spec] of list) {
       seen.add(id);
       let b = this.buildings.get(id);
       if (!b) b = this.place(key, gx, gz, owner, id);
@@ -612,6 +675,13 @@ export var BuildManager = class {
       if (b.level !== level) {
         b.applyLevel(level);
         this.root.add(b.mesh);
+      }
+      // 특화는 호스트가 정하고 스냅샷으로만 내려온다 — 참가자 화면의 사거리\xB7피해 계산과
+      // 고리 표시가 호스트와 어긋나지 않도록 여기서 맞춘다
+      if ((spec || null) !== b.spec) {
+        b.spec = spec || null;
+        if (b.spec) b.showSpecRing();
+        else if (b.specRing) b.specRing.visible = false;
       }
       b.hp = hp;
       b.refreshBar();

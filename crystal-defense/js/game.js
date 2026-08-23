@@ -653,6 +653,27 @@ export var Game = class {
     this._trackSpend(cost, "upgrade");
     this.buildMgr.upgrade(id);
   }
+  requestSpecialize(id, spec) {
+    if (this.isHost) this.hostSpecialize(this.local.id, id, spec);
+    else this.net.send("specialize", { id, spec });
+  }
+  hostSpecialize(playerId, id, spec) {
+    const b = this.buildMgr.buildings.get(id);
+    if (!b || !b.canSpecialize) return;
+    const sp = CFG.towerSpec[b.key]?.[spec];
+    if (!sp) return;
+    const cost = CFG.towerSpec.cost;
+    const pool = this._poolOf(playerId);
+    if (!canAfford(pool, cost)) {
+      this._notify(playerId, "자원이 부족합니다", "bad");
+      return;
+    }
+    payCost(pool, cost);
+    this._trackSpend(cost, "upgrade");
+    this.buildMgr.specialize(id, spec);
+    this._notify(playerId, `${sp.icon} ${b.def.name} → ${sp.name} 특화 완료!`, "good");
+    if (playerId === this.local.id) this.sfx.upgrade();
+  }
   requestSell(id) {
     this.sfx.sell();
     if (this.isHost) this.hostSell(this.local.id, id);
@@ -1293,6 +1314,9 @@ export var Game = class {
     net.on("upgrade", (d2, from) => {
       if (this.isHost) this.hostUpgrade(from, d2.id);
     });
+    net.on("specialize", (d2, from) => {
+      if (this.isHost) this.hostSpecialize(from, d2.id, d2.spec);
+    });
     net.on("sell", (d2, from) => {
       if (this.isHost) this.hostSell(from, d2.id);
     });
@@ -1614,7 +1638,10 @@ export var Game = class {
           this.ui?.toast(this.buildMgr.ghostReason, "bad");
         }
       } else if (this.buildMgr.mode === "upgrade") {
-        if (this.buildMgr.hover) this.requestUpgrade(this.buildMgr.hover.id);
+        // 최대 레벨이면 업그레이드 대신 특화 선택창을 연다 — 강화 흐름의 마지막 단계로 자연스럽게 잇는다
+        const h2 = this.buildMgr.hover;
+        if (h2?.canSpecialize) this.ui?.showSpecChoice(h2);
+        else if (h2) this.requestUpgrade(h2.id);
       } else if (this.buildMgr.mode === "repair") {
         if (this.buildMgr.hover) this.requestRepair(this.buildMgr.hover.id);
       } else if (this.buildMgr.mode === "sell") {
