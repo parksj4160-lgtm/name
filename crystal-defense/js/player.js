@@ -349,6 +349,14 @@ export var LocalPlayer = class extends Player {
     this.cancelHarvest();
     return true;
   }
+  // 활을 들었을 때 — 폭탄과 같은 구조로 같은 attackCd 를 공유한다
+  tryShoot() {
+    if (!this.alive || this.attackCd > 0) return false;
+    this.attackCd = CFG.craft.bow.shoot.cd;
+    this.swing = 1;
+    this.cancelHarvest();
+    return true;
+  }
 };
 export var RemotePlayer = class extends Player {
   constructor(id, name, colorIdx) {

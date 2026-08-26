@@ -86,6 +86,8 @@ export var Game = class {
     this._seenTrap = false;
     this._seenDash = false;
     this._seenBomb = false;
+    this._seenBow = false;
+    this._seenHealer = false;
     this.boonMult = { atk: 1, towerDmg: 1, skillCostDelta: 0, bounty: 1, crystalUpgradeCostDelta: 0, weaponUpgradeCostDelta: 0 };
     this.pendingBoon = null;
     this._dropTimer = CFG.supplyDrop.firstDelay;
@@ -739,9 +741,15 @@ export var Game = class {
       this._notify(playerId, "💠 정수 획득! 인벤토리 스킬 탭에서 회복 외에 폭발·시간 왜곡·방벽도 쓸 수 있다", "good");
     }
   }
-  requestAttack() {
+  // aim 을 넘기면(대상을 직접 클릭한 경우) 원거리 무기가 마우스 위치가 아니라 그 지점을 겨눈다 —
+  // 클릭한 적과 실제로 겨누는 곳이 어긋나지 않게 한다(특히 탭으로 조작하는 모바일)
+  requestAttack(aim = null) {
     if (this.local.heldWeapon === "bomb") {
-      this._requestThrow();
+      this._requestThrow(aim);
+      return;
+    }
+    if (this.local.heldWeapon === "bow") {
+      this._requestShoot(aim);
       return;
     }
     if (!this.local.tryAttack()) return;
@@ -759,13 +767,13 @@ export var Game = class {
   }
   // 폭탄가방을 들었을 때의 공격 — 근접 대신 조준한 지점(포인터가 가리키는 바닥)에 던진다.
   // 사거리를 넘는 곳을 가리키면 사거리 끝까지만 날아간다
-  _requestThrow() {
+  _requestThrow(aim = null) {
     const cfg = CFG.craft.bomb.throw;
     if (!canAfford(this.myPool, cfg.cost)) {
       this._notify(this.local.id, "자원이 부족합니다", "bad");
       return;
     }
-    const pointer = this.sm.updatePointerWorld();
+    const pointer = aim || this.sm.updatePointerWorld();
     if (!pointer) return;
     if (!this.local.tryThrow()) return;
     const dx = pointer.x - this.local.x, dz = pointer.z - this.local.z;
@@ -785,6 +793,57 @@ export var Game = class {
       this._seenBomb = true;
       this.ui?.toast("💣 폭탄 투척! 손 대신 조준한 곳에 던진다 — 타워가 못 맞추는 결계 몹이나 멀리서 몰려온 무리를 노려라", "good");
     }
+  }
+  // 활을 들었을 때의 공격 — 근접 대신 조준한 쪽으로 화살이 날아간다. 폭탄과 같은 배관을 쓰지만
+  // 자원을 안 먹고 명중 지점에서 가장 가까운 한 마리만 맞힌다.
+  _requestShoot(aim = null) {
+    const cfg = CFG.craft.bow.shoot;
+    const pointer = aim || this.sm.updatePointerWorld();
+    if (!pointer) return;
+    if (!this.local.tryShoot()) return;
+    const dx = pointer.x - this.local.x, dz = pointer.z - this.local.z;
+    const len = Math.hypot(dx, dz) || 1;
+    const clamped = Math.min(len, cfg.range);
+    const tx = this.local.x + dx / len * clamped, tz = this.local.z + dz / len * clamped;
+    this.local.rot = Math.atan2(dx, dz);
+    this.sfx.meleeSwing();
+    if (this.isHost) {
+      this.hostShootArrow(this.local.id, this.local.x, this.local.z, tx, tz);
+    } else {
+      this.net.send("shootArrow", { x: this.local.x, z: this.local.z, tx, tz });
+      // 참가자 화면에서도 자기가 쏜 화살이 보이도록 연출 전용으로 한 발 더 쏜다(피해 계산은 호스트 몫)
+      const from = new THREE.Vector3(this.local.x, 1.4, this.local.z);
+      const to2 = new THREE.Vector3(tx, 0.9, tz);
+      this.projectiles.fire(from, to2, cfg.speed, 16772829, (pos) => this._arrowVFX(pos));
+    }
+    if (!this._seenBow) {
+      this._seenBow = true;
+      this.ui?.toast("🏹 활 사격! 손 대신 조준한 쪽으로 화살이 날아간다 — 자원은 안 들지만 한 발에 한 마리만 맞는다", "good");
+    }
+  }
+  _arrowVFX(pos) {
+    this.fx.burst(pos.x, pos.y, pos.z, 16772829, 5, 3);
+  }
+  hostShootArrow(playerId, fromX, fromZ, tx, tz) {
+    const cfg = CFG.craft.bow.shoot;
+    const lv = this._weaponLvOf("bow", playerId);
+    const dmg = Math.round((cfg.dmg + (CFG.weaponUpgrade.perLv.bow?.dmg || 0) * lv) * this.boonMult.atk * this._desperationMult);
+    const from = new THREE.Vector3(fromX, 1.4, fromZ);
+    const to2 = new THREE.Vector3(tx, 0.9, tz);
+    this.projectiles.fire(from, to2, cfg.speed, 16772829, (pos) => {
+      this._arrowVFX(pos);
+      // 명중 지점에서 가장 가까운 한 마리만 — 폭탄의 광역과 달리 점사다
+      let best = null, bestD = cfg.hitRadius;
+      for (const e of this.enemyMgr.list) {
+        if (e.dead) continue;
+        const d2 = dist(e.x, e.z, pos.x, pos.z);
+        if (d2 < bestD) {
+          bestD = d2;
+          best = e;
+        }
+      }
+      if (best) this._hurtEnemy(best, dmg, "player", pos.x, pos.z);
+    });
   }
   _bombVFX(pos, radius) {
     this.fx.burst(pos.x, pos.y, pos.z, 3355443, 16, 6);
@@ -898,6 +957,14 @@ export var Game = class {
   }
   // 화면을 클릭했을 때 — 가리킨 것이 몬스터면 때리고, 자원이면 캔다. 아무것도 없으면 그냥 휘두른다.
   // 채집 버튼 없이 대상을 직접 눌러 상호작용하는 게 기본 조작이다.
+  // 지금 손에 든 무기로 실제로 닿는 거리. 원거리 무기(활\xB7폭탄가방)는 근접 사거리가 아니라
+  // 자기 사거리를 쓴다 — 이게 없으면 사거리 9~16짜리 무기를 들고도 멀리 있는 적을 클릭했을 때
+  // "더 가까이 가세요" 라고 거부당한다
+  get attackReach() {
+    const def = CFG.craft[this.local.heldWeapon];
+    const ranged = def?.shoot || def?.throw;
+    return ranged ? ranged.range : this.local.attackStats.range;
+  }
   clickWorld(pointer) {
     if (!pointer) {
       this.requestAttack();
@@ -906,13 +973,13 @@ export var Game = class {
     const PICK = 2.2;
     const enemy = this._enemyNear(pointer.x, pointer.z, PICK);
     if (enemy) {
-      const reach = this.local.attackStats.range + enemy.st.radius;
+      const reach = this.attackReach + enemy.st.radius;
       if (dist(this.local.x, this.local.z, enemy.x, enemy.z) > reach) {
         this.ui?.toast(`${enemy.st.name}에게 더 가까이 가세요`, "warn");
         return;
       }
       this.local.rot = Math.atan2(enemy.x - this.local.x, enemy.z - this.local.z);
-      this.requestAttack();
+      this.requestAttack({ x: enemy.x, z: enemy.z });
       return;
     }
     const node = this.world.nearestNode(pointer.x, pointer.z, PICK);
@@ -1334,6 +1401,9 @@ export var Game = class {
     });
     net.on("throwBomb", (d2, from) => {
       if (this.isHost) this.hostThrowBomb(from, d2.x, d2.z, d2.tx, d2.tz);
+    });
+    net.on("shootArrow", (d2, from) => {
+      if (this.isHost) this.hostShootArrow(from, d2.x, d2.z, d2.tx, d2.tz);
     });
     net.on("startWave", (d2, from) => {
       if (this.isHost && this.wave?.startWave()) this.net.send("waveStarted", {});
