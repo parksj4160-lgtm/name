@@ -262,7 +262,8 @@ export var CFG = {
       bow: { dmg: 10 },
       spear: { dmg: 8 },
       hammer: { dmg: 12 },
-      bomb: { dmg: 20 }
+      bomb: { dmg: 20 },
+      whip: { dmg: 6 }
     }
   },
   // 제작대에서 만드는 것들. 각자 하나씩만 가질 수 있다.
@@ -303,6 +304,16 @@ export var CFG = {
       effect: { dmg: 30, arc: 2, cd: 0.55 },
       desc: "공격력 +30, 사방을 강타하지만 느리다(공격 간격 +0.55초) — 여럿이 몰려올 때 강하다."
     },
+    // 다른 근접 무기(칼·창·망치)는 전부 "더 세게 때리는" 쪽이지만, 이건 대미지 대신 맞은 적을
+    // 뒤로 밀쳐낸다 — 첫 근접 전용 제어기다. 크리스탈로 달려드는 무리를 잠깐 물러서게 하거나,
+    // 근접 위협을 밀어내고 그 틈에 타워·정수 스킬로 정리하는 용도.
+    whip: {
+      name: "채찍",
+      icon: "🔗",
+      cost: { wood: 25, iron: 5 },
+      effect: { range: 1.5, arc: 0.35, knockback: 3.2 },
+      desc: "사거리가 조금 늘고, 맞은 적을 뒤로 밀쳐낸다 — 대미지보다 거리 조절에 특화."
+    },
     // 유일한 원거리 무기 — 다른 무기(칼·활·창·망치)는 전부 근접 판정을 강화할 뿐이지만
     // 이건 실제 투사체를 던진다. 정수(shard)가 아니라 목재·광물을 태우는 소모형이라
     // 자원 관리 선택이 생기고, 결계(ward) 변종처럼 타워가 못 맞추는 원거리 위협에도 대응할 수 있다
@@ -337,6 +348,11 @@ export var CFG = {
     // 세 번째 보스(15웨이브 주기로 파괴자·서리 군주와 순환). 소환 대신 자기 발밑에 침묵 장판을 깐다 —
     // 장판 반경 안의 타워는 조준·사격이 전부 멈춘다(`buildings.js`의 `updateTowers` 참고). 돌진 패턴은 공유.
     warden: { name: "침묵의 군주", icon: "🔇", hp: 1100, speed: 1.8, dmg: 50, rate: 0.65, radius: 1.5, color: 8011711, bounty: { wood: 34, stone: 34 }, scale: 2.35, boss: true, silenceBoss: true },
+    // 네 번째 보스(20웨이브 주기로 나머지 셋과 순환). 소환·침묵 대신 자기 체력 문턱마다 팀 자원을
+    // 직접 훔쳐(그 절반만큼 자기 체력을 회복) — 다른 보스들의 압박이 전부 "크리스탈·건물·타워"를
+    // 향했다면 이쪽은 파밍한 자원 자체를 노린다. 놔두면 회복까지 겹쳐 싸움이 길어지므로, 캐스팅
+    // 중(그 사이엔 무방비로 서 있다) 화력을 몰아 최대한 못 훔치게 끊는 것이 유일한 대응이다.
+    looter: { name: "갈취자", icon: "🦂", hp: 1200, speed: 1.75, dmg: 52, rate: 0.65, radius: 1.5, color: 16766720, bounty: { wood: 36, stone: 36 }, scale: 2.4, boss: true, drainBoss: true },
     // 체력이 낮아 금방 죽지만, 죽는 순간(어떻게 죽었든) 그 자리에서 폭발해 주변 크리스탈·건물·플레이어에게
     // 피해를 준다 — 근접으로 마지막 일격을 넣으면 그 폭발을 그대로 맞는다. "닥치고 근접"이 항상 안전하지
     // 않게 만드는 가시(thorn) 변종과 목적은 비슷하지만, 이쪽은 변종이 아니라 종류 자체라 항상 그렇다.
@@ -418,6 +434,42 @@ export var CFG = {
       focus: { name: "집속", icon: "🎯", ring: 16752640, desc: "튐을 포기하고 한 놈에게 모든 전력을 쏟는다 — 보스·브루트를 순식간에 녹인다", mods: { dmg: 2.5, range: 1.25 }, add: { chain: { count: 1, range: 0, falloff: 1 } } }
     }
   },
+  // 무기 특화 — 타워 특화와 정확히 같은 개념을 무기 쪽으로 옮긴 것. 무기 강화가 최대
+  // 레벨(Lv.3)에 도달하면 두 갈래 중 하나를 골라 성격을 바꾼다(되돌릴 수 없다). mods 는 곱하고
+  // add 는 통째로 덮어쓴다. 대부분은 player.js 의 attackStats(근접 판정)가 강화 보너스까지 다
+  // 계산한 값 위에 적용되지만, 활·폭탄가방은 근접 판정과 다른 별도 배관(각각 shootStats·
+  // throwStats)을 타므로 그 배관의 기본값 위에 똑같은 방식으로 적용된다.
+  weaponSpec: {
+    cost: { iron: 12 },
+    sword: {
+      quickblade: { name: "쾌속검", icon: "⚡", desc: "대미지를 낮추는 대신 훨씬 빠르게 휘두른다 — 약한 잡몹을 순식간에 정리한다", mods: { dmg: 0.6, cd: 0.5 } },
+      greatsword: { name: "대검", icon: "🗡️", desc: "느려지는 대신 한 방이 훨씬 무겁다 — 단단한 한 놈을 확실히 끊는다", mods: { dmg: 2, cd: 1.6 } }
+    },
+    // 활은 근접 판정이 아니라 별도의 조준 사격 배관(craft.bow.shoot)을 타므로, 다른 무기처럼
+    // arc(판정각)를 건드리는 대신 그 배관의 진짜 변수인 사거리·발사 간격을 갈래마다 반대로 튼다.
+    bow: {
+      longbow: { name: "장궁", icon: "🎯", desc: "사거리와 대미지가 크게 늘지만 발사가 느려진다 — 멀리서 한 발 한 발 정조준", mods: { dmg: 1.5, cd: 1.3, range: 1.4 } },
+      rapid: { name: "속사", icon: "💨", desc: "사거리와 대미지를 내주고 발사 속도를 크게 올린다 — 가까이서 쏟아붓는다", mods: { cd: 0.5, dmg: 0.7, range: 0.75 } }
+    },
+    spear: {
+      lance: { name: "긴 창", icon: "🔱", desc: "사거리가 극단적으로 늘고 판정은 더 좁아진다 — 줄지어 오는 적을 꿰뚫는 데 특화", mods: { dmg: 1.5, arc: 0.6 }, add: { range: 9 } },
+      whirl: { name: "회전창", icon: "🌀", desc: "찌르기 대신 사방을 휩쓴다 — 사거리를 내주고 무리를 한꺼번에 벤다", mods: { dmg: 0.7 }, add: { arc: 3.2, range: 3.5 } }
+    },
+    hammer: {
+      crush: { name: "강타", icon: "💥", desc: "훨씬 느려지지만 한 방이 압도적이다 — 단단한 적·보스를 부순다", mods: { dmg: 1.8, cd: 1.35 } },
+      flurry: { name: "연속타격", icon: "🌪️", desc: "한 방을 내주고 훨씬 빠르게 휘두른다 — 사방을 두들기면서도 속도를 잃지 않는다", mods: { dmg: 0.6, cd: 0.45 } }
+    },
+    whip: {
+      longwhip: { name: "긴 채찍", icon: "🪢", desc: "사거리와 밀쳐내는 힘이 더 세진다 — 더 멀리서, 더 강하게 밀어낸다", mods: { range: 1.3, knockback: 1.6 } },
+      snapwhip: { name: "연속채찍", icon: "🔁", desc: "밀쳐내는 힘을 내주고 훨씬 빠르게 휘두른다 — 계속 두들겨 묶어 두듯 밀어낸다", mods: { cd: 0.6, knockback: 0.5 } }
+    },
+    // 폭탄가방도 활처럼 근접 판정이 아니라 별도 투척 배관(craft.bomb.throw)을 타므로
+    // player.js 의 throwStats 가 이 mods 를 그 배관 위에 얹는다.
+    bomb: {
+      cluster: { name: "확산탄", icon: "💥", desc: "범위가 크게 넓어지지만 한 방은 약해진다 — 뭉친 무리를 통째로 쓸어담는다", mods: { radius: 1.6, dmg: 0.65 } },
+      heavy: { name: "고폭탄", icon: "☢️", desc: "범위를 내주는 대신 한 방이 훨씬 무겁다(던지는 간격도 길어진다) — 단단한 한 놈을 확실히 끊는다", mods: { dmg: 1.8, radius: 0.6, cd: 1.3 } }
+    }
+  },
   // 보급품 투하 — 전투 중(웨이브 2부터) 가끔 지도 위에 상자가 떨어진다. 한 번에 최대 1개만 떠 있고,
   // 안 챙기고 놔두면 사라진다. 방어를 잠깐 비우고 달려가서 주울지 말지가 매 순간의 선택이 된다.
   supplyDrop: { minWave: 2, firstDelay: 16, minGap: 30, maxGap: 50, lifetime: 20, pickupRadius: 1.8, reward: { wood: 14, stone: 9 }, shardChance: 0.4 },
@@ -464,7 +516,10 @@ export var CFG = {
     growth: { name: "성장 가속", icon: "🌱", desc: "크리스탈 강화 비용 -1 (최소 1)", kind: "delta", key: "crystalUpgradeCostDelta", value: -1 },
     // growth 와 같은 구조를 이번 세션에 추가된 무기 강화 쪽으로도 옮긴 것. 철 비용이 정수보다
     // 단위가 커서(레벨당 5~13) -1로는 체감이 약해 -3으로 잡았다.
-    forging: { name: "제련술", icon: "⚒️", desc: "무기 강화 비용 -3 (최소 1)", kind: "delta", key: "weaponUpgradeCostDelta", value: -3 }
+    forging: { name: "제련술", icon: "⚒️", desc: "무기 강화 비용 -3 (최소 1)", kind: "delta", key: "weaponUpgradeCostDelta", value: -3 },
+    // forging 과 같은 구조를 무기 강화가 아니라 무기 특화(weaponSpec) 비용 쪽으로 옮긴 것 —
+    // 무기 특화는 철 12개 고정이라 강화(레벨당 5~13)보다 단가가 커서 -4로 잡았다.
+    mastery: { name: "숙련", icon: "🎓", desc: "무기 특화 비용 -4 (최소 1)", kind: "delta", key: "weaponSpecCostDelta", value: -4 }
   },
   // 보스 전용 패턴. 예고 시간을 반드시 두어서 플레이어가 반응할 수 있게 한다.
   bossPattern: {
@@ -484,7 +539,13 @@ export var CFG = {
     // 침묵의 군주 전용 — summonAt 임계값마다 소환 대신 침묵 장판을 깐다(summon과 배타적)
     silenceCast: 1.1,
     silenceRadius: 8,
-    silenceTime: 4
+    silenceTime: 4,
+    // 갈취자 전용 — summonAt 임계값마다 소환 대신 팀 자원을 훔친다(summon·silence와 배타적).
+    // 훔친 자원의 절반만큼 자기 최대 체력 비율로 회복한다 — 방치할수록 싸움이 길어진다.
+    drainCast: 1.1,
+    drainWood: 40,
+    drainStone: 40,
+    drainHealPct: 0.06
   },
   wave: {
     goal: 10,
@@ -503,8 +564,12 @@ export var CFG = {
     reward: { wood: 20, stone: 15, perWave: { wood: 8, stone: 6 } },
     shardEvery: 3,
     // n웨이브마다 수정 정수 1개 (크리스탈 25% 회복)
-    nightEvery: 7
+    nightEvery: 7,
     // n웨이브마다 밤 웨이브 — 조명이 어두워지고 시야(안개)가 좁아진다. 엔드리스에서도 계속 반복된다.
+    // 지금까진 순전히 시각 효과라 "귀찮지만 아무 의미 없는 웨이브"였다 — 야간 처치 보상을 올려서
+    // 어두워 위험을 감수한 만큼 실제로 보상이 따라오게 한다(타워 사거리 등 전투 수치는 안 건드린다 —
+    // 그건 이미 안개 날씨(WEATHER.fog)가 맡고 있어서 밤과 겹치면 이중 페널티가 된다).
+    nightBountyMult: 1.3
   },
   // 정수(💠) 액티브 스킬. 회복과 경쟁하도록 비용을 잡는다 — 정수를 아껴 회복할지, 지금 싸움에 쓸지 고민하게 만드는 게 목적.
   skills: {
@@ -560,7 +625,7 @@ export function specialWaveKind(w2) {
   const occurrence = Math.floor(w2 / 3) - Math.floor(w2 / 15);
   return SPECIAL_KEYS[(occurrence - 1) % SPECIAL_KEYS.length];
 }
-var BOSS_CYCLE = ["boss", "frostlord", "warden"];
+var BOSS_CYCLE = ["boss", "frostlord", "warden", "looter"];
 function _specialComposition(w2, kind) {
   const total = _standardTotal(w2);
   if (kind === "rush") {

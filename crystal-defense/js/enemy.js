@@ -468,6 +468,7 @@ export var EnemyManager = class {
       e.castKind = null;
       if (kind === "summon") this._bossSummon(e);
       else if (kind === "silence") this._bossSilence(e);
+      else if (kind === "drain") this._bossDrain(e);
       else this._bossBeginCharge(e);
       return true;
     }
@@ -484,10 +485,13 @@ export var EnemyManager = class {
     if (e.summonsDone < P2.summonAt.length && ratio <= P2.summonAt[e.summonsDone]) {
       e.summonsDone++;
       const silence = !!e.st.silenceBoss;
-      e.castKind = silence ? "silence" : "summon";
-      e.castUntil = silence ? P2.silenceCast : P2.summonCast;
-      this.fx.ring(e.x, e.z, silence ? 8011711 : 16733525, 5);
-      this.onBossTelegraph?.(e, silence ? "silence" : "summon");
+      const drain = !!e.st.drainBoss;
+      const kind2 = silence ? "silence" : drain ? "drain" : "summon";
+      e.castKind = kind2;
+      e.castUntil = silence ? P2.silenceCast : drain ? P2.drainCast : P2.summonCast;
+      const color = silence ? 8011711 : drain ? 16766720 : 16733525;
+      this.fx.ring(e.x, e.z, color, 5);
+      this.onBossTelegraph?.(e, kind2);
       return true;
     }
     e.chargeCd -= dt2;
@@ -518,6 +522,11 @@ export var EnemyManager = class {
     e.silenceUntil = performance.now() / 1e3 + P2.silenceTime;
     this.fx.ring(e.x, e.z, 8011711, P2.silenceRadius);
     this.onBossTelegraph?.(e, "silenceGo");
+  }
+  // 갈취자 전용 — 실제 자원 차감·자기 회복은 팀 자원 풀에 접근해야 해서 game.js 쪽 콜백이 처리한다.
+  _bossDrain(e) {
+    this.fx.ring(e.x, e.z, 16766720, 6);
+    this.onBossDrain?.(e);
   }
   _bossBeginCharge(e) {
     const P2 = CFG.bossPattern;

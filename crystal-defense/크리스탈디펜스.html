@@ -523,6 +523,7 @@ button.corner.mute.off { opacity: 0.5; }
 </head>
 <body>
 
+
 <canvas id="scene"></canvas>
 <div id="fx-layer"></div>
 <div id="crystal-warning" class="hidden"></div>
@@ -629,7 +630,7 @@ button.corner.mute.off { opacity: 0.5; }
       <tr><td>🕸️ 덫탑</td><td>피해는 미미하지만 맞은 적을 잠깐 완전히 묶어 이동을 멈춘다(둔화가 아니라 정지). 🦇 박쥐처럼 벽·함정을 무시하는 적도 사거리 안에만 들어오면 그대로 묶인다 — 다른 타워가 명중시킬 시간을 벌어 준다. <b>묶인 적을 다른 타워가 맞추면 추가 피해 35%</b> — 인접 배치 없이 묶인 상태 자체가 조건이라 어떤 타워 조합이든 이득을 본다</td></tr>
       <tr><td>🌩️ 번개탑</td><td>명중한 적에서 가까운 다른 적으로 튀어 옮겨붙는다(튈수록 피해 감소) — 뭉쳐서 오는 잡몹 무리엔 대포탑만큼 강하고, 흩어진 적에게는 화살탑처럼 한 놈에 집중된다</td></tr>
       <tr><td>🪤 함정</td><td>벽·타워와 달리 <b>길을 막지 않는다</b> — 적이 지나가는 길목 한복판에 심어 두면, 적이 밟는 순간 큰 피해+둔화를 주고 사라지는 1회용이다. 벽 뒤가 아니라 통로 위에 놓는 게 핵심</td></tr>
-      <tr><td>제작</td><td><b>제작대</b>를 지으면 인벤토리 <b>제작</b> 탭에서 ⛏️ 곡괭이 · 🗡️ 칼 · 🏹 활 · 🔱 창 · 🔨 망치 · 💣 폭탄가방을 만든다. 칼은 단단한 일격, <b>활은 실제로 화살을 쏘는 원거리</b>, 창은 좁고 긴 관통, 망치는 느리지만 사방을 강타. <b>화로</b>를 지으면 광물을 녹여 ⚙️ 철을 얻는다</td></tr>
+      <tr><td>제작</td><td><b>제작대</b>를 지으면 인벤토리 <b>제작</b> 탭에서 ⛏️ 곡괭이 · 🗡️ 칼 · 🏹 활 · 🔱 창 · 🔨 망치 · 🔗 채찍 · 💣 폭탄가방을 만든다. 칼은 단단한 일격, <b>활은 실제로 화살을 쏘는 원거리</b>, 창은 좁고 긴 관통, 망치는 느리지만 사방을 강타, 채찍은 대미지 대신 맞은 적을 뒤로 밀쳐낸다. <b>화로</b>를 지으면 광물을 녹여 ⚙️ 철을 얻는다</td></tr>
       <tr><td>🏹 활</td><td>손에 들면 공격이 근접 대신 <b>조준한 쪽으로 화살을 쏘는 것</b>으로 바뀐다(사거리 16). 폭탄가방과 달리 자원이 전혀 안 들지만 한 발에 한 마리만 맞고 피해도 낮다 — 안전한 거리에서 꾸준히 점사하는 용도</td></tr>
       <tr><td>💣 폭탄가방</td><td>손에 들면 공격이 근접 대신 <b>조준한 바닥 지점에 폭탄을 던지는 것</b>으로 바뀐다(사거리 9, 던질 때마다 목재4·광물3 소모). 정수 스킬과 달리 목재·광물로 계속 쓸 수 있다. 🌀 결계 몹처럼 타워가 못 맞추는 원거리 위협이나 멀리서 몰려온 무리에 좋다</td></tr>
       <tr><td>쓰러짐·부활</td><td>체력이 0이 되면 쓰러져 잠시(5초) 조작 불가 상태가 됐다가 크리스탈 옆에서 부활한다. <b>협동 플레이라면 살아있는 아군이 쓰러진 사람 가까이 가면 부활이 3배 빨라진다</b> — 위험을 무릅쓰고 구하러 갈지 판단해야 한다. 혼자 할 땐 영향 없음</td></tr>
@@ -644,12 +645,13 @@ button.corner.mute.off { opacity: 0.5; }
       <tr><td>📦 보급품 투하</td><td>2웨이브부터 전투 중 가끔 상자가 떨어진다(한 번에 최대 1개, 미니맵에 노란 점으로 표시). 가까이 다가가면 자동으로 줍고 자원(목재·광물, 확률로 정수)을 얻는다 — 오래 안 챙기면 사라지니 방어를 잠깐 비우고 달려갈지 말지가 선택</td></tr>
       <tr><td>🧳 떠돌이 상인</td><td>2웨이브 클리어 후부터 준비 시간에 가끔 나타나 그 준비 시간에만 무작위 2개 품목을 목재·광물로 판다(물약·정수/철 교환 등). 품목은 각자 한 번씩만 살 수 있고 웨이브가 시작되면 사라진다 — 축복과 달리 엔드리스가 아니어도, 정수가 없어도 쓸 수 있는 자원 소비처다</td></tr>
       <tr><td>지형</td><td>판마다 지형이 다르다: 🏔️ 협곡(입구가 좁아 길막기가 잘 먹히지만 자원 부족) · 🌾 개활지(자원은 넉넉하지만 적이 사방에서 온다) · 🗺️ 평지(표준). 좌상단 자원 패널에 항상 표시된다</td></tr>
-      <tr><td>🌙 밤 웨이브</td><td>7웨이브마다(엔드리스에서도 반복) 조명이 어두워지고 안개가 짙어져 시야가 좁아진다. 크리스탈 불빛은 오히려 더 밝아져 등대 역할을 한다</td></tr>
+      <tr><td>🌙 밤 웨이브</td><td>7웨이브마다(엔드리스에서도 반복) 조명이 어두워지고 안개가 짙어져 시야가 좁아진다. 크리스탈 불빛은 오히려 더 밝아져 등대 역할을 한다. 대신 그 웨이브에서 처치한 몬스터의 자원 보상이 30% 더 후하다 — 어두워서 위험한 만큼 보상도 따라온다</td></tr>
       <tr><td>날씨</td><td>밤이 아닌 웨이브에 가끔 낀다: 🌧️ 비(땅이 젖어 이동 속도 소폭 감소) · 🌫️ 안개(시야가 줄고 타워 사거리 소폭 감소). 웨이브 시작 토스트로 미리 알려준다</td></tr>
       <tr><td>♾️ 축복</td><td>엔드리스 모드에서 3웨이브마다 준비 시간이 멈추고 영구 버프 2개 중 하나를 고른다(공격력·타워 공격력·스킬 비용·즉시 회복). 표준 10웨이브에는 나오지 않는다</td></tr>
       <tr><td>💎 크리스탈 강화</td><td>인벤토리 <b>크리스탈</b> 탭에서 정수(💠)로 크리스탈 자체를 영구히 키운다: 💪 강화(최대 체력 +150) · 💚 재생(초당 자동 회복) · ⚡ 오라(주변 적에게 주기 피해) · 🪞 반사(크리스탈을 때린 적에게 받은 피해 일부를 그대로 돌려줌). 각 5레벨까지, 레벨이 오를수록 비용도 오른다 — 지킬 대상이 강해지면 후반에 방어선을 좁혀 버티는 선택지가 생긴다</td></tr>
       <tr><td>특수 웨이브</td><td>3웨이브마다(보스 웨이브 제외) 성격이 다른 웨이브가 섞인다: 🏃 러시(러너 대량, 물량전) · 🏰 공성(브루트+약탈자, 건물이 표적) · ⭐ 정예전(수는 적지만 전부 정예) · 🌀 결계(전부 결계를 둘러 타워가 조준 못함) · 💉 치유단(치유사가 잔뜩 섞여 서로 회복, 먼저 솎아내야 함). 준비 시간 웨이브 예고에 노란 배지로 미리 알려준다</td></tr>
-      <tr><td>보스</td><td>5웨이브마다 💀 파괴자 · 🧊 서리 군주 · 🔇 침묵의 군주가 15웨이브 주기로 돌아가며 등장한다. 체력이 깎일 때마다 파괴자·서리 군주는 <b>잡졸을 소환</b>하고(서리 군주는 전부 🛡️ 방패 변종), 침묵의 군주는 대신 <b>발밑에 침묵 장판</b>을 깔아 반경 안 타워를 전부 멈춘다(직접 나가서 막아야 함). 멀리 있으면 셋 다 <b>크리스탈로 돌진</b>해 지나는 건물을 부순다. 전부 <b>예고가 먼저 뜨니</b> 그때 대응할 것</td></tr>
+      <tr><td>보스</td><td>5웨이브마다 💀 파괴자 · 🧊 서리 군주 · 🔇 침묵의 군주 · 🦂 갈취자가 20웨이브 주기로 돌아가며 등장한다. 체력이 깎일 때마다 파괴자·서리 군주는 <b>잡졸을 소환</b>하고(서리 군주는 전부 🛡️ 방패 변종), 침묵의 군주는 <b>발밑에 침묵 장판</b>을 깔아 반경 안 타워를 전부 멈추며, 갈취자는 대신 <b>팀 자원을 훔쳐 체력을 회복</b>한다(캐스팅 중에 화력을 몰아야 손해를 줄인다). 멀리 있으면 넷 다 <b>크리스탈로 돌진</b>해 지나는 건물을 부순다. 전부 <b>예고가 먼저 뜨니</b> 그때 대응할 것</td></tr>
+      <tr><td>⚗️ 특화</td><td>최대 레벨(Lv.3)에 도달한 전투 타워를 <b>업그레이드 모드로 다시 클릭</b>하면, 또는 최대 레벨까지 강화한 무기를 인벤토리 <b>제작</b> 탭에서 클릭하면, 두 갈래 중 하나를 골라 성격을 영구히 바꾼다(되돌릴 수 없다) — 같은 타워·무기라도 특화에 따라 역할이 크게 갈린다</td></tr>
       <tr><td>업그레이드</td><td><kbd class="rebind" data-action="upgrade">U</kbd> 후 건물 클릭</td></tr>
       <tr><td>수리</td><td><kbd class="rebind" data-action="repair">G</kbd> 후 건물 클릭 (손상 비례 자원 소모)</td></tr>
       <tr><td>철거(50% 환급)</td><td><kbd class="rebind" data-action="sell">X</kbd> 후 건물 클릭</td></tr>
@@ -10219,7 +10221,8 @@ button.corner.mute.off { opacity: 0.5; }
     eliteHunter: { name: "\uC815\uC608 \uC0AC\uB0E5\uAFBC", icon: "\u2B50", desc: "\uC815\uC608 \uBAAC\uC2A4\uD130\uB97C 5\uB9C8\uB9AC \uCC98\uCE58\uD588\uB2E4" },
     weaponMaster: { name: "\uC7A5\uC778\uC758 \uC190\uAE38", icon: "\u{1F6E0}\uFE0F", desc: "\uBB34\uAE30 \uD558\uB098\uB97C \uCD5C\uB300 \uB808\uBCA8\uAE4C\uC9C0 \uAC15\uD654\uD588\uB2E4" },
     treasureHunter: { name: "\uBCF4\uBB3C \uC0AC\uB0E5\uAFBC", icon: "\u{1F980}", desc: "\uBCF4\uBB3C\uAC8C\uB97C 5\uB9C8\uB9AC \uC7A1\uC558\uB2E4" },
-    nightmareConqueror: { name: "\uC545\uBABD \uC815\uBCF5", icon: "\u{1F631}", desc: "\uC545\uBABD \uB09C\uC774\uB3C4\uB85C 10\uC6E8\uC774\uBE0C\uB97C \uB9C9\uC544\uB0C8\uB2E4" }
+    nightmareConqueror: { name: "\uC545\uBABD \uC815\uBCF5", icon: "\u{1F631}", desc: "\uC545\uBABD \uB09C\uC774\uB3C4\uB85C 10\uC6E8\uC774\uBE0C\uB97C \uB9C9\uC544\uB0C8\uB2E4" },
+    fourKings: { name: "\uC0AC\uCC9C\uC655", icon: "\u{1F409}", desc: "\uD55C \uD310\uC5D0\uC11C \uB124 \uBCF4\uC2A4(\uD30C\uAD34\uC790\xB7\uC11C\uB9AC \uAD70\uC8FC\xB7\uCE68\uBB35\uC758 \uAD70\uC8FC\xB7\uAC08\uCDE8\uC790)\uB97C \uC804\uBD80 \uCC98\uCE58\uD588\uB2E4" }
   };
   var STORE_KEY = "cd.achievements";
   function loadUnlocked() {
@@ -10975,7 +10978,8 @@ button.corner.mute.off { opacity: 0.5; }
         bow: { dmg: 10 },
         spear: { dmg: 8 },
         hammer: { dmg: 12 },
-        bomb: { dmg: 20 }
+        bomb: { dmg: 20 },
+        whip: { dmg: 6 }
       }
     },
     // 제작대에서 만드는 것들. 각자 하나씩만 가질 수 있다.
@@ -11016,6 +11020,16 @@ button.corner.mute.off { opacity: 0.5; }
         effect: { dmg: 30, arc: 2, cd: 0.55 },
         desc: "\uACF5\uACA9\uB825 +30, \uC0AC\uBC29\uC744 \uAC15\uD0C0\uD558\uC9C0\uB9CC \uB290\uB9AC\uB2E4(\uACF5\uACA9 \uAC04\uACA9 +0.55\uCD08) \u2014 \uC5EC\uB7FF\uC774 \uBAB0\uB824\uC62C \uB54C \uAC15\uD558\uB2E4."
       },
+      // 다른 근접 무기(칼·창·망치)는 전부 "더 세게 때리는" 쪽이지만, 이건 대미지 대신 맞은 적을
+      // 뒤로 밀쳐낸다 — 첫 근접 전용 제어기다. 크리스탈로 달려드는 무리를 잠깐 물러서게 하거나,
+      // 근접 위협을 밀어내고 그 틈에 타워·정수 스킬로 정리하는 용도.
+      whip: {
+        name: "\uCC44\uCC0D",
+        icon: "\u{1F517}",
+        cost: { wood: 25, iron: 5 },
+        effect: { range: 1.5, arc: 0.35, knockback: 3.2 },
+        desc: "\uC0AC\uAC70\uB9AC\uAC00 \uC870\uAE08 \uB298\uACE0, \uB9DE\uC740 \uC801\uC744 \uB4A4\uB85C \uBC00\uCCD0\uB0B8\uB2E4 \u2014 \uB300\uBBF8\uC9C0\uBCF4\uB2E4 \uAC70\uB9AC \uC870\uC808\uC5D0 \uD2B9\uD654."
+      },
       // 유일한 원거리 무기 — 다른 무기(칼·활·창·망치)는 전부 근접 판정을 강화할 뿐이지만
       // 이건 실제 투사체를 던진다. 정수(shard)가 아니라 목재·광물을 태우는 소모형이라
       // 자원 관리 선택이 생기고, 결계(ward) 변종처럼 타워가 못 맞추는 원거리 위협에도 대응할 수 있다
@@ -11050,6 +11064,11 @@ button.corner.mute.off { opacity: 0.5; }
       // 세 번째 보스(15웨이브 주기로 파괴자·서리 군주와 순환). 소환 대신 자기 발밑에 침묵 장판을 깐다 —
       // 장판 반경 안의 타워는 조준·사격이 전부 멈춘다(`buildings.js`의 `updateTowers` 참고). 돌진 패턴은 공유.
       warden: { name: "\uCE68\uBB35\uC758 \uAD70\uC8FC", icon: "\u{1F507}", hp: 1100, speed: 1.8, dmg: 50, rate: 0.65, radius: 1.5, color: 8011711, bounty: { wood: 34, stone: 34 }, scale: 2.35, boss: true, silenceBoss: true },
+      // 네 번째 보스(20웨이브 주기로 나머지 셋과 순환). 소환·침묵 대신 자기 체력 문턱마다 팀 자원을
+      // 직접 훔쳐(그 절반만큼 자기 체력을 회복) — 다른 보스들의 압박이 전부 "크리스탈·건물·타워"를
+      // 향했다면 이쪽은 파밍한 자원 자체를 노린다. 놔두면 회복까지 겹쳐 싸움이 길어지므로, 캐스팅
+      // 중(그 사이엔 무방비로 서 있다) 화력을 몰아 최대한 못 훔치게 끊는 것이 유일한 대응이다.
+      looter: { name: "\uAC08\uCDE8\uC790", icon: "\u{1F982}", hp: 1200, speed: 1.75, dmg: 52, rate: 0.65, radius: 1.5, color: 16766720, bounty: { wood: 36, stone: 36 }, scale: 2.4, boss: true, drainBoss: true },
       // 체력이 낮아 금방 죽지만, 죽는 순간(어떻게 죽었든) 그 자리에서 폭발해 주변 크리스탈·건물·플레이어에게
       // 피해를 준다 — 근접으로 마지막 일격을 넣으면 그 폭발을 그대로 맞는다. "닥치고 근접"이 항상 안전하지
       // 않게 만드는 가시(thorn) 변종과 목적은 비슷하지만, 이쪽은 변종이 아니라 종류 자체라 항상 그렇다.
@@ -11131,6 +11150,42 @@ button.corner.mute.off { opacity: 0.5; }
         focus: { name: "\uC9D1\uC18D", icon: "\u{1F3AF}", ring: 16752640, desc: "\uD290\uC744 \uD3EC\uAE30\uD558\uACE0 \uD55C \uB188\uC5D0\uAC8C \uBAA8\uB4E0 \uC804\uB825\uC744 \uC3DF\uB294\uB2E4 \u2014 \uBCF4\uC2A4\xB7\uBE0C\uB8E8\uD2B8\uB97C \uC21C\uC2DD\uAC04\uC5D0 \uB179\uC778\uB2E4", mods: { dmg: 2.5, range: 1.25 }, add: { chain: { count: 1, range: 0, falloff: 1 } } }
       }
     },
+    // 무기 특화 — 타워 특화와 정확히 같은 개념을 무기 쪽으로 옮긴 것. 무기 강화가 최대
+    // 레벨(Lv.3)에 도달하면 두 갈래 중 하나를 골라 성격을 바꾼다(되돌릴 수 없다). mods 는 곱하고
+    // add 는 통째로 덮어쓴다. 대부분은 player.js 의 attackStats(근접 판정)가 강화 보너스까지 다
+    // 계산한 값 위에 적용되지만, 활·폭탄가방은 근접 판정과 다른 별도 배관(각각 shootStats·
+    // throwStats)을 타므로 그 배관의 기본값 위에 똑같은 방식으로 적용된다.
+    weaponSpec: {
+      cost: { iron: 12 },
+      sword: {
+        quickblade: { name: "\uCF8C\uC18D\uAC80", icon: "\u26A1", desc: "\uB300\uBBF8\uC9C0\uB97C \uB0AE\uCD94\uB294 \uB300\uC2E0 \uD6E8\uC52C \uBE60\uB974\uAC8C \uD718\uB450\uB978\uB2E4 \u2014 \uC57D\uD55C \uC7A1\uBAB9\uC744 \uC21C\uC2DD\uAC04\uC5D0 \uC815\uB9AC\uD55C\uB2E4", mods: { dmg: 0.6, cd: 0.5 } },
+        greatsword: { name: "\uB300\uAC80", icon: "\u{1F5E1}\uFE0F", desc: "\uB290\uB824\uC9C0\uB294 \uB300\uC2E0 \uD55C \uBC29\uC774 \uD6E8\uC52C \uBB34\uAC81\uB2E4 \u2014 \uB2E8\uB2E8\uD55C \uD55C \uB188\uC744 \uD655\uC2E4\uD788 \uB04A\uB294\uB2E4", mods: { dmg: 2, cd: 1.6 } }
+      },
+      // 활은 근접 판정이 아니라 별도의 조준 사격 배관(craft.bow.shoot)을 타므로, 다른 무기처럼
+      // arc(판정각)를 건드리는 대신 그 배관의 진짜 변수인 사거리·발사 간격을 갈래마다 반대로 튼다.
+      bow: {
+        longbow: { name: "\uC7A5\uAD81", icon: "\u{1F3AF}", desc: "\uC0AC\uAC70\uB9AC\uC640 \uB300\uBBF8\uC9C0\uAC00 \uD06C\uAC8C \uB298\uC9C0\uB9CC \uBC1C\uC0AC\uAC00 \uB290\uB824\uC9C4\uB2E4 \u2014 \uBA40\uB9AC\uC11C \uD55C \uBC1C \uD55C \uBC1C \uC815\uC870\uC900", mods: { dmg: 1.5, cd: 1.3, range: 1.4 } },
+        rapid: { name: "\uC18D\uC0AC", icon: "\u{1F4A8}", desc: "\uC0AC\uAC70\uB9AC\uC640 \uB300\uBBF8\uC9C0\uB97C \uB0B4\uC8FC\uACE0 \uBC1C\uC0AC \uC18D\uB3C4\uB97C \uD06C\uAC8C \uC62C\uB9B0\uB2E4 \u2014 \uAC00\uAE4C\uC774\uC11C \uC3DF\uC544\uBD93\uB294\uB2E4", mods: { cd: 0.5, dmg: 0.7, range: 0.75 } }
+      },
+      spear: {
+        lance: { name: "\uAE34 \uCC3D", icon: "\u{1F531}", desc: "\uC0AC\uAC70\uB9AC\uAC00 \uADF9\uB2E8\uC801\uC73C\uB85C \uB298\uACE0 \uD310\uC815\uC740 \uB354 \uC881\uC544\uC9C4\uB2E4 \u2014 \uC904\uC9C0\uC5B4 \uC624\uB294 \uC801\uC744 \uAFF0\uB6AB\uB294 \uB370 \uD2B9\uD654", mods: { dmg: 1.5, arc: 0.6 }, add: { range: 9 } },
+        whirl: { name: "\uD68C\uC804\uCC3D", icon: "\u{1F300}", desc: "\uCC0C\uB974\uAE30 \uB300\uC2E0 \uC0AC\uBC29\uC744 \uD729\uC4F4\uB2E4 \u2014 \uC0AC\uAC70\uB9AC\uB97C \uB0B4\uC8FC\uACE0 \uBB34\uB9AC\uB97C \uD55C\uAEBC\uBC88\uC5D0 \uBCA4\uB2E4", mods: { dmg: 0.7 }, add: { arc: 3.2, range: 3.5 } }
+      },
+      hammer: {
+        crush: { name: "\uAC15\uD0C0", icon: "\u{1F4A5}", desc: "\uD6E8\uC52C \uB290\uB824\uC9C0\uC9C0\uB9CC \uD55C \uBC29\uC774 \uC555\uB3C4\uC801\uC774\uB2E4 \u2014 \uB2E8\uB2E8\uD55C \uC801\xB7\uBCF4\uC2A4\uB97C \uBD80\uC21C\uB2E4", mods: { dmg: 1.8, cd: 1.35 } },
+        flurry: { name: "\uC5F0\uC18D\uD0C0\uACA9", icon: "\u{1F32A}\uFE0F", desc: "\uD55C \uBC29\uC744 \uB0B4\uC8FC\uACE0 \uD6E8\uC52C \uBE60\uB974\uAC8C \uD718\uB450\uB978\uB2E4 \u2014 \uC0AC\uBC29\uC744 \uB450\uB4E4\uAE30\uBA74\uC11C\uB3C4 \uC18D\uB3C4\uB97C \uC783\uC9C0 \uC54A\uB294\uB2E4", mods: { dmg: 0.6, cd: 0.45 } }
+      },
+      whip: {
+        longwhip: { name: "\uAE34 \uCC44\uCC0D", icon: "\u{1FAA2}", desc: "\uC0AC\uAC70\uB9AC\uC640 \uBC00\uCCD0\uB0B4\uB294 \uD798\uC774 \uB354 \uC138\uC9C4\uB2E4 \u2014 \uB354 \uBA40\uB9AC\uC11C, \uB354 \uAC15\uD558\uAC8C \uBC00\uC5B4\uB0B8\uB2E4", mods: { range: 1.3, knockback: 1.6 } },
+        snapwhip: { name: "\uC5F0\uC18D\uCC44\uCC0D", icon: "\u{1F501}", desc: "\uBC00\uCCD0\uB0B4\uB294 \uD798\uC744 \uB0B4\uC8FC\uACE0 \uD6E8\uC52C \uBE60\uB974\uAC8C \uD718\uB450\uB978\uB2E4 \u2014 \uACC4\uC18D \uB450\uB4E4\uACA8 \uBB36\uC5B4 \uB450\uB4EF \uBC00\uC5B4\uB0B8\uB2E4", mods: { cd: 0.6, knockback: 0.5 } }
+      },
+      // 폭탄가방도 활처럼 근접 판정이 아니라 별도 투척 배관(craft.bomb.throw)을 타므로
+      // player.js 의 throwStats 가 이 mods 를 그 배관 위에 얹는다.
+      bomb: {
+        cluster: { name: "\uD655\uC0B0\uD0C4", icon: "\u{1F4A5}", desc: "\uBC94\uC704\uAC00 \uD06C\uAC8C \uB113\uC5B4\uC9C0\uC9C0\uB9CC \uD55C \uBC29\uC740 \uC57D\uD574\uC9C4\uB2E4 \u2014 \uBB49\uCE5C \uBB34\uB9AC\uB97C \uD1B5\uC9F8\uB85C \uC4F8\uC5B4\uB2F4\uB294\uB2E4", mods: { radius: 1.6, dmg: 0.65 } },
+        heavy: { name: "\uACE0\uD3ED\uD0C4", icon: "\u2622\uFE0F", desc: "\uBC94\uC704\uB97C \uB0B4\uC8FC\uB294 \uB300\uC2E0 \uD55C \uBC29\uC774 \uD6E8\uC52C \uBB34\uAC81\uB2E4(\uB358\uC9C0\uB294 \uAC04\uACA9\uB3C4 \uAE38\uC5B4\uC9C4\uB2E4) \u2014 \uB2E8\uB2E8\uD55C \uD55C \uB188\uC744 \uD655\uC2E4\uD788 \uB04A\uB294\uB2E4", mods: { dmg: 1.8, radius: 0.6, cd: 1.3 } }
+      }
+    },
     // 보급품 투하 — 전투 중(웨이브 2부터) 가끔 지도 위에 상자가 떨어진다. 한 번에 최대 1개만 떠 있고,
     // 안 챙기고 놔두면 사라진다. 방어를 잠깐 비우고 달려가서 주울지 말지가 매 순간의 선택이 된다.
     supplyDrop: { minWave: 2, firstDelay: 16, minGap: 30, maxGap: 50, lifetime: 20, pickupRadius: 1.8, reward: { wood: 14, stone: 9 }, shardChance: 0.4 },
@@ -11177,7 +11232,10 @@ button.corner.mute.off { opacity: 0.5; }
       growth: { name: "\uC131\uC7A5 \uAC00\uC18D", icon: "\u{1F331}", desc: "\uD06C\uB9AC\uC2A4\uD0C8 \uAC15\uD654 \uBE44\uC6A9 -1 (\uCD5C\uC18C 1)", kind: "delta", key: "crystalUpgradeCostDelta", value: -1 },
       // growth 와 같은 구조를 이번 세션에 추가된 무기 강화 쪽으로도 옮긴 것. 철 비용이 정수보다
       // 단위가 커서(레벨당 5~13) -1로는 체감이 약해 -3으로 잡았다.
-      forging: { name: "\uC81C\uB828\uC220", icon: "\u2692\uFE0F", desc: "\uBB34\uAE30 \uAC15\uD654 \uBE44\uC6A9 -3 (\uCD5C\uC18C 1)", kind: "delta", key: "weaponUpgradeCostDelta", value: -3 }
+      forging: { name: "\uC81C\uB828\uC220", icon: "\u2692\uFE0F", desc: "\uBB34\uAE30 \uAC15\uD654 \uBE44\uC6A9 -3 (\uCD5C\uC18C 1)", kind: "delta", key: "weaponUpgradeCostDelta", value: -3 },
+      // forging 과 같은 구조를 무기 강화가 아니라 무기 특화(weaponSpec) 비용 쪽으로 옮긴 것 —
+      // 무기 특화는 철 12개 고정이라 강화(레벨당 5~13)보다 단가가 커서 -4로 잡았다.
+      mastery: { name: "\uC219\uB828", icon: "\u{1F393}", desc: "\uBB34\uAE30 \uD2B9\uD654 \uBE44\uC6A9 -4 (\uCD5C\uC18C 1)", kind: "delta", key: "weaponSpecCostDelta", value: -4 }
     },
     // 보스 전용 패턴. 예고 시간을 반드시 두어서 플레이어가 반응할 수 있게 한다.
     bossPattern: {
@@ -11197,7 +11255,13 @@ button.corner.mute.off { opacity: 0.5; }
       // 침묵의 군주 전용 — summonAt 임계값마다 소환 대신 침묵 장판을 깐다(summon과 배타적)
       silenceCast: 1.1,
       silenceRadius: 8,
-      silenceTime: 4
+      silenceTime: 4,
+      // 갈취자 전용 — summonAt 임계값마다 소환 대신 팀 자원을 훔친다(summon·silence와 배타적).
+      // 훔친 자원의 절반만큼 자기 최대 체력 비율로 회복한다 — 방치할수록 싸움이 길어진다.
+      drainCast: 1.1,
+      drainWood: 40,
+      drainStone: 40,
+      drainHealPct: 0.06
     },
     wave: {
       goal: 10,
@@ -11216,8 +11280,12 @@ button.corner.mute.off { opacity: 0.5; }
       reward: { wood: 20, stone: 15, perWave: { wood: 8, stone: 6 } },
       shardEvery: 3,
       // n웨이브마다 수정 정수 1개 (크리스탈 25% 회복)
-      nightEvery: 7
+      nightEvery: 7,
       // n웨이브마다 밤 웨이브 — 조명이 어두워지고 시야(안개)가 좁아진다. 엔드리스에서도 계속 반복된다.
+      // 지금까진 순전히 시각 효과라 "귀찮지만 아무 의미 없는 웨이브"였다 — 야간 처치 보상을 올려서
+      // 어두워 위험을 감수한 만큼 실제로 보상이 따라오게 한다(타워 사거리 등 전투 수치는 안 건드린다 —
+      // 그건 이미 안개 날씨(WEATHER.fog)가 맡고 있어서 밤과 겹치면 이중 페널티가 된다).
+      nightBountyMult: 1.3
     },
     // 정수(💠) 액티브 스킬. 회복과 경쟁하도록 비용을 잡는다 — 정수를 아껴 회복할지, 지금 싸움에 쓸지 고민하게 만드는 게 목적.
     skills: {
@@ -11273,7 +11341,7 @@ button.corner.mute.off { opacity: 0.5; }
     const occurrence = Math.floor(w2 / 3) - Math.floor(w2 / 15);
     return SPECIAL_KEYS[(occurrence - 1) % SPECIAL_KEYS.length];
   }
-  var BOSS_CYCLE = ["boss", "frostlord", "warden"];
+  var BOSS_CYCLE = ["boss", "frostlord", "warden", "looter"];
   function _specialComposition(w2, kind) {
     const total = _standardTotal(w2);
     if (kind === "rush") {
@@ -12538,6 +12606,7 @@ button.corner.mute.off { opacity: 0.5; }
         e.castKind = null;
         if (kind === "summon") this._bossSummon(e);
         else if (kind === "silence") this._bossSilence(e);
+        else if (kind === "drain") this._bossDrain(e);
         else this._bossBeginCharge(e);
         return true;
       }
@@ -12554,10 +12623,13 @@ button.corner.mute.off { opacity: 0.5; }
       if (e.summonsDone < P2.summonAt.length && ratio <= P2.summonAt[e.summonsDone]) {
         e.summonsDone++;
         const silence = !!e.st.silenceBoss;
-        e.castKind = silence ? "silence" : "summon";
-        e.castUntil = silence ? P2.silenceCast : P2.summonCast;
-        this.fx.ring(e.x, e.z, silence ? 8011711 : 16733525, 5);
-        this.onBossTelegraph?.(e, silence ? "silence" : "summon");
+        const drain = !!e.st.drainBoss;
+        const kind2 = silence ? "silence" : drain ? "drain" : "summon";
+        e.castKind = kind2;
+        e.castUntil = silence ? P2.silenceCast : drain ? P2.drainCast : P2.summonCast;
+        const color = silence ? 8011711 : drain ? 16766720 : 16733525;
+        this.fx.ring(e.x, e.z, color, 5);
+        this.onBossTelegraph?.(e, kind2);
         return true;
       }
       e.chargeCd -= dt2;
@@ -12588,6 +12660,11 @@ button.corner.mute.off { opacity: 0.5; }
       e.silenceUntil = performance.now() / 1e3 + P2.silenceTime;
       this.fx.ring(e.x, e.z, 8011711, P2.silenceRadius);
       this.onBossTelegraph?.(e, "silenceGo");
+    }
+    // 갈취자 전용 — 실제 자원 차감·자기 회복은 팀 자원 풀에 접근해야 해서 game.js 쪽 콜백이 처리한다.
+    _bossDrain(e) {
+      this.fx.ring(e.x, e.z, 16766720, 6);
+      this.onBossDrain?.(e);
     }
     _bossBeginCharge(e) {
       const P2 = CFG.bossPattern;
@@ -13586,6 +13663,7 @@ button.corner.mute.off { opacity: 0.5; }
     spear: new su(0.035, 0.1, 1.9, 6),
     hammer: new su(0.09, 0.34, 1, 6),
     bomb: new Zu(0.22, 10, 8),
+    whip: new Ku(0.16, 0.04, 6, 14),
     ring: new qu(0.62, 0.76, 20)
   };
   var WEAPON_MAT = {
@@ -13595,7 +13673,8 @@ button.corner.mute.off { opacity: 0.5; }
     pickaxe: new sd({ color: 11119017, roughness: 0.45, metalness: 0.6 }),
     spear: new sd({ color: 13227747, roughness: 0.35, metalness: 0.75 }),
     hammer: new sd({ color: 7034692, roughness: 0.55, metalness: 0.4 }),
-    bomb: new sd({ color: 2829103, roughness: 0.5, metalness: 0.2 })
+    bomb: new sd({ color: 2829103, roughness: 0.5, metalness: 0.2 }),
+    whip: new sd({ color: 4210752, roughness: 0.4, metalness: 0.8 })
   };
   var WEAPON_LOOK = {
     default: { geo: GEO4.tool, mat: WEAPON_MAT.default, ry: 0, rz: 0 },
@@ -13604,7 +13683,8 @@ button.corner.mute.off { opacity: 0.5; }
     pickaxe: { geo: GEO4.pickaxe, mat: WEAPON_MAT.pickaxe, ry: 0, rz: 0.9 },
     spear: { geo: GEO4.spear, mat: WEAPON_MAT.spear, ry: 0, rz: 0.05 },
     hammer: { geo: GEO4.hammer, mat: WEAPON_MAT.hammer, ry: 0, rz: 0.85 },
-    bomb: { geo: GEO4.bomb, mat: WEAPON_MAT.bomb, ry: 0, rz: 0 }
+    bomb: { geo: GEO4.bomb, mat: WEAPON_MAT.bomb, ry: 0, rz: 0 },
+    whip: { geo: GEO4.whip, mat: WEAPON_MAT.whip, ry: Math.PI / 2, rz: 0 }
   };
   var PALETTE = [6280447, 10354539, 16757599, 16739286, 14065919, 7077840];
   var Player = class {
@@ -13624,6 +13704,7 @@ button.corner.mute.off { opacity: 0.5; }
       this.shards = 0;
       this.tools = {};
       this.weaponLv = {};
+      this.weaponSpec = {};
       this.equipped = null;
       this.harvestLv = 1;
       this.harvesting = null;
@@ -13679,12 +13760,51 @@ button.corner.mute.off { opacity: 0.5; }
     // 기본 공격치에 지금 손에 든 무기의 효과만 더한다 (여러 자루를 동시에 들 수는 없다)
     get attackStats() {
       const base = CFG.player.attack;
-      const out = { dmg: base.dmg, range: base.range, arc: base.arc, cd: base.cd };
+      const out = { dmg: base.dmg, range: base.range, arc: base.arc, cd: base.cd, knockback: 0 };
       const eff = CFG.craft[this.heldWeapon]?.effect;
       if (eff) for (const k2 of Object.keys(eff)) out[k2] += eff[k2];
       const bonus = CFG.weaponUpgrade.perLv[this.heldWeapon];
       const lv = this.weaponLv[this.heldWeapon] || 0;
       if (bonus && lv) for (const k2 of Object.keys(bonus)) out[k2] = (out[k2] || 0) + bonus[k2] * lv;
+      const specKey = this.weaponSpec[this.heldWeapon];
+      const spec = specKey && CFG.weaponSpec[this.heldWeapon]?.[specKey];
+      if (spec) {
+        for (const [k2, m] of Object.entries(spec.mods || {})) if (typeof out[k2] === "number") out[k2] *= m;
+        for (const [k2, v] of Object.entries(spec.add || {})) out[k2] = v;
+      }
+      return out;
+    }
+    // 활은 근접 판정(attackStats)이 아니라 별도의 조준 사격 배관을 타므로, 특화 mods/add 도
+    // 그 배관의 기본값(CFG.craft.bow.shoot) 위에 따로 얹어야 한다 — attackStats와 같은 계산 순서.
+    get shootStats() {
+      const base = CFG.craft.bow.shoot;
+      const out = { ...base };
+      const bonus = CFG.weaponUpgrade.perLv.bow;
+      const lv = this.weaponLv.bow || 0;
+      if (bonus && lv) for (const k2 of Object.keys(bonus)) out[k2] = (out[k2] || 0) + bonus[k2] * lv;
+      const specKey = this.weaponSpec.bow;
+      const spec = specKey && CFG.weaponSpec.bow?.[specKey];
+      if (spec) {
+        for (const [k2, m] of Object.entries(spec.mods || {})) if (typeof out[k2] === "number") out[k2] *= m;
+        for (const [k2, v] of Object.entries(spec.add || {})) out[k2] = v;
+      }
+      return out;
+    }
+    // 폭탄가방도 활과 같은 이유로 별도 getter — 투척 배관(craft.bomb.throw) 위에 특화를 얹는다.
+    // cost 는 숫자가 아닌 객체라 mods 대상에서 자연히 제외된다(공유 참조를 그대로 반환해도 무해 —
+    // 아무도 그 객체를 직접 변형하지 않고 payCost 가 매번 새 값을 읽어 차감할 뿐이다).
+    get throwStats() {
+      const base = CFG.craft.bomb.throw;
+      const out = { ...base };
+      const bonus = CFG.weaponUpgrade.perLv.bomb;
+      const lv = this.weaponLv.bomb || 0;
+      if (bonus && lv) for (const k2 of Object.keys(bonus)) out[k2] = (out[k2] || 0) + bonus[k2] * lv;
+      const specKey = this.weaponSpec.bomb;
+      const spec = specKey && CFG.weaponSpec.bomb?.[specKey];
+      if (spec) {
+        for (const [k2, m] of Object.entries(spec.mods || {})) if (typeof out[k2] === "number") out[k2] *= m;
+        for (const [k2, v] of Object.entries(spec.add || {})) out[k2] = v;
+      }
       return out;
     }
     // 지금 손에 든 무기의 강화 레벨 (없으면 0). 폭탄가방은 근접 판정이 아니라 투척 대미지에 따로 적용된다
@@ -13917,7 +14037,7 @@ button.corner.mute.off { opacity: 0.5; }
     // 폭탄가방을 들었을 때 공격 입력이 대신 이걸 부른다 — 같은 attackCd 를 공유하니 근접과 동시에 못 쓴다
     tryThrow() {
       if (!this.alive || this.attackCd > 0) return false;
-      this.attackCd = CFG.craft.bomb.throw.cd;
+      this.attackCd = this.throwStats.cd;
       this.swing = 1;
       this.cancelHarvest();
       return true;
@@ -13925,7 +14045,7 @@ button.corner.mute.off { opacity: 0.5; }
     // 활을 들었을 때 — 폭탄과 같은 구조로 같은 attackCd 를 공유한다
     tryShoot() {
       if (!this.alive || this.attackCd > 0) return false;
-      this.attackCd = CFG.craft.bow.shoot.cd;
+      this.attackCd = this.shootStats.cd;
       this.swing = 1;
       this.cancelHarvest();
       return true;
@@ -14880,7 +15000,7 @@ button.corner.mute.off { opacity: 0.5; }
       this._seenBomb = false;
       this._seenBow = false;
       this._seenHealer = false;
-      this.boonMult = { atk: 1, towerDmg: 1, skillCostDelta: 0, bounty: 1, crystalUpgradeCostDelta: 0, weaponUpgradeCostDelta: 0 };
+      this.boonMult = { atk: 1, towerDmg: 1, skillCostDelta: 0, bounty: 1, crystalUpgradeCostDelta: 0, weaponUpgradeCostDelta: 0, weaponSpecCostDelta: 0 };
       this.pendingBoon = null;
       this._dropTimer = CFG.supplyDrop.firstDelay;
       this._dropIdSeq = 1;
@@ -15015,6 +15135,9 @@ button.corner.mute.off { opacity: 0.5; }
         } else if (kind === "silenceGo") {
           this.ui?.toast(`\u{1F507} \uCE68\uBB35 \uC7A5\uD310 \uBC1C\uB3D9! \uBC18\uACBD \uC548\uC758 \uD0C0\uC6CC\uAC00 \uBA48\uCDC4\uB2E4 \u2014 \uC9C1\uC811 \uB9C9\uC544\uB77C`, "bad");
           this.fx.ring(e.x, e.z, 8011711, CFG.bossPattern.silenceRadius);
+        } else if (kind === "drain") {
+          this.ui?.toast(`${nm}\uAC00 \uC790\uC6D0\uC744 \uD6D4\uCE60 \uC900\uBE44\uB97C \uD55C\uB2E4 \u2014 \uC9C0\uAE08 \uD654\uB825\uC744 \uBAB0\uC544 \uB04A\uC5B4\uB77C!`, "warn");
+          this.sfx.bossWaveStart();
         } else if (kind === "charge") {
           this.ui?.toast(`${nm}\uAC00 \uB3CC\uC9C4 \uC790\uC138\uB97C \uC7A1\uB294\uB2E4 \u2014 \uAE38\uC744 \uBE44\uCF1C\uB77C!`, "warn");
           this.sfx.bossWaveStart();
@@ -15029,6 +15152,32 @@ button.corner.mute.off { opacity: 0.5; }
         const msg = e.st.summonVariant === "shield" ? `\u{1F6E1}\uFE0F \uBC29\uD328 \uB450\uB978 \uC7A1\uC878 ${n}\uB9C8\uB9AC\uAC00 \uD280\uC5B4\uB098\uC654\uB2E4 \u2014 \uB4F1 \uB4A4\uB97C \uB178\uB824\uB77C` : `\uC7A1\uC878 ${n}\uB9C8\uB9AC\uAC00 \uD280\uC5B4\uB098\uC654\uB2E4`;
         this.ui?.toast(msg, "bad");
         this.fx.burst(e.x, 1.6, e.z, 16733525, 18, 6);
+      };
+      this.enemyMgr.onBossDrain = (e) => {
+        if (!this.isHost) return;
+        const c2 = CFG.bossPattern;
+        let wood = 0, stone = 0;
+        if (this.shared) {
+          wood = Math.min(this.pools.team.wood, c2.drainWood);
+          stone = Math.min(this.pools.team.stone, c2.drainStone);
+          this.pools.team.wood -= wood;
+          this.pools.team.stone -= stone;
+        } else {
+          for (const p2 of this.players.values()) {
+            const pool = this._poolOf(p2.id);
+            const w2 = Math.min(pool.wood, c2.drainWood);
+            const s2 = Math.min(pool.stone, c2.drainStone);
+            pool.wood -= w2;
+            pool.stone -= s2;
+            wood += w2;
+            stone += s2;
+          }
+        }
+        const heal = Math.round(e.maxHp * c2.drainHealPct);
+        e.hp = Math.min(e.maxHp, e.hp + heal);
+        this.fx.float(`-${wood}\u{1FAB5} -${stone}\u{1FAA8}`, e.x, e.st.scale * 1.6 + 0.6, e.z, "bad");
+        this.fx.burst(e.x, 1.6, e.z, 16766720, 18, 6);
+        this.ui?.toast(`\u{1F982} \uAC08\uCDE8\uC790\uAC00 \uBAA9\uC7AC ${wood}\xB7\uAD11\uBB3C ${stone}\uC744 \uD6D4\uCCD0 \uCCB4\uB825\uC744 \uD68C\uBCF5\uD588\uB2E4!`, "bad");
       };
       this.enemyMgr.onBossCharge = (e) => {
         const reach = e.st.radius + 1.4;
@@ -15462,6 +15611,9 @@ button.corner.mute.off { opacity: 0.5; }
           if (["boss", "frostlord", "warden"].every((t2) => this.stats.bossKillsSeen.includes(t2))) {
             this._unlockAchievement("allBosses");
           }
+          if (["boss", "frostlord", "warden", "looter"].every((t2) => this.stats.bossKillsSeen.includes(t2))) {
+            this._unlockAchievement("fourKings");
+          }
         } else {
           this.sfx.enemyDeath();
         }
@@ -15476,8 +15628,9 @@ button.corner.mute.off { opacity: 0.5; }
           if (this.stats.elitesKilled >= 5) this._unlockAchievement("eliteHunter");
         }
         const b = e.st.bounty;
-        const bw = Math.round(b.wood * this.boonMult.bounty);
-        const bs2 = Math.round(b.stone * this.boonMult.bounty);
+        const nightMult = (this.wave.wave + 1) % CFG.wave.nightEvery === 0 ? CFG.wave.nightBountyMult : 1;
+        const bw = Math.round(b.wood * this.boonMult.bounty * nightMult);
+        const bs2 = Math.round(b.stone * this.boonMult.bounty * nightMult);
         const gotShard = e.st.shardChance && Math.random() < e.st.shardChance;
         if (this.shared) {
           this.pools.team.wood += bw;
@@ -15583,7 +15736,7 @@ button.corner.mute.off { opacity: 0.5; }
         const kind = specialWaveKind(w2);
         base = kind ? `${SPECIAL_WAVES[kind].icon} \uC6E8\uC774\uBE0C ${w2} \uC2DC\uC791! ${SPECIAL_WAVES[kind].name} \uC6E8\uC774\uBE0C \u2014 ${SPECIAL_WAVES[kind].desc} (\uBAAC\uC2A4\uD130 ${total}\uB9C8\uB9AC)` : `\uC6E8\uC774\uBE0C ${w2} \uC2DC\uC791! \uBAAC\uC2A4\uD130 ${total}\uB9C8\uB9AC`;
       }
-      if (w2 % CFG.wave.nightEvery === 0) return `\u{1F319} ${base} \u2014 \uBC24\uC774\uB77C \uC2DC\uC57C\uAC00 \uC881\uB2E4`;
+      if (w2 % CFG.wave.nightEvery === 0) return `\u{1F319} ${base} \u2014 \uBC24\uC774\uB77C \uC2DC\uC57C\uAC00 \uC881\uC9C0\uB9CC, \uCC98\uCE58 \uBCF4\uC0C1\uC740 ${Math.round((CFG.wave.nightBountyMult - 1) * 100)}% \uB354 \uD6C4\uD558\uB2E4`;
       const weatherKind = weatherOf(w2);
       if (weatherKind) return `${WEATHER[weatherKind].icon} ${base} \u2014 ${WEATHER[weatherKind].desc}`;
       return base;
@@ -15680,6 +15833,29 @@ button.corner.mute.off { opacity: 0.5; }
       this._notify(playerId, `${sp2.icon} ${b.def.name} \u2192 ${sp2.name} \uD2B9\uD654 \uC644\uB8CC!`, "good");
       if (playerId === this.local.id) this.sfx.upgrade();
     }
+    // 무기 특화 — 타워 특화(hostSpecialize)와 정확히 같은 구조를 개인 무기 쪽으로 옮긴 것.
+    // 건물과 달리 id가 없다 — 플레이어별로 무기 종류당 하나만 가질 수 있어 key만으로 충분하다.
+    requestSpecializeWeapon(key, spec) {
+      if (this.isHost) this.hostSpecializeWeapon(this.local.id, key, spec);
+      else this.net.send("specializeWeapon", { key, spec });
+    }
+    hostSpecializeWeapon(playerId, key, spec) {
+      const p2 = this.players.get(playerId);
+      const sp2 = CFG.weaponSpec[key]?.[spec];
+      if (!p2 || !sp2 || !p2.tools[key] || p2.weaponSpec[key] || (p2.weaponLv[key] || 0) < CFG.weaponUpgrade.maxLv) return;
+      const cost = this._weaponSpecCost();
+      const pool = this._poolOf(playerId);
+      if (!canAfford(pool, cost)) {
+        this._notify(playerId, "\uC790\uC6D0\uC774 \uBD80\uC871\uD569\uB2C8\uB2E4", "bad");
+        return;
+      }
+      payCost(pool, cost);
+      this._trackSpend(cost, "upgrade");
+      p2.weaponSpec[key] = spec;
+      const def = CFG.craft[key];
+      this._notify(playerId, `${sp2.icon} ${def.name} \u2192 ${sp2.name} \uD2B9\uD654 \uC644\uB8CC!`, "good");
+      if (playerId === this.local.id) this.sfx.upgrade();
+    }
     requestSell(id) {
       this.sfx.sell();
       if (this.isHost) this.hostSell(this.local.id, id);
@@ -15772,7 +15948,7 @@ button.corner.mute.off { opacity: 0.5; }
     // 폭탄가방을 들었을 때의 공격 — 근접 대신 조준한 지점(포인터가 가리키는 바닥)에 던진다.
     // 사거리를 넘는 곳을 가리키면 사거리 끝까지만 날아간다
     _requestThrow(aim = null) {
-      const cfg = CFG.craft.bomb.throw;
+      const cfg = this.local.throwStats;
       if (!canAfford(this.myPool, cfg.cost)) {
         this._notify(this.local.id, "\uC790\uC6D0\uC774 \uBD80\uC871\uD569\uB2C8\uB2E4", "bad");
         return;
@@ -15801,7 +15977,7 @@ button.corner.mute.off { opacity: 0.5; }
     // 활을 들었을 때의 공격 — 근접 대신 조준한 쪽으로 화살이 날아간다. 폭탄과 같은 배관을 쓰지만
     // 자원을 안 먹고 명중 지점에서 가장 가까운 한 마리만 맞힌다.
     _requestShoot(aim = null) {
-      const cfg = CFG.craft.bow.shoot;
+      const cfg = this.local.shootStats;
       const pointer = aim || this.sm.updatePointerWorld();
       if (!pointer) return;
       if (!this.local.tryShoot()) return;
@@ -15828,9 +16004,8 @@ button.corner.mute.off { opacity: 0.5; }
       this.fx.burst(pos.x, pos.y, pos.z, 16772829, 5, 3);
     }
     hostShootArrow(playerId, fromX, fromZ, tx, tz) {
-      const cfg = CFG.craft.bow.shoot;
-      const lv = this._weaponLvOf("bow", playerId);
-      const dmg = Math.round((cfg.dmg + (CFG.weaponUpgrade.perLv.bow?.dmg || 0) * lv) * this._desperationMult);
+      const cfg = this.players.get(playerId)?.shootStats ?? CFG.craft.bow.shoot;
+      const dmg = Math.round(cfg.dmg * this._desperationMult);
       const from = new Ui(fromX, 1.4, fromZ);
       const to2 = new Ui(tx, 0.9, tz);
       this.projectiles.fire(from, to2, cfg.speed, 16772829, (pos) => {
@@ -15853,7 +16028,7 @@ button.corner.mute.off { opacity: 0.5; }
       this.sfx.buildingHit();
     }
     hostThrowBomb(playerId, fromX, fromZ, tx, tz) {
-      const cfg = CFG.craft.bomb.throw;
+      const cfg = this.players.get(playerId)?.throwStats ?? CFG.craft.bomb.throw;
       const pool = this._poolOf(playerId);
       if (!canAfford(pool, cfg.cost)) {
         this._notify(playerId, "\uC790\uC6D0\uC774 \uBD80\uC871\uD569\uB2C8\uB2E4", "bad");
@@ -15861,7 +16036,7 @@ button.corner.mute.off { opacity: 0.5; }
       }
       payCost(pool, cfg.cost);
       this._trackSpend(cfg.cost, "craft");
-      const dmg = Math.round((cfg.dmg + (CFG.weaponUpgrade.perLv.bomb?.dmg || 0) * this._weaponLvOf("bomb", playerId)) * this._desperationMult);
+      const dmg = Math.round(cfg.dmg * this._desperationMult);
       const from = new Ui(fromX, 1.1, fromZ);
       const to2 = new Ui(tx, 0.4, tz);
       this.projectiles.fire(from, to2, cfg.speed, 3355443, (pos) => {
@@ -15919,6 +16094,15 @@ button.corner.mute.off { opacity: 0.5; }
         if (diff > a.arc) continue;
         this._hurtEnemy(e, dmg, "player", x2, z2);
         if (e.variant === "thorn") thornDmg += Math.round(dmg * CFG.variants.thorn.reflectPct);
+        if (a.knockback && !e.dead) {
+          const kd = Math.max(d2, 0.4);
+          e.x += (e.x - x2) / kd * a.knockback;
+          e.z += (e.z - z2) / kd * a.knockback;
+          if (!this._seenKnockback) {
+            this._seenKnockback = true;
+            this.ui?.toast("\u{1F517} \uCC44\uCC0D\uC774 \uC801\uC744 \uB4A4\uB85C \uBC00\uCCD0\uB0C8\uB2E4! \uAC70\uB9AC\uB97C \uBC8C\uB9AC\uAC70\uB098 \uBB34\uB9AC\uB97C \uD769\uC5B4\uB193\uC744 \uB54C \uC720\uC6A9\uD558\uB2E4", "good");
+          }
+        }
       }
       if (thornDmg > 0) this._reflectThorns(playerId, thornDmg, x2, z2);
     }
@@ -15978,9 +16162,9 @@ button.corner.mute.off { opacity: 0.5; }
     // 자기 사거리를 쓴다 — 이게 없으면 사거리 9~16짜리 무기를 들고도 멀리 있는 적을 클릭했을 때
     // "더 가까이 가세요" 라고 거부당한다
     get attackReach() {
-      const def = CFG.craft[this.local.heldWeapon];
-      const ranged = def?.shoot || def?.throw;
-      return ranged ? ranged.range : this.local.attackStats.range;
+      if (this.local.heldWeapon === "bow") return this.local.shootStats.range;
+      if (this.local.heldWeapon === "bomb") return this.local.throwStats.range;
+      return this.local.attackStats.range;
     }
     clickWorld(pointer) {
       if (!pointer) {
@@ -16106,6 +16290,10 @@ button.corner.mute.off { opacity: 0.5; }
     }
     _weaponLvOf(key, playerId = this.local.id) {
       return this.players.get(playerId)?.weaponLv[key] || 0;
+    }
+    // 무기 특화 비용 (숙련 축복이 깎아 준다) — 강화 비용(_weaponUpgradeCost)과 같은 구조
+    _weaponSpecCost() {
+      return { iron: Math.max(1, CFG.weaponSpec.cost.iron + this.boonMult.weaponSpecCostDelta) };
     }
     requestUpgradeWeapon(key) {
       if (this.isHost) this.hostUpgradeWeapon(this.local.id, key);
@@ -16390,9 +16578,12 @@ button.corner.mute.off { opacity: 0.5; }
       to2.tools[key] = true;
       to2.weaponLv[key] = from.weaponLv[key] || 0;
       from.weaponLv[key] = 0;
+      to2.weaponSpec[key] = from.weaponSpec[key] || null;
+      from.weaponSpec[key] = null;
       const def = CFG.craft[key];
       const lvNote = to2.weaponLv[key] ? ` (\uAC15\uD654 Lv.${to2.weaponLv[key]})` : "";
-      this._notify(toId, `${def.icon} ${def.name}\uC744(\uB97C) \uBC1B\uC558\uB2E4${lvNote} \u2014 \uC778\uBCA4\uD1A0\uB9AC \uC7A5\uBE44 \uD0ED\uC5D0\uC11C \uC190\uC5D0 \uC958 \uC218 \uC788\uB2E4`, "good");
+      const specNote = to2.weaponSpec[key] ? ` ${CFG.weaponSpec[key][to2.weaponSpec[key]].icon} ${CFG.weaponSpec[key][to2.weaponSpec[key]].name} \uD2B9\uD654` : "";
+      this._notify(toId, `${def.icon} ${def.name}\uC744(\uB97C) \uBC1B\uC558\uB2E4${lvNote}${specNote} \u2014 \uC778\uBCA4\uD1A0\uB9AC \uC7A5\uBE44 \uD0ED\uC5D0\uC11C \uC190\uC5D0 \uC958 \uC218 \uC788\uB2E4`, "good");
     }
     _notify(playerId, text, kind) {
       if (playerId === this.local.id) {
@@ -16457,6 +16648,9 @@ button.corner.mute.off { opacity: 0.5; }
       });
       net.on("specialize", (d2, from) => {
         if (this.isHost) this.hostSpecialize(from, d2.id, d2.spec);
+      });
+      net.on("specializeWeapon", (d2, from) => {
+        if (this.isHost) this.hostSpecializeWeapon(from, d2.key, d2.spec);
       });
       net.on("sell", (d2, from) => {
         if (this.isHost) this.hostSell(from, d2.id);
@@ -16588,7 +16782,7 @@ button.corner.mute.off { opacity: 0.5; }
     _snapshot() {
       const players = {};
       for (const p2 of this.players.values()) {
-        players[p2.id] = { hv: p2.harvestLv, tl: Object.keys(p2.tools).filter((k2) => p2.tools[k2]), eq: p2.equipped || null, wl: p2.weaponLv };
+        players[p2.id] = { hv: p2.harvestLv, tl: Object.keys(p2.tools).filter((k2) => p2.tools[k2]), eq: p2.equipped || null, wl: p2.weaponLv, ws: p2.weaponSpec };
       }
       return {
         e: this.enemyMgr.snapshot(),
@@ -16606,6 +16800,10 @@ button.corner.mute.off { opacity: 0.5; }
         mt: this._meteorPending ? [Math.round(this._meteorPending.x * 10) / 10, Math.round(this._meteorPending.z * 10) / 10, Math.round(this._meteorPending.timeLeft * 10) / 10] : null,
         mc: this._merchant ? { offers: this._merchant.offers, boughtBy: this._merchant.boughtBy } : null,
         tb: { atk: this.tempBoon.atk, towerDmg: this.tempBoon.towerDmg },
+        // 엔드리스 축복(영구 배율·할인)은 호스트만 고르고 이 필드로만 전파된다 — 없으면 참가자
+        // 화면의 강화·특화 비용 미리보기가 호스트가 이미 적용한 할인을 못 보고 "자원 부족"으로
+        // 잘못 비활성화되고, 솔로 저장·재개 시에도 그동안 고른 축복이 전부 초기화된다.
+        bm: this.boonMult,
         r: this.shared ? { team: this.pools.team } : { byId: this.pools.byId },
         p: players,
         sh: this.shared,
@@ -16672,6 +16870,7 @@ button.corner.mute.off { opacity: 0.5; }
       if (!this._merchant && s2.mc) this.ui?.toast("\u{1F9F3} \uB5A0\uB3CC\uC774 \uC0C1\uC778\uC774 \uC654\uB2E4! \uC774\uBC88 \uC900\uBE44 \uC2DC\uAC04\uC5D0\uB9CC \uBB3C\uAC74\uC744 \uD310\uB2E4", "good");
       this._merchant = s2.mc ? { offers: s2.mc.offers, boughtBy: s2.mc.boughtBy || {} } : null;
       if (s2.tb) Object.assign(this.tempBoon, s2.tb);
+      if (s2.bm) Object.assign(this.boonMult, s2.bm);
       if (s2.r.team) this.pools.team = s2.r.team;
       if (s2.r.byId) this.pools.byId = s2.r.byId;
       for (const [id, pd2] of Object.entries(s2.p || {})) {
@@ -16681,6 +16880,7 @@ button.corner.mute.off { opacity: 0.5; }
           p2.tools = {};
           for (const k2 of pd2.tl || []) p2.tools[k2] = true;
           p2.weaponLv = pd2.wl || {};
+          p2.weaponSpec = pd2.ws || {};
           if (p2 !== this.local) p2.equipped = pd2.eq || null;
         }
       }
@@ -16694,6 +16894,9 @@ button.corner.mute.off { opacity: 0.5; }
         }
         if (["boss", "frostlord", "warden"].every((t2) => this.stats.bossKillsSeen.includes(t2))) {
           this._unlockAchievement("allBosses");
+        }
+        if (["boss", "frostlord", "warden", "looter"].every((t2) => this.stats.bossKillsSeen.includes(t2))) {
+          this._unlockAchievement("fourKings");
         }
       }
       if (this.wave.phase === PHASE.LOST && !this.result) {
@@ -16934,6 +17137,7 @@ button.corner.mute.off { opacity: 0.5; }
       if (s2.cr !== void 0) this.world.crystal.regenLv = s2.cr;
       if (s2.cx !== void 0) this.world.crystal.auraLv = s2.cx;
       if (s2.crf !== void 0) this.world.crystal.reflectLv = s2.crf;
+      if (s2.bm) Object.assign(this.boonMult, s2.bm);
       this.world.crystal.hp = s2.c;
       if (s2.r.team) this.pools.team = s2.r.team;
       if (s2.r.byId) this.pools.byId = s2.r.byId;
@@ -16943,6 +17147,7 @@ button.corner.mute.off { opacity: 0.5; }
         this.local.tools = {};
         for (const k2 of savedPlayer.tl || []) this.local.tools[k2] = true;
         this.local.weaponLv = savedPlayer.wl || {};
+        this.local.weaponSpec = savedPlayer.ws || {};
         this.local.equipped = savedPlayer.eq || null;
       }
       if (save.stats) this.stats = save.stats;
@@ -17134,6 +17339,36 @@ button.corner.mute.off { opacity: 0.5; }
           const lv = g2.local.weaponLv[key] || 0;
           const maxed = lv >= CFG.weaponUpgrade.maxLv;
           const cost = g2._weaponUpgradeCost(key);
+          const specOpts = CFG.weaponSpec[key];
+          const specKey = g2.local.weaponSpec[key];
+          if (maxed && specOpts && specKey) {
+            const sp2 = specOpts[specKey];
+            rows2.push({
+              key: "upgrade:" + key + ":" + specKey,
+              icon: sp2.icon,
+              name: `${r.name} \u2014 ${sp2.name}`,
+              desc: sp2.desc,
+              cost: null,
+              state: "owned",
+              note: "\uD2B9\uD654 \uC644\uB8CC",
+              action: () => {
+              }
+            });
+            continue;
+          }
+          if (maxed && specOpts) {
+            rows2.push({
+              key: "upgrade:" + key + ":choose",
+              icon: r.icon,
+              name: `${r.name} \uD2B9\uD654 \uC120\uD0DD`,
+              desc: `\uCD5C\uB300 \uB808\uBCA8 \uB3C4\uB2EC \u2014 \uB450 \uAC08\uB798 \uC911 \uD558\uB098\uB97C \uACE8\uB77C \uC131\uACA9\uC744 \uBC14\uAFBC\uB2E4. \uBE44\uC6A9 ${costText(g2._weaponSpecCost())}`,
+              cost: null,
+              state: "",
+              note: "\uD2B9\uD654 \uAC00\uB2A5",
+              action: () => this.showWeaponSpecChoice(key)
+            });
+            continue;
+          }
           rows2.push({
             key: "upgrade:" + key,
             icon: r.icon,
@@ -17811,6 +18046,30 @@ button.corner.mute.off { opacity: 0.5; }
     }
     hideSpecChoice() {
       this.el.specOverlay.classList.add("hidden");
+    }
+    // 최대 레벨 무기를 두 갈래 중 하나로 특화하는 선택창. 타워 특화(showSpecChoice)와 같은
+    // 오버레이·카드 UI 를 그대로 재사용한다 — 인벤토리 제작 탭의 "특화 선택" 카드에서 연다.
+    showWeaponSpecChoice(key) {
+      const opts = CFG.weaponSpec[key];
+      const def = CFG.craft[key];
+      if (!opts || !def) return;
+      const cost = this.game._weaponSpecCost();
+      const afford = canAfford(this.game.myPool, cost);
+      this.el.specTitle.textContent = `${def.icon} ${def.name} \uD2B9\uD654`;
+      this.el.specSub.textContent = `\uBE44\uC6A9 ${costText(cost)} \xB7 \uB418\uB3CC\uB9B4 \uC218 \uC5C6\uB2E4.`;
+      this.el.specChoices.innerHTML = Object.entries(opts).map(([k2, sp2]) => `<button type="button" class="boon-card" data-spec="${k2}"${afford ? "" : " disabled"}>
+<span class="bc-icon">${sp2.icon}</span>
+<span><span class="bc-name">${sp2.name}</span><br><span class="bc-desc">${sp2.desc}</span></span>
+</button>`).join("");
+      for (const btn of this.el.specChoices.querySelectorAll(".boon-card")) {
+        btn.onclick = () => {
+          this.hideSpecChoice();
+          this.game.requestSpecializeWeapon(key, btn.dataset.spec);
+        };
+      }
+      if (!afford) this.toast("\uD2B9\uD654\uD560 \uC790\uC6D0\uC774 \uBD80\uC871\uD569\uB2C8\uB2E4", "bad");
+      this.el.specCancel.onclick = () => this.hideSpecChoice();
+      this.el.specOverlay.classList.remove("hidden");
     }
     showResult(win, stats, wave) {
       this.el.result.classList.remove("hidden");
