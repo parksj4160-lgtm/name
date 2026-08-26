@@ -65,7 +65,8 @@ export var Game = class {
         upgrade: { wood: 0, stone: 0, iron: 0 },
         repair: { wood: 0, stone: 0, iron: 0 },
         harvest: { wood: 0, stone: 0, iron: 0 },
-        craft: { wood: 0, stone: 0, iron: 0 }
+        craft: { wood: 0, stone: 0, iron: 0 },
+        merchant: { wood: 0, stone: 0, iron: 0 }
       },
       time: 0,
       waveLog: [],
@@ -1042,7 +1043,9 @@ export var Game = class {
   hostShootArrow(playerId, fromX, fromZ, tx, tz) {
     const cfg = CFG.craft.bow.shoot;
     const lv = this._weaponLvOf("bow", playerId);
-    const dmg = Math.round((cfg.dmg + (CFG.weaponUpgrade.perLv.bow?.dmg || 0) * lv) * this.boonMult.atk * this._desperationMult);
+    // 완력\xB7힘의 물약은 설명 그대로 "근접" 전용이라 원거리인 활에는 안 붙는다(폭탄 투척과 같은 규칙).
+    // 필사의 반격은 근접\xB7투척 모두에 붙는 위기 보정이므로 활도 받는다.
+    const dmg = Math.round((cfg.dmg + (CFG.weaponUpgrade.perLv.bow?.dmg || 0) * lv) * this._desperationMult);
     const from = new THREE.Vector3(fromX, 1.4, fromZ);
     const to2 = new THREE.Vector3(tx, 0.9, tz);
     this.projectiles.fire(from, to2, cfg.speed, 16772829, (pos) => {
@@ -2097,6 +2100,8 @@ export var Game = class {
     if (!this.stats.newAchievements) this.stats.newAchievements = [];
     if (!this.stats.bossKillsSeen) this.stats.bossKillsSeen = [];
     if (!this.stats.trapsTriggered) this.stats.trapsTriggered = 0;
+    // 이 항목이 생기기 전에 저장된 게임을 이어받아도 상인 지출이 집계에서 빠지지 않게 한다
+    if (this.stats.spentBy && !this.stats.spentBy.merchant) this.stats.spentBy.merchant = { wood: 0, stone: 0, iron: 0 };
     if (!this.stats.elitesKilled) this.stats.elitesKilled = 0;
     if (!this.stats.treasuresCaught) this.stats.treasuresCaught = 0;
     this.ui?.toast(`이어하기 — 웨이브 ${this.wave.displayWave}`, "good");

@@ -14807,7 +14807,8 @@ button.corner.mute.off { opacity: 0.5; }
           upgrade: { wood: 0, stone: 0, iron: 0 },
           repair: { wood: 0, stone: 0, iron: 0 },
           harvest: { wood: 0, stone: 0, iron: 0 },
-          craft: { wood: 0, stone: 0, iron: 0 }
+          craft: { wood: 0, stone: 0, iron: 0 },
+          merchant: { wood: 0, stone: 0, iron: 0 }
         },
         time: 0,
         waveLog: [],
@@ -15780,7 +15781,7 @@ button.corner.mute.off { opacity: 0.5; }
     hostShootArrow(playerId, fromX, fromZ, tx, tz) {
       const cfg = CFG.craft.bow.shoot;
       const lv = this._weaponLvOf("bow", playerId);
-      const dmg = Math.round((cfg.dmg + (CFG.weaponUpgrade.perLv.bow?.dmg || 0) * lv) * this.boonMult.atk * this._desperationMult);
+      const dmg = Math.round((cfg.dmg + (CFG.weaponUpgrade.perLv.bow?.dmg || 0) * lv) * this._desperationMult);
       const from = new Ui(fromX, 1.4, fromZ);
       const to2 = new Ui(tx, 0.9, tz);
       this.projectiles.fire(from, to2, cfg.speed, 16772829, (pos) => {
@@ -16834,6 +16835,7 @@ button.corner.mute.off { opacity: 0.5; }
       if (!this.stats.newAchievements) this.stats.newAchievements = [];
       if (!this.stats.bossKillsSeen) this.stats.bossKillsSeen = [];
       if (!this.stats.trapsTriggered) this.stats.trapsTriggered = 0;
+      if (this.stats.spentBy && !this.stats.spentBy.merchant) this.stats.spentBy.merchant = { wood: 0, stone: 0, iron: 0 };
       if (!this.stats.elitesKilled) this.stats.elitesKilled = 0;
       if (!this.stats.treasuresCaught) this.stats.treasuresCaught = 0;
       this.ui?.toast(`\uC774\uC5B4\uD558\uAE30 \u2014 \uC6E8\uC774\uBE0C ${this.wave.displayWave}`, "good");
@@ -17752,7 +17754,7 @@ button.corner.mute.off { opacity: 0.5; }
     }
     // 자원을 어디에 썼는지 항목별로 쪼개 보여준다 (쓴 곳만)
     _spendBreakdown(stats) {
-      const LABELS2 = { build: "\uAC74\uC124", upgrade: "\uC5C5\uADF8\uB808\uC774\uB4DC", repair: "\uC218\uB9AC", harvest: "\uCC44\uC9D1\uC18D\uB3C4", craft: "\uC81C\uC791" };
+      const LABELS2 = { build: "\uAC74\uC124", upgrade: "\uC5C5\uADF8\uB808\uC774\uB4DC", repair: "\uC218\uB9AC", harvest: "\uCC44\uC9D1\uC18D\uB3C4", craft: "\uC81C\uC791", merchant: "\uC0C1\uC778" };
       const by = stats.spentBy || {};
       const rows = Object.entries(LABELS2).map(([key, label]) => [label, by[key] || { wood: 0, stone: 0, iron: 0 }]).filter(([, c2]) => c2.wood || c2.stone || c2.iron).map(([label, c2]) => {
         const parts = [];

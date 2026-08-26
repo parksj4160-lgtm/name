@@ -913,7 +913,7 @@ export var UI = class {
   }
   // 자원을 어디에 썼는지 항목별로 쪼개 보여준다 (쓴 곳만)
   _spendBreakdown(stats) {
-    const LABELS2 = { build: "건설", upgrade: "업그레이드", repair: "수리", harvest: "채집속도", craft: "제작" };
+    const LABELS2 = { build: "건설", upgrade: "업그레이드", repair: "수리", harvest: "채집속도", craft: "제작", merchant: "상인" };
     const by = stats.spentBy || {};
     const rows = Object.entries(LABELS2).map(([key, label]) => [label, by[key] || { wood: 0, stone: 0, iron: 0 }]).filter(([, c2]) => c2.wood || c2.stone || c2.iron).map(([label, c2]) => {
       const parts = [];
