@@ -587,7 +587,8 @@ export var Game = class {
   // 자동 동기화되므로(enemyMgr.snapshot 이 타입을 가리지 않는다) 별도 네트워크 코드가 필요 없다.
   _updateTreasure(dt2) {
     const c2 = CFG.treasureEvent;
-    if (this.wave.phase !== PHASE.COMBAT || this.wave.wave + 1 < c2.minWave) return;
+    // 이미 나와 있는 게의 수명은 단계와 무관하게 계속 흐른다 — 보물게는 웨이브 클리어를 막지 않으므로
+    // 전투가 끝난 뒤에도 살아 있을 수 있는데, 여기서 같이 멈춰 버리면 준비 시간 내내 안 사라진다
     if (this._treasureId != null) {
       const e2 = this.enemyMgr.list.find((x2) => x2.id === this._treasureId);
       if (!e2) {
@@ -607,6 +608,8 @@ export var Game = class {
       }
       return;
     }
+    // 새로 내보내는 것은 전투 중에만 — 준비 시간에 튀어나오면 쫓아갈 이유가 없다
+    if (this.wave.phase !== PHASE.COMBAT || this.wave.wave + 1 < c2.minWave) return;
     this._treasureTimer -= dt2;
     if (this._treasureTimer > 0) return;
     this._treasureTimer = c2.minGap + Math.random() * (c2.maxGap - c2.minGap);

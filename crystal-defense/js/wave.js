@@ -26,7 +26,7 @@ export var WaveDirector = class {
     return Math.min(CFG.wave.goal, this.wave + 1);
   }
   get remaining() {
-    return this.queue.length + this.enemies.alive;
+    return this.queue.length + this.enemies.aliveInWave;
   }
   startWave() {
     if (this.phase !== PHASE.PREP) return false;
@@ -88,7 +88,7 @@ export var WaveDirector = class {
           this.spawnTimer = 1;
         }
       }
-    } else if (this.enemies.alive === 0) {
+    } else if (this.enemies.aliveInWave === 0) {
       this._clear();
     }
   }

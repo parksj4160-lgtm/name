@@ -230,6 +230,11 @@ export var EnemyManager = class {
   get alive() {
     return this.list.filter((e) => !e.dead).length;
   }
+  // 웨이브에 속한 적만 — 보물게처럼 독립 이벤트로 나온 개체는 빼고 센다.
+  // 웨이브 클리어 판정과 "남은 몬스터" 표시는 반드시 이쪽을 써야 한다.
+  get aliveInWave() {
+    return this.list.filter((e) => !e.dead && !e.st.event).length;
+  }
   spawn(type, wave, x2, z2, id, variant, statMult) {
     if (this.list.length >= CFG.wave.maxAlive) return null;
     const e = new Enemy(type, wave, x2, z2, id, variant, statMult);
