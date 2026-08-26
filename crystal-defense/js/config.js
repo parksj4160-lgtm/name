@@ -511,7 +511,12 @@ export var CFG = {
     heal: { name: "회복", icon: "💧", cost: 1, healPct: 0.25, desc: "크리스탈 체력 25% 회복" },
     blast: { name: "폭발", icon: "💥", cost: 2, radius: 6, dmg: 90, desc: "내 주변 적에게 즉시 폭발 피해" },
     chill: { name: "시간 왜곡", icon: "🌀", cost: 2, radius: 8, slow: 0.65, time: 4, desc: "내 주변 적을 크게 둔화시킨다" },
-    barrier: { name: "긴급 방벽", icon: "🛡️", cost: 3, time: 5, desc: "잠시 크리스탈이 어떤 피해도 받지 않는다" }
+    barrier: { name: "긴급 방벽", icon: "🛡️", cost: 3, time: 5, desc: "잠시 크리스탈이 어떤 피해도 받지 않는다" },
+    // 나머지 넷과 성격이 다른 유일한 "설치형" 스킬 — 내 발밑이 아니라 **조준한 지점**에 잠깐 열려서
+    // 주변 적을 중심으로 끌어당긴다. 그 자체로는 피해가 0이라 단독으로는 아무것도 못 죽이지만,
+    // 흩어져 오는 무리를 한 덩어리로 뭉쳐 놓기 때문에 대포탑\xB7융단폭격\xB7폭탄\xB7운석처럼 범위 피해를
+    // 주는 수단과 짝지으면 판이 갈린다. 보스는 자기 패턴이 있으므로 면역(끌려다니면 패턴이 망가진다).
+    rift: { name: "중력 균열", icon: "🌌", cost: 3, radius: 7, pull: 5.5, time: 3.5, aimRange: 14, desc: "조준한 곳에 균열을 열어 주변 적을 끌어모은다 (피해 없음 · 보스 면역)" }
   },
   net: {
     snapshotHz: 12,

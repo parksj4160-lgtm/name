@@ -95,6 +95,7 @@ export var Game = class {
     this._dropTimer = CFG.supplyDrop.firstDelay;
     this._dropIdSeq = 1;
     this._meteorTimer = CFG.meteor.firstDelay;
+    this._rift = null;
     this._meteorPending = null;
     this.world.clearMeteor();
     this._treasureTimer = CFG.treasureEvent.firstDelay;
@@ -1490,6 +1491,63 @@ export var Game = class {
     this.fx.burst(p2.x, 1.4, p2.z, 8382719, 16, 4);
     this._notify(playerId, `🌀 시간 왜곡! 적 ${targets.length}마리 둔화`, "good");
   }
+  // 중력 균열 — 다른 스킬과 달리 조준한 지점에 설치된다. 폭탄 투척과 같은 방식으로 겨눈다.
+  requestSkillRift(aim = null) {
+    const s2 = CFG.skills.rift;
+    const pointer = aim || this.sm.updatePointerWorld();
+    if (!pointer) return;
+    const dx = pointer.x - this.local.x, dz = pointer.z - this.local.z;
+    const len = Math.hypot(dx, dz) || 1;
+    const clamped = Math.min(len, s2.aimRange);
+    const tx = this.local.x + dx / len * clamped, tz = this.local.z + dz / len * clamped;
+    this.sfx.shard();
+    if (this.isHost) this.hostSkillRift(this.local.id, tx, tz);
+    else this.net.send("skillRift", { tx, tz });
+  }
+  hostSkillRift(playerId, tx, tz) {
+    const s2 = CFG.skills.rift;
+    const cost = this._skillCost(s2);
+    const p2 = this.players.get(playerId);
+    const pool = this._poolOf(playerId);
+    if (!p2) return;
+    if (this._rift) {
+      this._notify(playerId, "이미 균열이 열려 있습니다", "bad");
+      return;
+    }
+    if ((pool.shard || 0) < cost) {
+      this._notify(playerId, "수정 정수가 부족합니다", "bad");
+      return;
+    }
+    pool.shard -= cost;
+    this._unlockAchievement("skillUser", playerId);
+    this._rift = { x: tx, z: tz, timeLeft: s2.time };
+    this.world.setRift(tx, tz, s2.time, s2.radius);
+    this.fx.ring(tx, tz, 11239935, s2.radius);
+    this._notify(playerId, `🌌 중력 균열! ${s2.time}초간 주변 적을 끌어모은다 — 범위 공격을 겹쳐라`, "good");
+  }
+  // 균열은 호스트에서만 계산하고, 위치·잔여시간만 스냅샷으로 내려보낸다(운석과 같은 패턴).
+  // 피해는 0이라 "끌어당김"만 적용하면 되고, 보스는 자기 패턴이 있으므로 제외한다.
+  _updateRift(dt2) {
+    if (!this.isHost || !this._rift) return;
+    const s2 = CFG.skills.rift;
+    const r = this._rift;
+    r.timeLeft -= dt2;
+    if (r.timeLeft <= 0) {
+      this._rift = null;
+      this.world.clearRift();
+      return;
+    }
+    this.world.setRift(r.x, r.z, r.timeLeft, s2.radius);
+    for (const e of this.enemyMgr.list) {
+      if (e.dead || e.st.boss) continue;
+      const dx = r.x - e.x, dz = r.z - e.z;
+      const d2 = Math.hypot(dx, dz);
+      if (d2 > s2.radius || d2 < 0.15) continue;
+      const step = Math.min(d2, s2.pull * dt2);
+      e.x += dx / d2 * step;
+      e.z += dz / d2 * step;
+    }
+  }
   requestSkillBarrier() {
     this.sfx.shard();
     if (this.isHost) this.hostSkillBarrier(this.local.id);
@@ -1677,6 +1735,9 @@ export var Game = class {
     net.on("skillChill", (d2, from) => {
       if (this.isHost) this.hostSkillChill(from);
     });
+    net.on("skillRift", (d2, from) => {
+      if (this.isHost) this.hostSkillRift(from, d2.tx, d2.tz);
+    });
     net.on("skillBarrier", (d2, from) => {
       if (this.isHost) this.hostSkillBarrier(from);
     });
@@ -1758,6 +1819,7 @@ export var Game = class {
       cr: this.world.crystal.regenLv,
       cx: this.world.crystal.auraLv,
       crf: this.world.crystal.reflectLv,
+      rf: this._rift ? [Math.round(this._rift.x * 10) / 10, Math.round(this._rift.z * 10) / 10, Math.round(this._rift.timeLeft * 10) / 10] : null,
       mt: this._meteorPending ? [Math.round(this._meteorPending.x * 10) / 10, Math.round(this._meteorPending.z * 10) / 10, Math.round(this._meteorPending.timeLeft * 10) / 10] : null,
       mc: this._merchant ? { offers: this._merchant.offers, boughtBy: this._merchant.boughtBy } : null,
       tb: { atk: this.tempBoon.atk, towerDmg: this.tempBoon.towerDmg },
@@ -1822,6 +1884,8 @@ export var Game = class {
     }
     if (s2.mt) this.world.setMeteor(s2.mt[0], s2.mt[1], s2.mt[2], CFG.meteor.radius);
     else this.world.clearMeteor();
+    if (s2.rf) this.world.setRift(s2.rf[0], s2.rf[1], s2.rf[2], CFG.skills.rift.radius);
+    else this.world.clearRift();
     if (!this._merchant && s2.mc) this.ui?.toast("🧳 떠돌이 상인이 왔다! 이번 준비 시간에만 물건을 판다", "good");
     this._merchant = s2.mc ? { offers: s2.mc.offers, boughtBy: s2.mc.boughtBy || {} } : null;
     if (s2.tb) Object.assign(this.tempBoon, s2.tb);
@@ -1891,6 +1955,7 @@ export var Game = class {
       this._updateSupplyDrops(dt2);
       this._updateMeteor(dt2);
       this._updateTreasure(dt2);
+      this._updateRift(dt2);
       this._updateMerchant();
       this._updateCrystalUpgrades(dt2);
     } else {
@@ -1940,6 +2005,7 @@ export var Game = class {
     if (inp.hit(km.get("skillBlast"))) this.requestSkillBlast();
     if (inp.hit(km.get("skillChill"))) this.requestSkillChill();
     if (inp.hit(km.get("skillBarrier"))) this.requestSkillBarrier();
+    if (inp.hit(km.get("skillRift"))) this.requestSkillRift();
     if (inp.hit(km.get("startWave")) && this.wave.phase === PHASE.PREP) this.requestStartWave();
     const pointer = this.sm.updatePointerWorld();
     this.buildMgr.updateGhost(pointer, this.myPool);

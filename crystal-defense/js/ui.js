@@ -197,9 +197,10 @@ export var UI = class {
         heal: () => g2.requestShard(),
         blast: () => g2.requestSkillBlast(),
         chill: () => g2.requestSkillChill(),
-        barrier: () => g2.requestSkillBarrier()
+        barrier: () => g2.requestSkillBarrier(),
+        rift: () => g2.requestSkillRift()
       };
-      const HOTKEYS = { heal: "shard", blast: "skillBlast", chill: "skillChill", barrier: "skillBarrier" };
+      const HOTKEYS = { heal: "shard", blast: "skillBlast", chill: "skillChill", barrier: "skillBarrier", rift: "skillRift" };
       return Object.entries(CFG.skills).map(([key, s]) => {
         const shardCost = key === "heal" ? s.cost : g2._skillCost(s);
         const cost = { shard: shardCost };

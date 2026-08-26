@@ -11223,7 +11223,12 @@ button.corner.mute.off { opacity: 0.5; }
       heal: { name: "\uD68C\uBCF5", icon: "\u{1F4A7}", cost: 1, healPct: 0.25, desc: "\uD06C\uB9AC\uC2A4\uD0C8 \uCCB4\uB825 25% \uD68C\uBCF5" },
       blast: { name: "\uD3ED\uBC1C", icon: "\u{1F4A5}", cost: 2, radius: 6, dmg: 90, desc: "\uB0B4 \uC8FC\uBCC0 \uC801\uC5D0\uAC8C \uC989\uC2DC \uD3ED\uBC1C \uD53C\uD574" },
       chill: { name: "\uC2DC\uAC04 \uC65C\uACE1", icon: "\u{1F300}", cost: 2, radius: 8, slow: 0.65, time: 4, desc: "\uB0B4 \uC8FC\uBCC0 \uC801\uC744 \uD06C\uAC8C \uB454\uD654\uC2DC\uD0A8\uB2E4" },
-      barrier: { name: "\uAE34\uAE09 \uBC29\uBCBD", icon: "\u{1F6E1}\uFE0F", cost: 3, time: 5, desc: "\uC7A0\uC2DC \uD06C\uB9AC\uC2A4\uD0C8\uC774 \uC5B4\uB5A4 \uD53C\uD574\uB3C4 \uBC1B\uC9C0 \uC54A\uB294\uB2E4" }
+      barrier: { name: "\uAE34\uAE09 \uBC29\uBCBD", icon: "\u{1F6E1}\uFE0F", cost: 3, time: 5, desc: "\uC7A0\uC2DC \uD06C\uB9AC\uC2A4\uD0C8\uC774 \uC5B4\uB5A4 \uD53C\uD574\uB3C4 \uBC1B\uC9C0 \uC54A\uB294\uB2E4" },
+      // 나머지 넷과 성격이 다른 유일한 "설치형" 스킬 — 내 발밑이 아니라 **조준한 지점**에 잠깐 열려서
+      // 주변 적을 중심으로 끌어당긴다. 그 자체로는 피해가 0이라 단독으로는 아무것도 못 죽이지만,
+      // 흩어져 오는 무리를 한 덩어리로 뭉쳐 놓기 때문에 대포탑\xB7융단폭격\xB7폭탄\xB7운석처럼 범위 피해를
+      // 주는 수단과 짝지으면 판이 갈린다. 보스는 자기 패턴이 있으므로 면역(끌려다니면 패턴이 망가진다).
+      rift: { name: "\uC911\uB825 \uADE0\uC5F4", icon: "\u{1F30C}", cost: 3, radius: 7, pull: 5.5, time: 3.5, aimRange: 14, desc: "\uC870\uC900\uD55C \uACF3\uC5D0 \uADE0\uC5F4\uC744 \uC5F4\uC5B4 \uC8FC\uBCC0 \uC801\uC744 \uB04C\uC5B4\uBAA8\uC740\uB2E4 (\uD53C\uD574 \uC5C6\uC74C \xB7 \uBCF4\uC2A4 \uBA74\uC5ED)" }
     },
     net: {
       snapshotHz: 12,
@@ -13294,6 +13299,7 @@ button.corner.mute.off { opacity: 0.5; }
     skillBlast: "t",
     skillChill: "y",
     skillBarrier: "b",
+    skillRift: "c",
     startWave: "enter",
     pause: "p",
     help: "h",
@@ -13312,6 +13318,7 @@ button.corner.mute.off { opacity: 0.5; }
     skillBlast: "\uC815\uC218 \uC2A4\uD0AC: \uD3ED\uBC1C",
     skillChill: "\uC815\uC218 \uC2A4\uD0AC: \uC2DC\uAC04 \uC65C\uACE1",
     skillBarrier: "\uC815\uC218 \uC2A4\uD0AC: \uAE34\uAE09 \uBC29\uBCBD",
+    skillRift: "\uC815\uC218 \uC2A4\uD0AC: \uC911\uB825 \uADE0\uC5F4",
     startWave: "\uC6E8\uC774\uBE0C \uC2DC\uC791",
     pause: "\uC77C\uC2DC\uC815\uC9C0",
     help: "\uB3C4\uC6C0\uB9D0",
@@ -14338,7 +14345,9 @@ button.corner.mute.off { opacity: 0.5; }
     crate: new qs(0.95, 0.85, 0.95),
     dropRing: new qu(1.05, 1.3, 28),
     dropBeam: new su(0.07, 0.07, 6, 6),
-    meteorRing: new qu(0.92, 1, 48)
+    meteorRing: new qu(0.92, 1, 48),
+    riftRing: new qu(0.86, 1, 48),
+    riftCore: new ru(1, 32)
   };
   var MAT = {
     trunk: new sd({ color: 5979428, roughness: 0.95 }),
@@ -14369,7 +14378,9 @@ button.corner.mute.off { opacity: 0.5; }
     gemStump: new sd({ color: 5915496, roughness: 0.8 }),
     crate: new sd({ color: 9127211, roughness: 0.85 }),
     dropGlow: new es({ color: 16759043, transparent: true, opacity: 0.55, side: p, depthWrite: false }),
-    meteorWarn: new es({ color: 16729139, transparent: true, opacity: 0.6, side: p, depthWrite: false })
+    meteorWarn: new es({ color: 16729139, transparent: true, opacity: 0.6, side: p, depthWrite: false }),
+    riftRing: new es({ color: 11239935, transparent: true, opacity: 0.75, side: p, depthWrite: false }),
+    riftCore: new es({ color: 4530126, transparent: true, opacity: 0.4, side: p, depthWrite: false })
   };
   var World = class {
     constructor(sceneMgr, seed = 1) {
@@ -14635,6 +14646,41 @@ button.corner.mute.off { opacity: 0.5; }
       ring.visible = false;
       this.scene.add(ring);
       this.meteorRing = ring;
+      const rr2 = new Xs(GEO.riftRing, MAT.riftRing.clone());
+      rr2.rotation.x = -Math.PI / 2;
+      rr2.visible = false;
+      this.scene.add(rr2);
+      this.riftRing = rr2;
+      const rc = new Xs(GEO.riftCore, MAT.riftCore.clone());
+      rc.rotation.x = -Math.PI / 2;
+      rc.visible = false;
+      this.scene.add(rc);
+      this.riftCore = rc;
+    }
+    setRift(x2, z2, timeLeft, radius) {
+      this.rift = { x: x2, z: z2, timeLeft, radius };
+    }
+    clearRift() {
+      this.rift = null;
+      if (this.riftRing) this.riftRing.visible = false;
+      if (this.riftCore) this.riftCore.visible = false;
+    }
+    updateRiftVisual(now) {
+      if (!this.rift) {
+        if (this.riftRing) this.riftRing.visible = false;
+        if (this.riftCore) this.riftCore.visible = false;
+        return;
+      }
+      const { x: x2, z: z2, radius } = this.rift;
+      this.riftRing.visible = true;
+      this.riftRing.position.set(x2, 0.07, z2);
+      this.riftRing.scale.setScalar(radius);
+      this.riftRing.rotation.z = now * 1.6;
+      this.riftRing.material.opacity = 0.55 + Math.abs(Math.sin(now * 4)) * 0.35;
+      this.riftCore.visible = true;
+      this.riftCore.position.set(x2, 0.06, z2);
+      this.riftCore.scale.setScalar(radius * (0.35 + (1 - now * 1.2 % 1) * 0.5));
+      this.riftCore.material.opacity = 0.18 + now * 1.2 % 1 * 0.3;
     }
     setMeteor(x2, z2, timeLeft, radius) {
       this.meteor = { x: x2, z: z2, timeLeft, radius };
@@ -14753,6 +14799,7 @@ button.corner.mute.off { opacity: 0.5; }
       this.updateNodes(now);
       this.updateDrops(dt2, now);
       this.updateMeteorVisual(now);
+      this.updateRiftVisual(now);
     }
   };
 
@@ -14837,6 +14884,7 @@ button.corner.mute.off { opacity: 0.5; }
       this._dropTimer = CFG.supplyDrop.firstDelay;
       this._dropIdSeq = 1;
       this._meteorTimer = CFG.meteor.firstDelay;
+      this._rift = null;
       this._meteorPending = null;
       this.world.clearMeteor();
       this._treasureTimer = CFG.treasureEvent.firstDelay;
@@ -16225,6 +16273,63 @@ button.corner.mute.off { opacity: 0.5; }
       this.fx.burst(p2.x, 1.4, p2.z, 8382719, 16, 4);
       this._notify(playerId, `\u{1F300} \uC2DC\uAC04 \uC65C\uACE1! \uC801 ${targets.length}\uB9C8\uB9AC \uB454\uD654`, "good");
     }
+    // 중력 균열 — 다른 스킬과 달리 조준한 지점에 설치된다. 폭탄 투척과 같은 방식으로 겨눈다.
+    requestSkillRift(aim = null) {
+      const s2 = CFG.skills.rift;
+      const pointer = aim || this.sm.updatePointerWorld();
+      if (!pointer) return;
+      const dx = pointer.x - this.local.x, dz = pointer.z - this.local.z;
+      const len = Math.hypot(dx, dz) || 1;
+      const clamped = Math.min(len, s2.aimRange);
+      const tx = this.local.x + dx / len * clamped, tz = this.local.z + dz / len * clamped;
+      this.sfx.shard();
+      if (this.isHost) this.hostSkillRift(this.local.id, tx, tz);
+      else this.net.send("skillRift", { tx, tz });
+    }
+    hostSkillRift(playerId, tx, tz) {
+      const s2 = CFG.skills.rift;
+      const cost = this._skillCost(s2);
+      const p2 = this.players.get(playerId);
+      const pool = this._poolOf(playerId);
+      if (!p2) return;
+      if (this._rift) {
+        this._notify(playerId, "\uC774\uBBF8 \uADE0\uC5F4\uC774 \uC5F4\uB824 \uC788\uC2B5\uB2C8\uB2E4", "bad");
+        return;
+      }
+      if ((pool.shard || 0) < cost) {
+        this._notify(playerId, "\uC218\uC815 \uC815\uC218\uAC00 \uBD80\uC871\uD569\uB2C8\uB2E4", "bad");
+        return;
+      }
+      pool.shard -= cost;
+      this._unlockAchievement("skillUser", playerId);
+      this._rift = { x: tx, z: tz, timeLeft: s2.time };
+      this.world.setRift(tx, tz, s2.time, s2.radius);
+      this.fx.ring(tx, tz, 11239935, s2.radius);
+      this._notify(playerId, `\u{1F30C} \uC911\uB825 \uADE0\uC5F4! ${s2.time}\uCD08\uAC04 \uC8FC\uBCC0 \uC801\uC744 \uB04C\uC5B4\uBAA8\uC740\uB2E4 \u2014 \uBC94\uC704 \uACF5\uACA9\uC744 \uACB9\uCCD0\uB77C`, "good");
+    }
+    // 균열은 호스트에서만 계산하고, 위치·잔여시간만 스냅샷으로 내려보낸다(운석과 같은 패턴).
+    // 피해는 0이라 "끌어당김"만 적용하면 되고, 보스는 자기 패턴이 있으므로 제외한다.
+    _updateRift(dt2) {
+      if (!this.isHost || !this._rift) return;
+      const s2 = CFG.skills.rift;
+      const r = this._rift;
+      r.timeLeft -= dt2;
+      if (r.timeLeft <= 0) {
+        this._rift = null;
+        this.world.clearRift();
+        return;
+      }
+      this.world.setRift(r.x, r.z, r.timeLeft, s2.radius);
+      for (const e of this.enemyMgr.list) {
+        if (e.dead || e.st.boss) continue;
+        const dx = r.x - e.x, dz = r.z - e.z;
+        const d2 = Math.hypot(dx, dz);
+        if (d2 > s2.radius || d2 < 0.15) continue;
+        const step = Math.min(d2, s2.pull * dt2);
+        e.x += dx / d2 * step;
+        e.z += dz / d2 * step;
+      }
+    }
     requestSkillBarrier() {
       this.sfx.shard();
       if (this.isHost) this.hostSkillBarrier(this.local.id);
@@ -16412,6 +16517,9 @@ button.corner.mute.off { opacity: 0.5; }
       net.on("skillChill", (d2, from) => {
         if (this.isHost) this.hostSkillChill(from);
       });
+      net.on("skillRift", (d2, from) => {
+        if (this.isHost) this.hostSkillRift(from, d2.tx, d2.tz);
+      });
       net.on("skillBarrier", (d2, from) => {
         if (this.isHost) this.hostSkillBarrier(from);
       });
@@ -16493,6 +16601,7 @@ button.corner.mute.off { opacity: 0.5; }
         cr: this.world.crystal.regenLv,
         cx: this.world.crystal.auraLv,
         crf: this.world.crystal.reflectLv,
+        rf: this._rift ? [Math.round(this._rift.x * 10) / 10, Math.round(this._rift.z * 10) / 10, Math.round(this._rift.timeLeft * 10) / 10] : null,
         mt: this._meteorPending ? [Math.round(this._meteorPending.x * 10) / 10, Math.round(this._meteorPending.z * 10) / 10, Math.round(this._meteorPending.timeLeft * 10) / 10] : null,
         mc: this._merchant ? { offers: this._merchant.offers, boughtBy: this._merchant.boughtBy } : null,
         tb: { atk: this.tempBoon.atk, towerDmg: this.tempBoon.towerDmg },
@@ -16557,6 +16666,8 @@ button.corner.mute.off { opacity: 0.5; }
       }
       if (s2.mt) this.world.setMeteor(s2.mt[0], s2.mt[1], s2.mt[2], CFG.meteor.radius);
       else this.world.clearMeteor();
+      if (s2.rf) this.world.setRift(s2.rf[0], s2.rf[1], s2.rf[2], CFG.skills.rift.radius);
+      else this.world.clearRift();
       if (!this._merchant && s2.mc) this.ui?.toast("\u{1F9F3} \uB5A0\uB3CC\uC774 \uC0C1\uC778\uC774 \uC654\uB2E4! \uC774\uBC88 \uC900\uBE44 \uC2DC\uAC04\uC5D0\uB9CC \uBB3C\uAC74\uC744 \uD310\uB2E4", "good");
       this._merchant = s2.mc ? { offers: s2.mc.offers, boughtBy: s2.mc.boughtBy || {} } : null;
       if (s2.tb) Object.assign(this.tempBoon, s2.tb);
@@ -16626,6 +16737,7 @@ button.corner.mute.off { opacity: 0.5; }
         this._updateSupplyDrops(dt2);
         this._updateMeteor(dt2);
         this._updateTreasure(dt2);
+        this._updateRift(dt2);
         this._updateMerchant();
         this._updateCrystalUpgrades(dt2);
       } else {
@@ -16675,6 +16787,7 @@ button.corner.mute.off { opacity: 0.5; }
       if (inp.hit(km.get("skillBlast"))) this.requestSkillBlast();
       if (inp.hit(km.get("skillChill"))) this.requestSkillChill();
       if (inp.hit(km.get("skillBarrier"))) this.requestSkillBarrier();
+      if (inp.hit(km.get("skillRift"))) this.requestSkillRift();
       if (inp.hit(km.get("startWave")) && this.wave.phase === PHASE.PREP) this.requestStartWave();
       const pointer = this.sm.updatePointerWorld();
       this.buildMgr.updateGhost(pointer, this.myPool);
@@ -17038,9 +17151,10 @@ button.corner.mute.off { opacity: 0.5; }
           heal: () => g2.requestShard(),
           blast: () => g2.requestSkillBlast(),
           chill: () => g2.requestSkillChill(),
-          barrier: () => g2.requestSkillBarrier()
+          barrier: () => g2.requestSkillBarrier(),
+          rift: () => g2.requestSkillRift()
         };
-        const HOTKEYS = { heal: "shard", blast: "skillBlast", chill: "skillChill", barrier: "skillBarrier" };
+        const HOTKEYS = { heal: "shard", blast: "skillBlast", chill: "skillChill", barrier: "skillBarrier", rift: "skillRift" };
         return Object.entries(CFG.skills).map(([key, s]) => {
           const shardCost = key === "heal" ? s.cost : g2._skillCost(s);
           const cost = { shard: shardCost };
