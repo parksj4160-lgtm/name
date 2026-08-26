@@ -65,6 +65,7 @@ export var UI = class {
       merchantOffers: $2("merchant-offers"),
       btnContinue: $2("btn-continue"),
       tutorial: $2("tutorial"),
+      resPanel: $2("res-panel"),
       tutorialText: $2("tutorial-text"),
       achList: $2("ach-list"),
       achCount: $2("ach-count"),
@@ -1059,6 +1060,17 @@ export var UI = class {
     }
     const waveBottom = this.el.wavePanel.getBoundingClientRect().bottom;
     this.el.toasts.style.top = `${Math.round(waveBottom + 8)}px`;
+    // 튜토리얼은 자원 패널 바로 아래에 붙인다. 자원 패널은 도구를 만들수록(도구 줄) 세로로 길어져서
+    // 높이가 고정이 아니다 — CSS 로 top 을 박아 두면 도구가 늘어난 순간 패널을 덮어 가린다.
+    // 좁은 화면(<=780px)은 CSS 미디어 쿼리가 튜토리얼을 아예 다른 자리에 놓으므로 건드리지 않는다
+    if (!this.el.tutorial.classList.contains("hidden")) {
+      if (window.innerWidth > 780) {
+        const resBottom = this.el.resPanel.getBoundingClientRect().bottom;
+        this.el.tutorial.style.top = `${Math.round(resBottom + 10)}px`;
+      } else if (this.el.tutorial.style.top) {
+        this.el.tutorial.style.top = "";
+      }
+    }
     const p2 = g2.local;
     const hpR = clamp(p2.hp / p2.maxHp, 0, 1);
     this.el.hpFill.style.transform = `scaleX(${hpR})`;
