@@ -71,7 +71,7 @@ export var Net = class {
         };
         this._ws.onopen = () => {
           this.mode = "ws";
-          this.status = `온라인 \xB7 방 ${this.roomCode}`;
+          this.status = `온라인 · 방 ${this.roomCode}`;
           this._post({ type: "join" });
         };
         this._ws.onclose = () => {
@@ -92,7 +92,7 @@ export var Net = class {
       this._chan = new BroadcastChannel("crystal-defense-" + this.roomCode);
       this._chan.onmessage = (ev) => this._receive(ev.data);
       this.mode = "local";
-      this.status = `같은 브라우저 \xB7 방 ${this.roomCode}`;
+      this.status = `같은 브라우저 · 방 ${this.roomCode}`;
       this._post({ type: "join" });
     }
     if (this.mode === "off") this.status = "이 브라우저는 멀티플레이를 지원하지 않습니다";

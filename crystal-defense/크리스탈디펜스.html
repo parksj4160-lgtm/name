@@ -4,7 +4,6 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
 <title>크리스탈 디펜스 (Crystal Defense) — 더블클릭 실행판</title>
-
 <style>
 :root {
   --bg: #0b0f1a;
@@ -112,6 +111,26 @@ button.go:disabled { opacity: 0.4; cursor: not-allowed; }
   background: rgba(255,204,85,0.16); border: 1px solid rgba(255,204,85,0.3);
 }
 
+/* ---------- 떠돌이 상인 ---------- */
+.merchant-panel {
+  margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line);
+}
+.merchant-head { font-size: 12px; font-weight: 700; color: var(--warn); margin-bottom: 6px; }
+.merchant-offers { display: flex; gap: 8px; flex-wrap: wrap; }
+.merchant-card {
+  flex: 1 1 160px; display: flex; align-items: center; gap: 8px; text-align: left;
+  background: rgba(255,204,85,0.08); border: 1px solid rgba(255,204,85,0.28); border-radius: 8px;
+  padding: 6px 8px; cursor: pointer; color: var(--text); font-family: inherit;
+}
+.merchant-card:hover { background: rgba(255,204,85,0.18); }
+.merchant-card:disabled { opacity: 0.45; cursor: not-allowed; }
+.merchant-card .mc-icon { font-size: 20px; flex: none; }
+.merchant-card .mc-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.merchant-card .mc-name { font-weight: 700; font-size: 12px; }
+.merchant-card .mc-desc { font-size: 11px; color: var(--dim); }
+.merchant-card .mc-cost { font-size: 11px; color: var(--cyan); }
+.merchant-card.bought .mc-cost::after { content: " · 구매함"; color: var(--dim); }
+
 /* ---------- 파티 ---------- */
 #party-panel { right: 14px; top: 14px; min-width: 180px; max-width: 240px; }
 #party-panel .head { font-weight: 700; display: flex; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
@@ -158,7 +177,7 @@ button.go:disabled { opacity: 0.4; cursor: not-allowed; }
 #minimap {
   position: fixed; right: 14px; bottom: 14px; width: 176px; height: 176px;
   border-radius: 12px; border: 1px solid var(--line); background: rgba(10,14,24,0.72);
-  backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px); cursor: pointer;
 }
 
 /* ---------- 토스트 ---------- */
@@ -534,6 +553,11 @@ button.corner.mute.off { opacity: 0.5; }
       <button id="btn-wave" class="go">웨이브 시작 <kbd>Enter</kbd></button>
     </div>
     <div id="wave-preview" class="preview hidden"></div>
+    <!-- 떠돌이 상인 — 준비 시간에 가끔만 나타나 이번 준비 시간에만 물건을 판다 -->
+    <div id="merchant-panel" class="merchant-panel hidden">
+      <div class="merchant-head">🧳 떠돌이 상인 — 이번 준비 시간에만</div>
+      <div id="merchant-offers" class="merchant-offers"></div>
+    </div>
   </div>
 
   <!-- 우상단: 파티 -->
@@ -603,23 +627,28 @@ button.corner.mute.off { opacity: 0.5; }
       <tr><td>인벤토리</td><td><kbd class="rebind" data-action="inventory">I</kbd> — 건설 · 제작 · 장비를 여기서 전부 고른다</td></tr>
       <tr><td>건설</td><td>인벤토리 <b>건설</b> 탭에서 고르면 배치 모드가 된다 → 좌클릭으로 배치. 벽·타워는 <b>제작대를 먼저 지어야</b> 열린다</td></tr>
       <tr><td>🕸️ 덫탑</td><td>피해는 미미하지만 맞은 적을 잠깐 완전히 묶어 이동을 멈춘다(둔화가 아니라 정지). 🦇 박쥐처럼 벽·함정을 무시하는 적도 사거리 안에만 들어오면 그대로 묶인다 — 다른 타워가 명중시킬 시간을 벌어 준다. <b>묶인 적을 다른 타워가 맞추면 추가 피해 35%</b> — 인접 배치 없이 묶인 상태 자체가 조건이라 어떤 타워 조합이든 이득을 본다</td></tr>
+      <tr><td>🌩️ 번개탑</td><td>명중한 적에서 가까운 다른 적으로 튀어 옮겨붙는다(튈수록 피해 감소) — 뭉쳐서 오는 잡몹 무리엔 대포탑만큼 강하고, 흩어진 적에게는 화살탑처럼 한 놈에 집중된다</td></tr>
       <tr><td>🪤 함정</td><td>벽·타워와 달리 <b>길을 막지 않는다</b> — 적이 지나가는 길목 한복판에 심어 두면, 적이 밟는 순간 큰 피해+둔화를 주고 사라지는 1회용이다. 벽 뒤가 아니라 통로 위에 놓는 게 핵심</td></tr>
-      <tr><td>제작</td><td><b>제작대</b>를 지으면 인벤토리 <b>제작</b> 탭에서 ⛏️ 곡괭이 · 🗡️ 칼 · 🏹 활 · 🔱 창 · 🔨 망치 · 💣 폭탄가방을 만든다. 칼은 단단한 일격, 활은 넓은 사거리, 창은 좁고 긴 관통, 망치는 느리지만 사방을 강타. <b>화로</b>를 지으면 광물을 녹여 ⚙️ 철을 얻는다</td></tr>
-      <tr><td>💣 폭탄가방</td><td>유일한 원거리 무기 — 손에 들면 공격이 근접 대신 <b>조준한 바닥 지점에 폭탄을 던지는 것</b>으로 바뀐다(사거리 9, 던질 때마다 목재4·광물3 소모). 정수 스킬과 달리 목재·광물로 계속 쓸 수 있다. 🌀 결계 몹처럼 타워가 못 맞추는 원거리 위협이나 멀리서 몰려온 무리에 좋다</td></tr>
+      <tr><td>제작</td><td><b>제작대</b>를 지으면 인벤토리 <b>제작</b> 탭에서 ⛏️ 곡괭이 · 🗡️ 칼 · 🏹 활 · 🔱 창 · 🔨 망치 · 💣 폭탄가방을 만든다. 칼은 단단한 일격, <b>활은 실제로 화살을 쏘는 원거리</b>, 창은 좁고 긴 관통, 망치는 느리지만 사방을 강타. <b>화로</b>를 지으면 광물을 녹여 ⚙️ 철을 얻는다</td></tr>
+      <tr><td>🏹 활</td><td>손에 들면 공격이 근접 대신 <b>조준한 쪽으로 화살을 쏘는 것</b>으로 바뀐다(사거리 16). 폭탄가방과 달리 자원이 전혀 안 들지만 한 발에 한 마리만 맞고 피해도 낮다 — 안전한 거리에서 꾸준히 점사하는 용도</td></tr>
+      <tr><td>💣 폭탄가방</td><td>손에 들면 공격이 근접 대신 <b>조준한 바닥 지점에 폭탄을 던지는 것</b>으로 바뀐다(사거리 9, 던질 때마다 목재4·광물3 소모). 정수 스킬과 달리 목재·광물로 계속 쓸 수 있다. 🌀 결계 몹처럼 타워가 못 맞추는 원거리 위협이나 멀리서 몰려온 무리에 좋다</td></tr>
       <tr><td>쓰러짐·부활</td><td>체력이 0이 되면 쓰러져 잠시(5초) 조작 불가 상태가 됐다가 크리스탈 옆에서 부활한다. <b>협동 플레이라면 살아있는 아군이 쓰러진 사람 가까이 가면 부활이 3배 빨라진다</b> — 위험을 무릅쓰고 구하러 갈지 판단해야 한다. 혼자 할 땐 영향 없음</td></tr>
       <tr><td>🤝 장비 건네주기</td><td>우측 상단 파티 목록에서 내가 만든 무기 아이콘을 누르면 그 파티원에게 그대로 넘어간다(나는 잃는다). 자원 공유 설정과 무관하게 항상 가능 — 결계 몹을 상대하는 동료에게 폭탄가방을 건네는 식으로 쓴다. 혼자 할 땐 표시 안 됨</td></tr>
+      <tr><td>📍 미니맵 핑</td><td>우하단 미니맵을 클릭하면 그 위치에 표시가 뜨고(고리+빛기둥, 3.5초간 유지) 파티원 전원의 화면에도 똑같이 나타난다 — 말 없이 "여기로 와" · "여기 위험해"를 전달하는 협동 신호. 도배 방지로 2.5초 쿨다운이 있다</td></tr>
       <tr><td>장비</td><td>인벤토리 <b>장비</b> 탭에서 고르면 손에 든다. ⛏️ 곡괭이도 쥐어야 정수석을 캘 수 있다</td></tr>
-      <tr><td>몬스터</td><td>🧙 주술사는 벽을 무시하고 멀리서 크리스탈을 저격 · 🪓 약탈자는 가장 가까운 건물로 직행해 부순다 · 🦇 박쥐(6웨이브부터)는 벽·함정을 전부 무시하고 하늘로 크리스탈까지 직선 비행한다 — 체력이 낮아 타워로 요격하는 게 사실상 유일한 대응</td></tr>
+      <tr><td>몬스터</td><td>🧙 주술사는 벽을 무시하고 멀리서 크리스탈을 저격 · 🪓 약탈자는 가장 가까운 건물로 직행해 부순다 · 🦇 박쥐(6웨이브부터)는 벽·함정을 전부 무시하고 하늘로 크리스탈까지 직선 비행한다 — 체력이 낮아 타워로 요격하는 게 사실상 유일한 대응 · 🧨 폭탄병(8웨이브부터)은 죽는 순간 주변에 폭발 피해를 남긴다 — 코앞에서 마무리하면 같이 맞으니 거리를 두고 처리할 것</td></tr>
+      <tr><td>🦀 보물게</td><td>3웨이브부터 전투 중 가끔 튀어나와 공격은 안 하고 도망만 다닌다. 시간 안에 못 잡으면 보상 없이 사라지니 지금 하던 걸 멈추고 쫓아갈지 판단해야 한다 — 잡으면 자원을 두둑히, 가끔 정수(💠)까지 준다</td></tr>
       <tr><td>변종</td><td>웨이브가 오를수록 몬스터에 접두사가 붙는다: 🛡️ 방패(정면 피해 대폭 감소, 등 뒤를 쳐야 함) · ➗ 분열(죽으면 약한 개체 2마리로) · 💨 질주(주기적으로 폭발적 가속) · 💚 재생(잠시 안 맞으면 체력이 차오름, 끝까지 몰아쳐야 함) · 🌀 결계(타워가 조준 못함, 직접 처치해야 함). 색 틴트 + 머리 위 아이콘으로 항상 표시된다</td></tr>
       <tr><td>⭐ 정예</td><td>3웨이브부터 웨이브당 최대 1마리, 확률적으로 골드빛 정예가 섞여 나온다. 체력·공격력이 크게 세지지만 처치 보상(목재·광물)은 3배 — 등장하면 토스트로 알려주니 그놈부터 집중해서 잡을지 무시할지는 선택</td></tr>
       <tr><td>☄️ 운석 낙하</td><td>4웨이브부터 전투 중 가끔 바닥에 빨간 경고 링이 뜨고, 2.5초 뒤 그 자리에 큰 범위 피해가 떨어진다. 몬스터 무리를 그 위로 끌어들이면 한 방에 정리할 수 있지만, 내 건물이나 캐릭터가 그 자리에 있으면 그대로 맞는다 — 보급품과 반대로 피해야 할 수도, 이용해야 할 수도 있는 양날의 검</td></tr>
       <tr><td>📦 보급품 투하</td><td>2웨이브부터 전투 중 가끔 상자가 떨어진다(한 번에 최대 1개, 미니맵에 노란 점으로 표시). 가까이 다가가면 자동으로 줍고 자원(목재·광물, 확률로 정수)을 얻는다 — 오래 안 챙기면 사라지니 방어를 잠깐 비우고 달려갈지 말지가 선택</td></tr>
+      <tr><td>🧳 떠돌이 상인</td><td>2웨이브 클리어 후부터 준비 시간에 가끔 나타나 그 준비 시간에만 무작위 2개 품목을 목재·광물로 판다(물약·정수/철 교환 등). 품목은 각자 한 번씩만 살 수 있고 웨이브가 시작되면 사라진다 — 축복과 달리 엔드리스가 아니어도, 정수가 없어도 쓸 수 있는 자원 소비처다</td></tr>
       <tr><td>지형</td><td>판마다 지형이 다르다: 🏔️ 협곡(입구가 좁아 길막기가 잘 먹히지만 자원 부족) · 🌾 개활지(자원은 넉넉하지만 적이 사방에서 온다) · 🗺️ 평지(표준). 좌상단 자원 패널에 항상 표시된다</td></tr>
       <tr><td>🌙 밤 웨이브</td><td>7웨이브마다(엔드리스에서도 반복) 조명이 어두워지고 안개가 짙어져 시야가 좁아진다. 크리스탈 불빛은 오히려 더 밝아져 등대 역할을 한다</td></tr>
       <tr><td>날씨</td><td>밤이 아닌 웨이브에 가끔 낀다: 🌧️ 비(땅이 젖어 이동 속도 소폭 감소) · 🌫️ 안개(시야가 줄고 타워 사거리 소폭 감소). 웨이브 시작 토스트로 미리 알려준다</td></tr>
-      <tr><td>♾️ 축복</td><td>엔드리스 모드에서 3웨이브마다 준비 시간이 멈추고 영구 버프 2개 중 하나를 고른다(공격력\xB7타워 공격력\xB7스킬 비용\xB7즉시 회복). 표준 10웨이브에는 나오지 않는다</td></tr>
-      <tr><td>💎 크리스탈 강화</td><td>인벤토리 <b>크리스탈</b> 탭에서 정수(💠)로 크리스탈 자체를 영구히 키운다: 💪 강화(최대 체력 +150) · 💚 재생(초당 자동 회복) · ⚡ 오라(주변 적에게 주기 피해). 각 5레벨까지, 레벨이 오를수록 비용도 오른다 — 지킬 대상이 강해지면 후반에 방어선을 좁혀 버티는 선택지가 생긴다</td></tr>
-      <tr><td>특수 웨이브</td><td>3웨이브마다(보스 웨이브 제외) 성격이 다른 웨이브가 섞인다: 🏃 러시(러너 대량, 물량전) · 🏰 공성(브루트+약탈자, 건물이 표적) · ⭐ 정예전(수는 적지만 전부 정예). 준비 시간 웨이브 예고에 노란 배지로 미리 알려준다</td></tr>
+      <tr><td>♾️ 축복</td><td>엔드리스 모드에서 3웨이브마다 준비 시간이 멈추고 영구 버프 2개 중 하나를 고른다(공격력·타워 공격력·스킬 비용·즉시 회복). 표준 10웨이브에는 나오지 않는다</td></tr>
+      <tr><td>💎 크리스탈 강화</td><td>인벤토리 <b>크리스탈</b> 탭에서 정수(💠)로 크리스탈 자체를 영구히 키운다: 💪 강화(최대 체력 +150) · 💚 재생(초당 자동 회복) · ⚡ 오라(주변 적에게 주기 피해) · 🪞 반사(크리스탈을 때린 적에게 받은 피해 일부를 그대로 돌려줌). 각 5레벨까지, 레벨이 오를수록 비용도 오른다 — 지킬 대상이 강해지면 후반에 방어선을 좁혀 버티는 선택지가 생긴다</td></tr>
+      <tr><td>특수 웨이브</td><td>3웨이브마다(보스 웨이브 제외) 성격이 다른 웨이브가 섞인다: 🏃 러시(러너 대량, 물량전) · 🏰 공성(브루트+약탈자, 건물이 표적) · ⭐ 정예전(수는 적지만 전부 정예) · 🌀 결계(전부 결계를 둘러 타워가 조준 못함) · 💉 치유단(치유사가 잔뜩 섞여 서로 회복, 먼저 솎아내야 함). 준비 시간 웨이브 예고에 노란 배지로 미리 알려준다</td></tr>
       <tr><td>보스</td><td>5웨이브마다 💀 파괴자 · 🧊 서리 군주 · 🔇 침묵의 군주가 15웨이브 주기로 돌아가며 등장한다. 체력이 깎일 때마다 파괴자·서리 군주는 <b>잡졸을 소환</b>하고(서리 군주는 전부 🛡️ 방패 변종), 침묵의 군주는 대신 <b>발밑에 침묵 장판</b>을 깔아 반경 안 타워를 전부 멈춘다(직접 나가서 막아야 함). 멀리 있으면 셋 다 <b>크리스탈로 돌진</b>해 지나는 건물을 부순다. 전부 <b>예고가 먼저 뜨니</b> 그때 대응할 것</td></tr>
       <tr><td>업그레이드</td><td><kbd class="rebind" data-action="upgrade">U</kbd> 후 건물 클릭</td></tr>
       <tr><td>수리</td><td><kbd class="rebind" data-action="repair">G</kbd> 후 건물 클릭 (손상 비례 자원 소모)</td></tr>
@@ -656,6 +685,7 @@ button.corner.mute.off { opacity: 0.5; }
         <button type="button" class="diff-opt" data-diff="normal">보통</button>
         <button type="button" class="diff-opt" data-diff="easy">쉬움</button>
         <button type="button" class="diff-opt" data-diff="hard">어려움</button>
+        <button type="button" class="diff-opt" data-diff="nightmare">악몽</button>
       </div>
     </div>
     <p class="dim diff-desc" id="diff-desc"></p>
@@ -10186,7 +10216,9 @@ button.corner.mute.off { opacity: 0.5; }
     trapMaster: { name: "\uB36B\uC0AC\uB0E5\uAFBC", icon: "\u{1FAA4}", desc: "\uD55C \uD310\uC5D0\uC11C \uD568\uC815\uC744 3\uBC88 \uC774\uC0C1 \uBC1C\uB3D9\uC2DC\uCF30\uB2E4" },
     ironWill: { name: "\uAC15\uCCA0 \uC758\uC9C0", icon: "\u{1F529}", desc: "\uC5B4\uB824\uC6C0 \uB09C\uC774\uB3C4\uB85C 10\uC6E8\uC774\uBE0C\uB97C \uB9C9\uC544\uB0C8\uB2E4" },
     eliteHunter: { name: "\uC815\uC608 \uC0AC\uB0E5\uAFBC", icon: "\u2B50", desc: "\uC815\uC608 \uBAAC\uC2A4\uD130\uB97C 5\uB9C8\uB9AC \uCC98\uCE58\uD588\uB2E4" },
-    weaponMaster: { name: "\uC7A5\uC778\uC758 \uC190\uAE38", icon: "\u{1F6E0}\uFE0F", desc: "\uBB34\uAE30 \uD558\uB098\uB97C \uCD5C\uB300 \uB808\uBCA8\uAE4C\uC9C0 \uAC15\uD654\uD588\uB2E4" }
+    weaponMaster: { name: "\uC7A5\uC778\uC758 \uC190\uAE38", icon: "\u{1F6E0}\uFE0F", desc: "\uBB34\uAE30 \uD558\uB098\uB97C \uCD5C\uB300 \uB808\uBCA8\uAE4C\uC9C0 \uAC15\uD654\uD588\uB2E4" },
+    treasureHunter: { name: "\uBCF4\uBB3C \uC0AC\uB0E5\uAFBC", icon: "\u{1F980}", desc: "\uBCF4\uBB3C\uAC8C\uB97C 5\uB9C8\uB9AC \uC7A1\uC558\uB2E4" },
+    nightmareConqueror: { name: "\uC545\uBABD \uC815\uBCF5", icon: "\u{1F631}", desc: "\uC545\uBABD \uB09C\uC774\uB3C4\uB85C 10\uC6E8\uC774\uBE0C\uB97C \uB9C9\uC544\uB0C8\uB2E4" }
   };
   var STORE_KEY = "cd.achievements";
   function loadUnlocked() {
@@ -10717,7 +10749,13 @@ button.corner.mute.off { opacity: 0.5; }
       maxLv: 5,
       armor: { name: "\uAC15\uD654", icon: "\u{1F4AA}", desc: "\uCD5C\uB300 \uCCB4\uB825 +150 (\uC989\uC2DC \uADF8\uB9CC\uD07C \uD68C\uBCF5\uB3C4 \uB428)", hpPerLv: 150, baseCost: 2, costStep: 1 },
       regen: { name: "\uC7AC\uC0DD", icon: "\u{1F49A}", desc: "\uB9E4\uCD08 \uCD5C\uB300 \uCCB4\uB825\uC758 0.6% \uB9CC\uD07C \uC790\uB3D9 \uD68C\uBCF5", pctPerLv: 6e-3, baseCost: 2, costStep: 1 },
-      aura: { name: "\uC624\uB77C", icon: "\u26A1", desc: "\uC8FC\uBCC0 \uC801\uC5D0\uAC8C 1\uCD08\uB9C8\uB2E4 \uD53C\uD574\uB97C \uC900\uB2E4", radius: 6.5, dmgPerLv: 12, tickTime: 1, baseCost: 3, costStep: 1 }
+      aura: { name: "\uC624\uB77C", icon: "\u26A1", desc: "\uC8FC\uBCC0 \uC801\uC5D0\uAC8C 1\uCD08\uB9C8\uB2E4 \uD53C\uD574\uB97C \uC900\uB2E4", radius: 6.5, dmgPerLv: 12, tickTime: 1, baseCost: 3, costStep: 1 },
+      // 몬스터의 공격 판정(onCrystalHit)으로 크리스탈이 맞을 때만 발동 — 근접이든 주술사의 원거리
+      // 저격이든 "누가 때렸는지"가 있으면 다 걸리지만, 운석·폭탄병 폭발처럼 특정 공격자 없이
+      // 들어오는 광역 피해에는 걸리지 않는다. 오라(주변 전체에 상시 피해)와 달리 "크리스탈이 실제로
+      // 맞아야" 발동해서, 방어선이 뚫려 크리스탈이 두들겨 맞는 위기 상황일수록 존재감이 커진다 —
+      // 오라가 평시의 화력이라면 반사는 위기의 보험에 가깝다.
+      reflect: { name: "\uBC18\uC0AC", icon: "\u{1FA9E}", desc: "\uD06C\uB9AC\uC2A4\uD0C8\uC744 \uC9C1\uC811 \uACF5\uACA9\uD55C \uC801\uC5D0\uAC8C \uBC1B\uC740 \uD53C\uD574\uC758 \uC77C\uBD80\uB97C \uADF8\uB300\uB85C \uB3CC\uB824\uC900\uB2E4", pctPerLv: 0.08, baseCost: 3, costStep: 1 }
     },
     player: {
       speed: 7.4,
@@ -10734,7 +10772,10 @@ button.corner.mute.off { opacity: 0.5; }
       attack: { dmg: 16, range: 2.8, arc: 1.5, cd: 0.42 },
       // 회피 돌진 — 짧게 무적 상태로 튀어나간다. 보스 돌진이나 다구리를 피할 때, 결계 몹에게 순식간에
       // 붙을 때 쓴다. 쿨다운 중엔 다시 못 쓴다
-      dash: { speed: 20, duration: 0.16, cooldown: 3 }
+      dash: { speed: 20, duration: 0.16, cooldown: 3 },
+      // 미니맵 핑 — 협동 플레이에서 위치를 알리는 신호. 자원도 안 쓰고 되돌릴 상태도 없어서
+      // 쿨다운은 순전히 도배 방지용이다
+      pingCooldown: 2.5
     },
     harvest: {
       range: 3.2,
@@ -10895,6 +10936,24 @@ button.corner.mute.off { opacity: 0.5; }
           { hp: 260, dmg: 6, range: 10.5, rate: 0.6, root: 1.8, cost: { wood: 60, stone: 40 } },
           { hp: 380, dmg: 9, range: 12, rate: 0.7, root: 2.2, cost: { wood: 110, stone: 90, iron: 5 } }
         ]
+      },
+      // 다른 타워는 전부 한 놈만 맞추거나(단일 표적) 한 자리를 지정해서 넓게 맞춘다(대포 splash).
+      // 번개탑은 그 중간 — 명중한 적에서 가까운 다른 적으로 튀어 옮겨붙는다(순차적으로, 튈수록 약해짐).
+      // 뭉쳐서 오는 잡몹 무리엔 대포탑만큼 강하면서, 흩어진 적에게는 화살탑처럼 한 놈에 집중된다 —
+      // "지금 뭉쳐 오나 흩어져 오나"에 따라 대포탑과 다른 선택지가 되는 게 목적.
+      lightning: {
+        name: "\uBC88\uAC1C\uD0D1",
+        icon: "\u{1F329}\uFE0F",
+        hotkey: "c",
+        cost: { wood: 45, stone: 35 },
+        hp: 170,
+        blocks: true,
+        desc: "\uBA85\uC911\uD55C \uC801\uC5D0\uC11C \uAC00\uAE4C\uC6B4 \uB2E4\uB978 \uC801\uC73C\uB85C \uD280\uC5B4 \uC62E\uACA8\uBD99\uB294\uB2E4(\uD288\uC218\uB85D \uD53C\uD574 \uAC10\uC18C). \uBB49\uCCD0 \uC624\uB294 \uC7A1\uBAB9 \uBB34\uB9AC\uC5D0 \uAC15\uD558\uB2E4.",
+        levels: [
+          { hp: 170, dmg: 9, range: 11, rate: 0.85, chain: { count: 3, range: 4.5, falloff: 0.6 } },
+          { hp: 260, dmg: 14, range: 12.5, rate: 0.95, chain: { count: 4, range: 5, falloff: 0.65 }, cost: { wood: 55, stone: 65 } },
+          { hp: 400, dmg: 21, range: 14, rate: 1.05, chain: { count: 5, range: 5.5, falloff: 0.7 }, cost: { wood: 100, stone: 130, iron: 6 } }
+        ]
       }
     },
     // 시설에 다가가 클릭하면 열리는 작업창. range 는 상호작용 가능 거리.
@@ -10989,7 +11048,15 @@ button.corner.mute.off { opacity: 0.5; }
       frostlord: { name: "\uC11C\uB9AC \uAD70\uC8FC", icon: "\u{1F9CA}", hp: 1050, speed: 1.7, dmg: 55, rate: 0.65, radius: 1.5, color: 10479871, bounty: { wood: 32, stone: 38 }, scale: 2.4, boss: true, summonVariant: "shield" },
       // 세 번째 보스(15웨이브 주기로 파괴자·서리 군주와 순환). 소환 대신 자기 발밑에 침묵 장판을 깐다 —
       // 장판 반경 안의 타워는 조준·사격이 전부 멈춘다(`buildings.js`의 `updateTowers` 참고). 돌진 패턴은 공유.
-      warden: { name: "\uCE68\uBB35\uC758 \uAD70\uC8FC", icon: "\u{1F507}", hp: 1100, speed: 1.8, dmg: 50, rate: 0.65, radius: 1.5, color: 8011711, bounty: { wood: 34, stone: 34 }, scale: 2.35, boss: true, silenceBoss: true }
+      warden: { name: "\uCE68\uBB35\uC758 \uAD70\uC8FC", icon: "\u{1F507}", hp: 1100, speed: 1.8, dmg: 50, rate: 0.65, radius: 1.5, color: 8011711, bounty: { wood: 34, stone: 34 }, scale: 2.35, boss: true, silenceBoss: true },
+      // 체력이 낮아 금방 죽지만, 죽는 순간(어떻게 죽었든) 그 자리에서 폭발해 주변 크리스탈·건물·플레이어에게
+      // 피해를 준다 — 근접으로 마지막 일격을 넣으면 그 폭발을 그대로 맞는다. "닥치고 근접"이 항상 안전하지
+      // 않게 만드는 가시(thorn) 변종과 목적은 비슷하지만, 이쪽은 변종이 아니라 종류 자체라 항상 그렇다.
+      bomber: { name: "\uD3ED\uD0C4\uBCD1", icon: "\u{1F9E8}", hp: 42, speed: 2.7, dmg: 8, rate: 1, radius: 0.55, color: 16733491, bounty: { wood: 2, stone: 2 }, scale: 1, explode: { radius: 3.2, dmg: 55, buildingDmgMult: 0.5, playerDmg: 42 } },
+      // 웨이브 구성에 안 끼고 전투 중 독립적으로(운석·보급품처럼) 튀어나온다. 공격을 아예 안 하고
+      // 가장 가까운 플레이어에게서 도망만 친다(체력이 낮아 잡기는 쉽지만 안 쫓아가면 금방 사라진다) —
+      // "지금 하던 걸 멈추고 쫓아갈지" 순간 판단을 만드는 게 목적. 못 잡으면 보상 없이 그냥 사라진다.
+      treasure: { name: "\uBCF4\uBB3C\uAC8C", icon: "\u{1F980}", hp: 16, speed: 5.4, dmg: 0, rate: 0, radius: 0.4, color: 16766720, bounty: { wood: 16, stone: 12 }, scale: 0.85, flees: true, shardChance: 0.5 }
     },
     // 몬스터 변종 접두사 — 종류를 늘리는 대신 기존 몬스터에 가끔 붙는다. 웨이브가 오를수록 등장 확률이 오른다.
     // 색 틴트 + 머리 위 아이콘으로 항상 표시되어(색약 여부와 무관하게) 눈에 띈다.
@@ -11005,8 +11072,8 @@ button.corner.mute.off { opacity: 0.5; }
       // 타워가 조준하지 못한다(자동 사격 대상에서 제외) — 함정·근접 공격·정수 스킬은 그대로 통한다.
       // 타워만 믿고 있으면 절대 안 죽으니 직접 달려가 처리해야 한다
       ward: { name: "\uACB0\uACC4", icon: "\u{1F300}", tint: 11800063 },
-      // 근접 공격(칼\xB7창\xB7망치 등)으로 때리면 준 피해의 일부를 그대로 되돌려 받는다. 타워\xB7함정\xB7
-      // 폭탄\xB7정수 스킬처럼 거리를 둔 공격에는 안 걸린다 — 무기 강화나 필사의 반격으로 근접 대미지가
+      // 근접 공격(칼·창·망치 등)으로 때리면 준 피해의 일부를 그대로 되돌려 받는다. 타워·함정·
+      // 폭탄·정수 스킬처럼 거리를 둔 공격에는 안 걸린다 — 무기 강화나 필사의 반격으로 근접 대미지가
       // 오른 만큼 반사 피해도 커지므로, "닥치고 근접"만으로는 항상 안전하지 않게 만드는 게 목적
       thorn: { name: "\uAC00\uC2DC", icon: "\u{1F335}", tint: 9127187, reflectPct: 0.4 }
     },
@@ -11051,6 +11118,13 @@ button.corner.mute.off { opacity: 0.5; }
       snare: {
         bind: { name: "\uC18D\uBC15", icon: "\u26D3\uFE0F", ring: 16764006, desc: "\uBB36\uB294 \uC2DC\uAC04\uC774 \uD06C\uAC8C \uB298\uC5B4\uB09C\uB2E4 \u2014 \uC704\uD5D8\uD55C \uD55C \uB188\uC744 \uC624\uB798 \uC138\uC6CC \uB454\uB2E4", mods: { root: 1.55, rate: 0.85 } },
         net: { name: "\uADF8\uBB3C", icon: "\u{1F578}\uFE0F", ring: 11800063, desc: "\uC8FC\uBCC0 \uC801\uAE4C\uC9C0 \uD568\uAED8 \uBB36\uB294\uB2E4(\uBB36\uB294 \uC2DC\uAC04\uC740 \uC9E7\uB2E4) \u2014 \uBB34\uB9AC\uB97C \uD1B5\uC9F8\uB85C \uC138\uC6B4\uB2E4", mods: { root: 0.7 }, add: { splash: 3.6 } }
+      },
+      // chain 은 숫자가 아니라 객체라 mods 로는 못 건드린다(stats getter가 숫자 필드만 곱한다) — add로
+      // 통째로 새 chain 객체를 얹어서(기존 값을 완전히 대체) 갈래마다 완전히 다른 체인 모양을 만든다.
+      // focus는 count:1로 사실상 체인을 끄는 셈이라 새 로직 없이 자연스럽게 단일 표적 타워가 된다.
+      lightning: {
+        spread: { name: "\uD655\uC0B0", icon: "\u{1F310}", ring: 6739199, desc: "\uD280\uB294 \uB300\uC0C1 \uC218\uC640 \uC0AC\uAC70\uB9AC\uAC00 \uB298\uC5B4\uB09C\uB2E4(\uD55C \uBC29\uC740 \uC57D\uD574\uC9C4\uB2E4) \u2014 \uD769\uC5B4\uC9C4 \uC7A1\uBAB9 \uBB34\uB9AC\uB97C \uD55C \uBC88\uC5D0 \uC4F8\uC5B4\uB2F4\uB294\uB2E4", mods: { dmg: 0.6, rate: 1.15 }, add: { chain: { count: 7, range: 6.5, falloff: 0.75 } } },
+        focus: { name: "\uC9D1\uC18D", icon: "\u{1F3AF}", ring: 16752640, desc: "\uD290\uC744 \uD3EC\uAE30\uD558\uACE0 \uD55C \uB188\uC5D0\uAC8C \uBAA8\uB4E0 \uC804\uB825\uC744 \uC3DF\uB294\uB2E4 \u2014 \uBCF4\uC2A4\xB7\uBE0C\uB8E8\uD2B8\uB97C \uC21C\uC2DD\uAC04\uC5D0 \uB179\uC778\uB2E4", mods: { dmg: 2.5, range: 1.25 }, add: { chain: { count: 1, range: 0, falloff: 1 } } }
       }
     },
     // 보급품 투하 — 전투 중(웨이브 2부터) 가끔 지도 위에 상자가 떨어진다. 한 번에 최대 1개만 떠 있고,
@@ -11061,6 +11135,28 @@ button.corner.mute.off { opacity: 0.5; }
     // 내 캐릭터가 그 자리에 있으면 그대로 맞는다 — 순수 이득이던 보급품 투하와 반대로 양날의 검이다.
     // 건물·자원 노드를 피하지 않는다 — 그래서 위험하다.
     meteor: { minWave: 4, firstDelay: 22, minGap: 40, maxGap: 65, telegraphTime: 2.5, radius: 5, dmg: 150, buildingDmgMult: 0.5, playerDmg: 35 },
+    // 보물게 — 전투 중(3웨이브부터) 가끔 튀어나와 도망만 다니는 몬스터. 웨이브 구성에 안 끼는 독립
+    // 이벤트라 운석·보급품과 같은 패턴(호스트 전용 타이머)으로 처리한다. lifetime 안에 못 잡으면
+    // 보상 없이 사라진다 — 보급품처럼 순수 이득이 아니라, 잡으려면 지금 하던 걸 멈추고 쫓아가야 한다.
+    treasureEvent: { minWave: 3, firstDelay: 20, minGap: 35, maxGap: 55, lifetime: 13 },
+    // 떠돌이 상인 — 웨이브를 클리어하고 준비 시간에 들어갈 때(2웨이브부터) 확률적으로 나타나,
+    // 그 준비 시간 동안만 무작위 2개 품목을 판다. 축복(엔드리스 전용, 정수로 구매, 영구 적용)과
+    // 달리 표준 캠페인부터 목재·광물로 살 수 있고, 물약 종류는 해당 웨이브 한 번만 지속되는
+    // 일회성 효과라 "지금 자원을 아껴 쌓을지, 당장의 이득으로 바꿀지"라는 준비 시간의 선택지를 넓힌다.
+    // 품목은 플레이어별로 각자 한 번씩 살 수 있다(공유 자원 모드에서도 동일 — 팀 전체가 아니라
+    // 인당 1회). 웨이브가 시작되면(전투 진입) 즉시 사라진다.
+    merchant: {
+      minWave: 2,
+      chance: 0.65,
+      offerCount: 2,
+      pool: {
+        heal: { name: "\uCE58\uC720 \uBB3C\uC57D", icon: "\u{1F9EA}", desc: "\uD06C\uB9AC\uC2A4\uD0C8 \uCCB4\uB825\uC744 \uC989\uC2DC 300 \uD68C\uBCF5\uD55C\uB2E4", cost: { wood: 40, stone: 30 }, kind: "heal", value: 300 },
+        atkTonic: { name: "\uD798\uC758 \uBB3C\uC57D", icon: "\u{1F4AA}", desc: "\uB2E4\uC74C \uC6E8\uC774\uBE0C \uB3D9\uC548 \uADFC\uC811 \uACF5\uACA9\uB825 +40%", cost: { wood: 35, stone: 20 }, kind: "tempAtk", value: 1.4 },
+        towerTonic: { name: "\uD3EC\uACA9 \uBB3C\uC57D", icon: "\u{1F5FC}", desc: "\uB2E4\uC74C \uC6E8\uC774\uBE0C \uB3D9\uC548 \uBAA8\uB4E0 \uD0C0\uC6CC \uACF5\uACA9\uB825 +25%", cost: { wood: 30, stone: 35 }, kind: "tempTower", value: 1.25 },
+        shardTrade: { name: "\uC815\uC218 \uAC10\uC815", icon: "\u{1F4A0}", desc: "\uBAA9\uC7AC\xB7\uAD11\uBB3C\uC744 \uC815\uC218 1\uAC1C\uB85C \uBC14\uAFBC\uB2E4", cost: { wood: 50, stone: 50 }, kind: "shard", value: 1 },
+        ironTrade: { name: "\uCCA0 \uC8FC\uAD34 \uAC70\uB798", icon: "\u2699\uFE0F", desc: "\uBAA9\uC7AC\xB7\uAD11\uBB3C\uC744 \uCCA0 3\uAC1C\uB85C \uBC14\uAFBC\uB2E4", cost: { wood: 60, stone: 40 }, kind: "iron", value: 3 }
+      }
+    },
     // 엔드리스 축복 — 10웨이브 승리 이후(엔드리스)에만 등장한다. 표준 캠페인 밸런스에는 영향이 없다.
     // n웨이브마다 무작위 2개 중 하나를 골라 영구 적용(응급 처치만 즉시 1회성). 전부 호스트가 계산하는
     // 값(근접 공격력·타워 공격력·스킬 비용·크리스탈 체력)에만 걸려 있어서 별도 동기화 없이 참가자에게도 그대로 반영된다.
@@ -11144,6 +11240,7 @@ button.corner.mute.off { opacity: 0.5; }
     if (w2 >= 5) n += 1 + Math.floor((w2 - 3) / 3);
     if (w2 >= 6) n += 1 + Math.floor((w2 - 4) / 2);
     if (w2 >= 7) n += 1 + Math.floor((w2 - 5) / 3);
+    if (w2 >= 8) n += 1 + Math.floor((w2 - 6) / 3);
     return n;
   }
   var SPECIAL_WAVES = {
@@ -11153,12 +11250,18 @@ button.corner.mute.off { opacity: 0.5; }
     // 이번 웨이브의 몬스터는(정예로 뽑히지 않는 한) 전부 결계(ward)를 두르고 나온다 — 타워가
     // 아예 조준을 못 하니 트랩·근접·정수 스킬로 직접 정리해야 한다. 평소엔 가끔 섞여 나오는
     // 변종 하나를 "이번 웨이브 전체의 규칙"으로 확대한 것 — 방어선을 잠깐 내려놓고 뛰어들게 만든다.
-    ward: { name: "\uACB0\uACC4", icon: "\u{1F300}", desc: "\uBAAC\uC2A4\uD130 \uC804\uBD80\uAC00 \uACB0\uACC4\uC5D0 \uC50C\uC6CC \uD0C0\uC6CC\uAC00 \uC870\uC900\uD558\uC9C0 \uBABB\uD55C\uB2E4 \u2014 \uD2B8\uB7A9\xB7\uADFC\uC811\xB7\uC815\uC218 \uC2A4\uD0AC\uB85C \uC9C1\uC811 \uC815\uB9AC\uD574\uC57C \uD55C\uB2E4" }
+    ward: { name: "\uACB0\uACC4", icon: "\u{1F300}", desc: "\uBAAC\uC2A4\uD130 \uC804\uBD80\uAC00 \uACB0\uACC4\uC5D0 \uC50C\uC6CC \uD0C0\uC6CC\uAC00 \uC870\uC900\uD558\uC9C0 \uBABB\uD55C\uB2E4 \u2014 \uD2B8\uB7A9\xB7\uADFC\uC811\xB7\uC815\uC218 \uC2A4\uD0AC\uB85C \uC9C1\uC811 \uC815\uB9AC\uD574\uC57C \uD55C\uB2E4" },
+    // 평소엔 무리에 한둘만 섞여 나오는 치유사(healer)를 이번 웨이브 전체의 핵심으로 확대한 것 —
+    // rush가 물량, siege가 건물 파괴, elite가 강한 개체, ward가 조준 불가라는 축이었다면 healers는
+    // "안 죽이면 끝나지 않는다"는 축이다. 치유사를 먼저 솎아내지 않으면 나머지 그런트가 계속
+    // 회복되어 웨이브가 실질적으로 안 끝난다 — 타워가 알아서 잡아 주길 기다리지 말고 직접
+    // 우선순위를 정해 뛰어들어야 한다.
+    healers: { name: "\uCE58\uC720\uB2E8", icon: "\u{1F489}", desc: "\uCE58\uC720\uC0AC\uAC00 \uC794\uB729 \uC11E\uC5EC \uB098\uC640 \uC11C\uB85C\uB97C \uD68C\uBCF5\uC2DC\uD0A8\uB2E4 \u2014 \uBA3C\uC800 \uC18E\uC544\uB0B4\uC9C0 \uC54A\uC73C\uBA74 \uBB34\uB9AC \uC804\uCCB4\uAC00 \uC548 \uC8FD\uB294\uB2E4" }
   };
   var SPECIAL_KEYS = Object.keys(SPECIAL_WAVES);
   function specialWaveKind(w2) {
     if (w2 < 3 || w2 % 5 === 0 || w2 % 3 !== 0) return null;
-    const occurrence = w2 / 3;
+    const occurrence = Math.floor(w2 / 3) - Math.floor(w2 / 15);
     return SPECIAL_KEYS[(occurrence - 1) % SPECIAL_KEYS.length];
   }
   var BOSS_CYCLE = ["boss", "frostlord", "warden"];
@@ -11174,6 +11277,12 @@ button.corner.mute.off { opacity: 0.5; }
         { type: otherType, count: Math.max(2, Math.round(total * 0.4)) }
       ];
     }
+    if (kind === "healers") {
+      return [
+        { type: "grunt", count: Math.max(3, Math.round(total * 0.34)) },
+        { type: "healer", count: Math.max(2, Math.round(total * 0.22)) }
+      ];
+    }
     return [{ type: "grunt", count: Math.max(3, Math.round(total * 0.32)) }];
   }
   function waveComposition(w2) {
@@ -11187,6 +11296,7 @@ button.corner.mute.off { opacity: 0.5; }
       if (w2 >= 5) l2.push({ type: "raider", count: 1 + Math.floor((w2 - 3) / 3) });
       if (w2 >= 6) l2.push({ type: "flyer", count: 1 + Math.floor((w2 - 4) / 2) });
       if (w2 >= 7) l2.push({ type: "healer", count: 1 + Math.floor((w2 - 5) / 3) });
+      if (w2 >= 8) l2.push({ type: "bomber", count: 1 + Math.floor((w2 - 6) / 3) });
       return l2;
     })();
     if (w2 % 5 === 0) {
@@ -11239,7 +11349,11 @@ button.corner.mute.off { opacity: 0.5; }
   var DIFFICULTIES = {
     normal: { key: "normal", label: "\uBCF4\uD1B5", desc: "\uB9E8\uC190\uC73C\uB85C \uC2DC\uC791 \xB7 \uB098\uBB34\uBD80\uD130 \uCE94\uB2E4", startWood: 0, startStone: 0, prepBonus: 0, hpMult: 1, dmgMult: 1 },
     easy: { key: "easy", label: "\uC26C\uC6C0", desc: "\uC900\uBE44 \uC2DC\uAC04 +30\uCD08 \xB7 \uC2DC\uC791 \uC790\uC6D0\uC740 \uB611\uAC19\uC774 0", startWood: 0, startStone: 0, prepBonus: 30, hpMult: 1, dmgMult: 1 },
-    hard: { key: "hard", label: "\uC5B4\uB824\uC6C0", desc: "\uC900\uBE44 \uC2DC\uAC04 -15\uCD08 \xB7 \uBAAC\uC2A4\uD130 \uCCB4\uB825\xB7\uACF5\uACA9\uB825 +15% \xB7 \uC2DC\uC791 \uC790\uC6D0 0", startWood: 0, startStone: 0, prepBonus: -15, hpMult: 1.15, dmgMult: 1.15 }
+    hard: { key: "hard", label: "\uC5B4\uB824\uC6C0", desc: "\uC900\uBE44 \uC2DC\uAC04 -15\uCD08 \xB7 \uBAAC\uC2A4\uD130 \uCCB4\uB825\xB7\uACF5\uACA9\uB825 +15% \xB7 \uC2DC\uC791 \uC790\uC6D0 0", startWood: 0, startStone: 0, prepBonus: -15, hpMult: 1.15, dmgMult: 1.15 },
+    // "어려움"보다 한 단계 더 — 파고들어 볼 사람들을 위한 선택지. 기존 두 축(준비 시간, 몬스터
+    // 체력·공격력)을 그대로 더 세게 미는 것뿐이라 새 로직이 필요 없다(둘 다 CFG.wave에 이미
+    // 걸려 있는 배율이라 여기 숫자만 바꾸면 웨이브 구성 전체에 자동으로 반영된다).
+    nightmare: { key: "nightmare", label: "\uC545\uBABD", desc: "\uC900\uBE44 \uC2DC\uAC04 -25\uCD08 \xB7 \uBAAC\uC2A4\uD130 \uCCB4\uB825\xB7\uACF5\uACA9\uB825 +30% \xB7 \uC2DC\uC791 \uC790\uC6D0 0", startWood: 0, startStone: 0, prepBonus: -25, hpMult: 1.3, dmgMult: 1.3 }
   };
   var BASE_PREP_TIME = CFG.wave.prepTime;
   var BASE_FIRST_PREP_TIME = CFG.wave.firstPrepTime;
@@ -11305,7 +11419,7 @@ button.corner.mute.off { opacity: 0.5; }
     buffRing: new es({ color: 14061311, transparent: true, opacity: 0.5, side: p })
   };
   var RANGE_RING_GEO = new qu(0.96, 1, 40);
-  var PROJECTILE_COLOR = { arrow: 16769162, frost: 8382719, cannon: 16751178, poison: 3526479, snare: 13215862 };
+  var PROJECTILE_COLOR = { arrow: 16769162, frost: 8382719, cannon: 16751178, poison: 3526479, snare: 13215862, lightning: 16769126 };
   var nextId = 1;
   function resetBuildingIds() {
     nextId = 1;
@@ -11331,8 +11445,8 @@ button.corner.mute.off { opacity: 0.5; }
       this.mesh.userData.building = this;
       this._makeBar();
     }
-    // 특화를 고른 타워는 레벨 스탯에 배율\xB7추가 속성을 얹은 값을 쓴다. 매 프레임 조준\xB7사격에서
-    // 읽히므로 레벨\xB7특화가 바뀔 때만 다시 만들고 그 뒤로는 캐시를 돌려준다.
+    // 특화를 고른 타워는 레벨 스탯에 배율·추가 속성을 얹은 값을 쓴다. 매 프레임 조준·사격에서
+    // 읽히므로 레벨·특화가 바뀔 때만 다시 만들고 그 뒤로는 캐시를 돌려준다.
     get stats() {
       const base = this.def.levels[this.level - 1];
       if (!this.spec) return base;
@@ -11424,7 +11538,7 @@ button.corner.mute.off { opacity: 0.5; }
       this.synergyRing.material.color.setHex(colorHex);
       this.synergyRing.material.opacity = 0.5;
     }
-    // 특화 표시 — 보루 버프(y 0.06)\xB7시너지(y 0.13) 고리와 높이를 달리해 셋이 같이 떠도 안 겹친다.
+    // 특화 표시 — 보루 버프(y 0.06)·시너지(y 0.13) 고리와 높이를 달리해 셋이 같이 떠도 안 겹친다.
     // 고리 색이 곧 특화 종류라, 지어 놓은 방어선을 멀리서 봐도 어떤 갈래인지 바로 읽힌다.
     showSpecRing() {
       const sp2 = this.specDef;
@@ -11995,6 +12109,7 @@ button.corner.mute.off { opacity: 0.5; }
         st.scale *= statMult.scale ?? 1;
         st.radius *= statMult.scale ?? 1;
         if (statMult.dmg) st.dmg = Math.round(st.dmg * statMult.dmg);
+        if (statMult.dmg && st.explode) st.explode = { ...st.explode, dmg: Math.round(st.explode.dmg * statMult.dmg), playerDmg: Math.round(st.explode.playerDmg * statMult.dmg) };
         if (statMult.bounty) st.bounty = { wood: Math.round(st.bounty.wood * statMult.bounty), stone: Math.round(st.bounty.stone * statMult.bounty) };
       }
       this.id = id || nextId2++;
@@ -12289,6 +12404,20 @@ button.corner.mute.off { opacity: 0.5; }
         const dashMult = e.variant === "dash" && now < e.dashUntil ? CFG.variants.dash.speedMult : 1;
         const rootMult = now < e.rootUntil ? 0 : 1;
         const speed = e.st.speed * e.slowFactor * dashMult * rootMult * (e.isCharging ? CFG.bossPattern.chargeSpeed / e.st.speed : 1);
+        if (e.st.flees) {
+          const p22 = this._nearestPlayer(players, e.x, e.z, 16);
+          const fx2 = p22 ? e.x - p22.x : e.x, fz2 = p22 ? e.z - p22.z : e.z;
+          const len3 = Math.hypot(fx2, fz2) || 1;
+          let mx3 = fx2 / len3 * speed, mz3 = fz2 / len3 * speed;
+          const sep3 = this._separation(e);
+          mx3 += sep3.x * speed * 0.6;
+          mz3 += sep3.z * speed * 0.6;
+          e.x += mx3 * dt2;
+          e.z += mz3 * dt2;
+          this._face(e, e.x + mx3, e.z + mz3, dt2);
+          this._applyPosition(e, dt2, now);
+          continue;
+        }
         e.attackCd -= dt2;
         const dc2 = Math.hypot(e.x, e.z);
         const atkRange = e.st.ranged ? e.st.atkRange : CFG.crystal.hitRange;
@@ -12650,6 +12779,7 @@ button.corner.mute.off { opacity: 0.5; }
       this.sparks = [];
       this.floats = [];
       this.rings = [];
+      this.pings = [];
       this._pool = [];
     }
     _spark(color) {
@@ -12686,6 +12816,24 @@ button.corner.mute.off { opacity: 0.5; }
       m2.position.set(x2, 0.2, z2);
       this.sm.scene.add(m2);
       this.rings.push({ mesh: m2, t: 0, life: 0.5, radius });
+    }
+    // 미니맵 핑 — 일반 ring()보다 훨씬 오래(3.5초) 남고, 땅 위 고리뿐 아니라 하늘로 뻗는 기둥도
+    // 같이 세워서 나무·건물에 가려도 멀리서부터 눈에 띈다. 협동 플레이에서 "여기로 와" 신호로 쓴다.
+    pingMarker(x2, z2, color = 16763904) {
+      const ring = new Xs(
+        new qu(0.15, 0.24, 28),
+        new es({ color, transparent: true, opacity: 0.95, side: p })
+      );
+      ring.rotation.x = -Math.PI / 2;
+      ring.position.set(x2, 0.15, z2);
+      this.sm.scene.add(ring);
+      const beam = new Xs(
+        new su(0.1, 0.1, 6, 8, 1, true),
+        new es({ color, transparent: true, opacity: 0.55, side: p })
+      );
+      beam.position.set(x2, 3, z2);
+      this.sm.scene.add(beam);
+      this.pings.push({ ring, beam, t: 0, life: 3.5 });
     }
     // 3D 좌표 위에 뜨는 데미지/획득 텍스트
     float(text, x2, y2, z2, cls = "") {
@@ -12729,6 +12877,23 @@ button.corner.mute.off { opacity: 0.5; }
         }
         r.mesh.scale.setScalar(0.4 + k2 * r.radius * 1.2);
         r.mesh.material.opacity = 0.9 * (1 - k2);
+      }
+      for (let i = this.pings.length - 1; i >= 0; i--) {
+        const p2 = this.pings[i];
+        p2.t += dt2;
+        const k2 = p2.t / p2.life;
+        if (k2 >= 1) {
+          this.sm.scene.remove(p2.ring);
+          this.sm.scene.remove(p2.beam);
+          p2.ring.geometry.dispose();
+          p2.beam.geometry.dispose();
+          this.pings.splice(i, 1);
+          continue;
+        }
+        p2.ring.scale.setScalar(0.4 + k2 * 5);
+        p2.ring.material.opacity = 0.95 * (1 - k2);
+        const pulse = 0.4 + Math.abs(Math.sin(p2.t * 6)) * 0.3;
+        p2.beam.material.opacity = pulse * (1 - k2);
       }
       const v2 = new Ui();
       for (let i = this.floats.length - 1; i >= 0; i--) {
@@ -14209,7 +14374,7 @@ button.corner.mute.off { opacity: 0.5; }
       this.portals = [];
       this.drops = [];
       this.biome = biomeOf(seed);
-      this.crystal = { hp: CFG.crystal.hp, maxHp: CFG.crystal.hp, shieldUntil: 0, armorLv: 0, regenLv: 0, auraLv: 0, _regenAccum: 0, _auraTimer: 0 };
+      this.crystal = { hp: CFG.crystal.hp, maxHp: CFG.crystal.hp, shieldUntil: 0, armorLv: 0, regenLv: 0, auraLv: 0, reflectLv: 0, _regenAccum: 0, _auraTimer: 0 };
       this.meteor = null;
       this._build();
       this._buildMeteorRing();
@@ -14641,7 +14806,8 @@ button.corner.mute.off { opacity: 0.5; }
         newAchievements: [],
         bossKillsSeen: [],
         trapsTriggered: 0,
-        elitesKilled: 0
+        elitesKilled: 0,
+        treasuresCaught: 0
       };
       this._waveMark = { time: 0, kills: 0 };
       this._bossActive = false;
@@ -14664,6 +14830,12 @@ button.corner.mute.off { opacity: 0.5; }
       this._meteorTimer = CFG.meteor.firstDelay;
       this._meteorPending = null;
       this.world.clearMeteor();
+      this._treasureTimer = CFG.treasureEvent.firstDelay;
+      this._treasureId = null;
+      this._treasureLifeLeft = 0;
+      this._merchant = null;
+      this.tempBoon = { atk: 1, towerDmg: 1, atkWavesLeft: 0, towerWavesLeft: 0 };
+      this._pingCd = 0;
       this.buildMode = null;
       this.paused = false;
       this.running = true;
@@ -14714,6 +14886,47 @@ button.corner.mute.off { opacity: 0.5; }
         const targets = st.splash ? this.enemyMgr.list.filter((e) => !e.dead && dist(e.x, e.z, pos.x, pos.z) <= st.splash) : this.enemyMgr.list.filter((e) => !e.dead && dist(e.x, e.z, pos.x, pos.z) <= 1.2);
         if (!targets.length) return;
         const now = performance.now() / 1e3;
+        if (st.chain) {
+          let candidates = this.enemyMgr.list.filter((e) => !e.dead);
+          let last2 = pos;
+          const hitChain = [];
+          for (let i = 0; i < st.chain.count && candidates.length; i++) {
+            const searchR = i === 0 ? 1.2 : st.chain.range;
+            let best = null, bestD = Infinity;
+            for (const e of candidates) {
+              const d2 = dist(e.x, e.z, last2.x, last2.z);
+              if (d2 <= searchR && d2 < bestD) {
+                bestD = d2;
+                best = e;
+              }
+            }
+            if (!best) break;
+            hitChain.push(best);
+            candidates = candidates.filter((e) => e !== best);
+            last2 = best;
+          }
+          if (!hitChain.length) return;
+          hitChain.forEach((e, i) => {
+            const wasRooted = now < e.rootUntil;
+            let base = st.dmg * Math.pow(st.chain.falloff, i);
+            if (wasRooted) {
+              base *= 1 + CFG.synergy.rootSnare.dmgMult;
+              if (!this._seenRootSynergy) {
+                this._seenRootSynergy = true;
+                this.ui?.toast("\u{1F578}\uFE0F\u2694\uFE0F \uC2DC\uB108\uC9C0 \uBC1C\uB3D9! \uB36B\uD0D1\uC5D0 \uBB36\uC778 \uC801\uC744 \uB2E4\uB978 \uD0C0\uC6CC\uAC00 \uB9DE\uCD94\uBA74 \uCD94\uAC00 \uD53C\uD574", "good");
+              }
+            }
+            const from = i === 0 ? pos : hitChain[i - 1];
+            this._hurtEnemy(e, Math.round(base * this.boonMult.towerDmg * this.tempBoon.towerDmg), "tower", from.x, from.z);
+            if (i > 0) this.fx.burst(e.x, 1, e.z, 16769126, 8, 3);
+          });
+          if (hitChain.length > 1 && !this._seenChain) {
+            this._seenChain = true;
+            this.ui?.toast("\u{1F329}\uFE0F \uBC88\uAC1C\uD0D1! \uBA85\uC911\uD55C \uC801\uC5D0\uC11C \uAC00\uAE4C\uC6B4 \uB2E4\uB978 \uC801\uC73C\uB85C \uD280\uC5B4 \uC62E\uACA8\uBD99\uB294\uB2E4 \u2014 \uBB49\uCE5C \uBB34\uB9AC\uC5D0 \uD2B9\uD788 \uAC15\uD558\uB2E4", "good");
+          }
+          this.sfx.towerHit(b.key);
+          return;
+        }
         const frostSynergy = b.key === "arrow" && this.buildMgr.hasNearbyFrost(b);
         for (const e of targets) {
           const wasRooted = b.key !== "snare" && now < e.rootUntil;
@@ -14729,7 +14942,7 @@ button.corner.mute.off { opacity: 0.5; }
               this.ui?.toast("\u{1F578}\uFE0F\u2694\uFE0F \uC2DC\uB108\uC9C0 \uBC1C\uB3D9! \uB36B\uD0D1\uC5D0 \uBB36\uC778 \uC801\uC744 \uB2E4\uB978 \uD0C0\uC6CC\uAC00 \uB9DE\uCD94\uBA74 \uCD94\uAC00 \uD53C\uD574", "good");
             }
           }
-          this._hurtEnemy(e, Math.round(base * this.boonMult.towerDmg), b.key === "frost" ? "frost" : "tower", b.x, b.z);
+          this._hurtEnemy(e, Math.round(base * this.boonMult.towerDmg * this.tempBoon.towerDmg), b.key === "frost" ? "frost" : "tower", b.x, b.z);
         }
         this.sfx.towerHit(b.key);
       };
@@ -14796,6 +15009,14 @@ button.corner.mute.off { opacity: 0.5; }
           this._seenHealer = true;
           this.ui?.toast("\u{1F489} \uCE58\uC720\uC0AC \uB4F1\uC7A5! \uC8FC\uAE30\uC801\uC73C\uB85C \uC8FC\uBCC0 \uC544\uAD70\uC744 \uD68C\uBCF5\uC2DC\uD0A8\uB2E4 \u2014 \uB194\uB450\uBA74 \uBB34\uB9AC \uC804\uCCB4\uAC00 \uC548 \uC8FD\uB294\uB2E4, \uBA3C\uC800 \uB178\uB824\uB77C", "warn");
         }
+        if (e.type === "bomber" && !this._seenBomber) {
+          this._seenBomber = true;
+          this.ui?.toast("\u{1F9E8} \uD3ED\uD0C4\uBCD1 \uB4F1\uC7A5! \uC8FD\uB294 \uC21C\uAC04 \uC8FC\uBCC0\uC5D0 \uD3ED\uBC1C \uD53C\uD574\uB97C \uB0A8\uAE34\uB2E4 \u2014 \uCF54\uC55E\uC5D0\uC11C \uB9C8\uBB34\uB9AC\uD558\uBA74 \uAC19\uC774 \uB9DE\uB294\uB2E4, \uAC70\uB9AC\uB97C \uB450\uACE0 \uCC98\uB9AC\uD558\uC790", "warn");
+        }
+        if (e.type === "treasure") {
+          this.ui?.toast(this._seenTreasure ? "\u{1F980} \uBCF4\uBB3C\uAC8C \uB4F1\uC7A5! \uC11C\uB458\uB7EC\uB77C \u2014 \uB193\uCE58\uBA74 \uC0AC\uB77C\uC9C4\uB2E4" : "\u{1F980} \uBCF4\uBB3C\uAC8C \uB4F1\uC7A5! \uACF5\uACA9\uC740 \uC548 \uD558\uACE0 \uB3C4\uB9DD\uB9CC \uB2E4\uB2CC\uB2E4 \u2014 \uB194\uB450\uBA74 \uACE7 \uC0AC\uB77C\uC9C0\uB2C8 \uC9C0\uAE08 \uC7A1\uC544\uC57C \uD55C\uB2E4", "good");
+          this._seenTreasure = true;
+        }
         if (!e.variant || this._seenVariants.has(e.variant)) return;
         this._seenVariants.add(e.variant);
         const v = CFG.variants[e.variant];
@@ -14824,6 +15045,17 @@ button.corner.mute.off { opacity: 0.5; }
         this.fx.float(`-${e.st.dmg}`, 0, 4.4, 0, "crystal");
         this.ui?.shake();
         this.sfx.crystalHit();
+        const rlv = this.world.crystal.reflectLv;
+        if (this.isHost && rlv > 0) {
+          const reflectDmg = Math.round(e.st.dmg * CFG.crystalUpgrade.reflect.pctPerLv * rlv);
+          if (reflectDmg > 0) {
+            this._hurtEnemy(e, reflectDmg, "crystal", 0, 0);
+            if (!this._seenReflect) {
+              this._seenReflect = true;
+              this.ui?.toast("\u{1FA9E} \uBC18\uC0AC! \uD06C\uB9AC\uC2A4\uD0C8\uC744 \uC9C1\uC811 \uB54C\uB9B0 \uC801\uC5D0\uAC8C \uBC1B\uC740 \uD53C\uD574\uB97C \uADF8\uB300\uB85C \uB3CC\uB824\uC900\uB2E4", "good");
+            }
+          }
+        }
         if (dead) this._lose();
       };
       this.enemyMgr.onBuildingHit = (e, b, mult = 1) => {
@@ -14861,8 +15093,12 @@ button.corner.mute.off { opacity: 0.5; }
         this._waveMark = { time: this.stats.time, kills: this.stats.kills };
         if (!won) this.sfx.waveClear();
         this._checkWaveAchievements(w2);
+        if (this.isHost) this._decayTempBoon();
         if (won) this._win();
-        else if (this.isHost && this.wave.endless && w2 % CFG.endlessBoon.every === 0) this._offerBoon();
+        else {
+          if (this.isHost && this.wave.endless && w2 % CFG.endlessBoon.every === 0) this._offerBoon();
+          if (this.isHost) this._maybeSpawnMerchant(w2);
+        }
       };
     }
     // 웨이브 클리어마다 확인하는 업적들 — 호스트에서만 정확히 판정한다
@@ -14872,7 +15108,7 @@ button.corner.mute.off { opacity: 0.5; }
       this._bossActive = false;
       const buildings = [...this.buildMgr.buildings.values()];
       if (w2 >= 5 && !buildings.some((b) => b.key === "wall")) this._unlockAchievement("noWall");
-      if (w2 >= 3 && !buildings.some((b) => ["arrow", "frost", "cannon", "poison", "support"].includes(b.key))) {
+      if (w2 >= 3 && !buildings.some((b) => b.isTower || b.isSupport)) {
         this._unlockAchievement("noTower");
       }
     }
@@ -14901,6 +15137,65 @@ button.corner.mute.off { opacity: 0.5; }
       this.ui?.toast(msg, "good");
       this.sfx.upgrade();
       this.net.send("boonPicked", { text: msg });
+    }
+    // 힘의 물약·포격 물약은 "다음 웨이브 한 판만" 지속된다 — 웨이브가 끝날 때마다(클리어 직후) 하나씩
+    // 깎아서, 사 두고 안 쓴 채 몇 판을 넘겨도 계속 남아있는 일이 없게 한다. 0이 되면 배율도 원상복구.
+    _decayTempBoon() {
+      const t2 = this.tempBoon;
+      if (t2.atkWavesLeft > 0 && --t2.atkWavesLeft <= 0) t2.atk = 1;
+      if (t2.towerWavesLeft > 0 && --t2.towerWavesLeft <= 0) t2.towerDmg = 1;
+    }
+    // 떠돌이 상인: 웨이브 클리어 직후(호스트에서만) 확률적으로 등장해, 이번 준비 시간에만
+    // 무작위 품목 2개를 판다. 다음 웨이브가 시작되면(_updateMerchant) 자동으로 사라진다.
+    _maybeSpawnMerchant(clearedWave) {
+      const c2 = CFG.merchant;
+      if (clearedWave < c2.minWave || Math.random() >= c2.chance) {
+        this._merchant = null;
+        return;
+      }
+      const keys = Object.keys(c2.pool);
+      const offers = [];
+      for (let i = 0; i < c2.offerCount && keys.length; i++) {
+        offers.push(keys.splice(Math.floor(Math.random() * keys.length), 1)[0]);
+      }
+      this._merchant = { offers, boughtBy: {} };
+      this.ui?.toast("\u{1F9F3} \uB5A0\uB3CC\uC774 \uC0C1\uC778\uC774 \uC654\uB2E4! \uC774\uBC88 \uC900\uBE44 \uC2DC\uAC04\uC5D0\uB9CC \uBB3C\uAC74\uC744 \uD310\uB2E4", "good");
+    }
+    requestBuyMerchant(key) {
+      if (this.isHost) this.hostBuyMerchant(this.local.id, key);
+      else this.net.send("buyMerchant", { key });
+    }
+    hostBuyMerchant(playerId, key) {
+      const m = this._merchant;
+      if (!m || !m.offers.includes(key)) return;
+      const bought = m.boughtBy[playerId] || (m.boughtBy[playerId] = []);
+      if (bought.includes(key)) return;
+      const o = CFG.merchant.pool[key];
+      const pool = this._poolOf(playerId);
+      if (!canAfford(pool, o.cost)) {
+        this._notify(playerId, "\uC790\uC6D0\uC774 \uBD80\uC871\uD569\uB2C8\uB2E4", "bad");
+        return;
+      }
+      payCost(pool, o.cost);
+      this._trackSpend(o.cost, "merchant");
+      bought.push(key);
+      this._applyMerchantEffect(playerId, o);
+      this._notify(playerId, `${o.icon} ${o.name} \uAD6C\uB9E4! ${o.desc}`, "good");
+      if (playerId === this.local.id) this.sfx.upgrade();
+    }
+    _applyMerchantEffect(playerId, o) {
+      if (o.kind === "heal") {
+        this.world.healCrystal(o.value);
+      } else if (o.kind === "tempAtk") {
+        this.tempBoon.atk = o.value;
+        this.tempBoon.atkWavesLeft = 1;
+      } else if (o.kind === "tempTower") {
+        this.tempBoon.towerDmg = o.value;
+        this.tempBoon.towerWavesLeft = 1;
+      } else if (o.kind === "shard" || o.kind === "iron") {
+        const pool = this._poolOf(playerId);
+        pool[o.kind] = (pool[o.kind] || 0) + o.value;
+      }
     }
     // playerId 를 넘기면 그 사람의 개인 행동에 대한 업적이라는 뜻 — 호스트가 참가자 대신 처리하는
     // 액션(스킬 사용 등)에서 이걸 안 넘기면, 실제로는 참가자가 한 행동인데 호스트 자신의 브라우저에
@@ -15020,6 +15315,48 @@ button.corner.mute.off { opacity: 0.5; }
       }
       return null;
     }
+    // 보물게 — 전투 중(3웨이브부터) 가끔 튀어나와 도망만 다니는 몬스터. 웨이브 구성에 안 끼는
+    // 독립 이벤트라 운석·보급품과 같은 패턴(호스트 전용 타이머)으로 처리한다. 최대 1마리만 떠 있고,
+    // lifetime 안에 못 잡으면 보상 없이 그냥 사라진다 — 보물게 자체는 일반 몬스터처럼 스냅샷으로
+    // 자동 동기화되므로(enemyMgr.snapshot 이 타입을 가리지 않는다) 별도 네트워크 코드가 필요 없다.
+    _updateTreasure(dt2) {
+      const c2 = CFG.treasureEvent;
+      if (this.wave.phase !== PHASE.COMBAT || this.wave.wave + 1 < c2.minWave) return;
+      if (this._treasureId != null) {
+        const e2 = this.enemyMgr.list.find((x2) => x2.id === this._treasureId);
+        if (!e2) {
+          this._treasureId = null;
+          return;
+        }
+        this._treasureLifeLeft -= dt2;
+        if (!this._treasureWarned && this._treasureLifeLeft <= 3) {
+          this._treasureWarned = true;
+          this.fx.ring(e2.x, e2.z, 16729139, 1.4);
+          this.ui?.toast("\u{1F980} \uBCF4\uBB3C\uAC8C\uAC00 \uACE7 \uB3C4\uB9DD\uCE5C\uB2E4! 3\uCD08 \uC548\uC5D0 \uBABB \uC7A1\uC73C\uBA74 \uB193\uCE5C\uB2E4", "warn");
+        }
+        if (this._treasureLifeLeft <= 0) {
+          this.fx.burst(e2.x, 1, e2.z, 16766720, 10, 4);
+          this.enemyMgr.kill(e2);
+          this._treasureId = null;
+        }
+        return;
+      }
+      this._treasureTimer -= dt2;
+      if (this._treasureTimer > 0) return;
+      this._treasureTimer = c2.minGap + Math.random() * (c2.maxGap - c2.minGap);
+      const spot = this._findDropSpot();
+      if (!spot) return;
+      const e = this.enemyMgr.spawn("treasure", this.wave.wave + 1, spot.x, spot.z);
+      if (!e) return;
+      this._treasureId = e.id;
+      this._treasureLifeLeft = c2.lifetime;
+      this._treasureWarned = false;
+    }
+    // 웨이브가 시작되면(전투 진입) 상인은 즉시 자리를 뜬다 — 준비 시간에만 파는 한정 품목이라는
+    // 뜻이다. 호스트에서만 지운다(스냅샷의 mc 필드가 null이 되면 참가자 화면도 그대로 따라온다).
+    _updateMerchant() {
+      if (this._merchant && this.wave.phase !== PHASE.PREP) this._merchant = null;
+    }
     // 위치는 요청에 실려온 값으로 검증한다 (harvest 와 동일한 패턴)
     requestSupplyPickup(dropId) {
       if (this.isHost) this.hostSupplyPickup(this.local.id, dropId, this.local.x, this.local.z);
@@ -15074,6 +15411,7 @@ button.corner.mute.off { opacity: 0.5; }
           this.enemyMgr.spawnSplit(e);
           this.fx.ring(e.x, e.z, 16755277, 2.4);
         }
+        if (e.st.explode) this._bomberExplode(e);
         if (e.elite) {
           this.stats.elitesKilled = (this.stats.elitesKilled || 0) + 1;
           this.fx.ring(e.x, e.z, 16763904, 3);
@@ -15082,17 +15420,55 @@ button.corner.mute.off { opacity: 0.5; }
         const b = e.st.bounty;
         const bw = Math.round(b.wood * this.boonMult.bounty);
         const bs2 = Math.round(b.stone * this.boonMult.bounty);
+        const gotShard = e.st.shardChance && Math.random() < e.st.shardChance;
         if (this.shared) {
           this.pools.team.wood += bw;
           this.pools.team.stone += bs2;
+          if (gotShard) this.pools.team.shard = (this.pools.team.shard || 0) + 1;
         } else {
           for (const p2 of this.players.values()) {
             const pool = this._poolOf(p2.id);
             pool.wood += bw;
             pool.stone += bs2;
+            if (gotShard) pool.shard = (pool.shard || 0) + 1;
           }
         }
+        if (e.type === "treasure") {
+          this._treasureId = null;
+          this.fx.burst(e.x, 1.2, e.z, 16766720, 18, 6);
+          this.ui?.toast(gotShard ? "\u{1F980} \uBCF4\uBB3C\uAC8C \uCC98\uCE58! \uBAA9\uC7AC\xB7\uAD11\uBB3C \uB450\uB451\uD788 + \u{1F4A0} \uC815\uC218 1" : "\u{1F980} \uBCF4\uBB3C\uAC8C \uCC98\uCE58! \uBAA9\uC7AC\xB7\uAD11\uBB3C\uC744 \uB450\uB451\uD788 \uCC59\uACBC\uB2E4", "good");
+          this.stats.treasuresCaught = (this.stats.treasuresCaught || 0) + 1;
+          if (this.stats.treasuresCaught >= 5) this._unlockAchievement("treasureHunter");
+        }
         this.enemyMgr.kill(e);
+      }
+    }
+    // 폭탄병이 죽는 순간(원인 불문 — 타워든 근접이든 폭탄이든) 그 자리에서 터진다.
+    // 크리스탈·건물·플레이어만 맞는다(다른 몬스터는 대상이 아니다 — 순수 위협이지 파밍 수단이 아니다)
+    _bomberExplode(e) {
+      const c2 = e.st.explode;
+      const x = e.x, z = e.z;
+      this.fx.burst(x, 1.2, z, 16733491, 20, 7);
+      this.fx.ring(x, z, 16733491, c2.radius);
+      this.sfx.buildingHit();
+      if (dist(x, z, 0, 0) <= c2.radius) {
+        const hpBefore = this.world.crystal.hp;
+        const dead = this.world.damageCrystal(c2.dmg);
+        this.fx.float(`-${c2.dmg}`, 0, 4.4, 0, "crystal");
+        if (this.world.crystal.hp < hpBefore && this._bossActive) this._bossWaveDamaged = true;
+        if (dead) this._lose();
+      }
+      for (const b of [...this.buildMgr.buildings.values()]) {
+        if (dist(b.x, b.z, x, z) <= c2.radius) {
+          const destroyed = b.damage(Math.round(c2.dmg * c2.buildingDmgMult));
+          if (destroyed) this.buildMgr.remove(b.id);
+        }
+      }
+      for (const p2 of this.players.values()) {
+        if (dist(p2.x, p2.z, x, z) <= c2.radius) {
+          if (p2.id === this.local.id) this._hurtLocal(c2.playerDmg);
+          else this.net.send("hurt", { to: p2.id, dmg: c2.playerDmg });
+        }
       }
     }
     _hurtLocal(dmg) {
@@ -15126,6 +15502,7 @@ button.corner.mute.off { opacity: 0.5; }
       this.sfx.win();
       this.sfx.music.stop();
       if (this.difficulty === "hard") this._unlockAchievement("ironWill");
+      if (this.difficulty === "nightmare") this._unlockAchievement("nightmareConqueror");
       if (!this.net.online) Game.clearLocalSave();
       this.ui?.showResult(true, this.stats, this.wave.wave);
     }
@@ -15450,6 +15827,21 @@ button.corner.mute.off { opacity: 0.5; }
         this.ui?.toast("\u{1F4A8} \uD68C\uD53C \uB3CC\uC9C4! \uC7A0\uAE50 \uBB34\uC801\uC73C\uB85C \uD280\uC5B4\uB098\uAC04\uB2E4 \u2014 \uBCF4\uC2A4 \uB3CC\uC9C4\uC774\uB098 \uB2E4\uAD6C\uB9AC\uB97C \uD53C\uD558\uAC70\uB098, \uACB0\uACC4 \uBAB9\uC5D0\uAC8C \uC21C\uC2DD\uAC04\uC5D0 \uBD99\uC744 \uB54C \uC368\uB77C", "good");
       }
     }
+    // 미니맵 핑 — 협동 플레이에서 "여기 좀 봐줘"를 말이나 채팅 없이 전달하는 유일한 수단이라
+    // 건설·공격처럼 호스트 검증이 필요 없다(자원도 안 쓰고 되돌릴 상태도 없다). 스팸을 막는
+    // 쿨다운만 로컬에서 걸고, 신호 자체는 그대로 방송한다 — 찍은 사람도 자기 화면에서 똑같이 보여야
+    // "제대로 찍혔는지" 확인이 되므로 로컬에도 바로 표시한다.
+    requestPing(x2, z2) {
+      if (this._pingCd > 0) return;
+      this._pingCd = CFG.player.pingCooldown;
+      this._showPing(x2, z2);
+      this.net.send("ping", { x: x2, z: z2, name: this.local.name });
+    }
+    _showPing(x2, z2, name) {
+      this.fx.pingMarker(x2, z2);
+      this.sfx.upgrade();
+      if (name) this.ui?.toast(`\u{1F4CD} ${name}: \uC5EC\uAE30 \uBD10\uC8FC\uC138\uC694!`, "warn");
+    }
     // 크리스탈 체력이 위험 문턱 아래면 "필사의 반격" — 플레이어(근접·폭탄)의 대미지가 오른다.
     // 타워에는 적용하지 않는다: 위기에서 직접 뛰어들 이유를 만드는 게 목적이라 자동 화력은 제외.
     get _desperationMult() {
@@ -15458,7 +15850,7 @@ button.corner.mute.off { opacity: 0.5; }
     }
     hostAttack(playerId, x2, z2, rot) {
       const a = this.players.get(playerId)?.attackStats ?? CFG.player.attack;
-      const dmg = Math.round(a.dmg * this.boonMult.atk * this._desperationMult);
+      const dmg = Math.round(a.dmg * this.boonMult.atk * this.tempBoon.atk * this._desperationMult);
       let thornDmg = 0;
       for (const e of this.enemyMgr.list) {
         if (e.dead) continue;
@@ -15524,7 +15916,7 @@ button.corner.mute.off { opacity: 0.5; }
     }
     // 화면을 클릭했을 때 — 가리킨 것이 몬스터면 때리고, 자원이면 캔다. 아무것도 없으면 그냥 휘두른다.
     // 채집 버튼 없이 대상을 직접 눌러 상호작용하는 게 기본 조작이다.
-    // 지금 손에 든 무기로 실제로 닿는 거리. 원거리 무기(활\xB7폭탄가방)는 근접 사거리가 아니라
+    // 지금 손에 든 무기로 실제로 닿는 거리. 원거리 무기(활·폭탄가방)는 근접 사거리가 아니라
     // 자기 사거리를 쓴다 — 이게 없으면 사거리 9~16짜리 무기를 들고도 멀리 있는 적을 클릭했을 때
     // "더 가까이 가세요" 라고 거부당한다
     get attackReach() {
@@ -15963,6 +16355,9 @@ button.corner.mute.off { opacity: 0.5; }
       net.on("supplyPickup", (d2, from) => {
         if (this.isHost) this.hostSupplyPickup(from, d2.id, d2.x, d2.z);
       });
+      net.on("buyMerchant", (d2, from) => {
+        if (this.isHost) this.hostBuyMerchant(from, d2.key);
+      });
       net.on("attack", (d2, from) => {
         if (this.isHost) this.hostAttack(from, d2.x, d2.z, d2.rot);
       });
@@ -15980,6 +16375,9 @@ button.corner.mute.off { opacity: 0.5; }
       });
       net.on("boonPicked", (d2) => {
         if (!this.isHost) this.ui?.toast(d2.text, "good");
+      });
+      net.on("ping", (d2) => {
+        this._showPing(d2.x, d2.z, d2.name);
       });
       net.on("hup", (d2, from) => {
         if (this.isHost) this.hostHarvestUpgrade(from);
@@ -16085,7 +16483,10 @@ button.corner.mute.off { opacity: 0.5; }
         ca: this.world.crystal.armorLv,
         cr: this.world.crystal.regenLv,
         cx: this.world.crystal.auraLv,
+        crf: this.world.crystal.reflectLv,
         mt: this._meteorPending ? [Math.round(this._meteorPending.x * 10) / 10, Math.round(this._meteorPending.z * 10) / 10, Math.round(this._meteorPending.timeLeft * 10) / 10] : null,
+        mc: this._merchant ? { offers: this._merchant.offers, boughtBy: this._merchant.boughtBy } : null,
+        tb: { atk: this.tempBoon.atk, towerDmg: this.tempBoon.towerDmg },
         r: this.shared ? { team: this.pools.team } : { byId: this.pools.byId },
         p: players,
         sh: this.shared,
@@ -16104,7 +16505,8 @@ button.corner.mute.off { opacity: 0.5; }
           waveLog: this.stats.waveLog,
           bossKillsSeen: this.stats.bossKillsSeen,
           trapsTriggered: this.stats.trapsTriggered,
-          elitesKilled: this.stats.elitesKilled
+          elitesKilled: this.stats.elitesKilled,
+          treasuresCaught: this.stats.treasuresCaught
         }
       };
     }
@@ -16127,7 +16529,7 @@ button.corner.mute.off { opacity: 0.5; }
         if (clearedWave % 5 === 0 && !this._pBossWaveDamaged) this._unlockAchievement("flawlessBoss");
         this._pBossWaveDamaged = false;
         if (clearedWave >= 5 && !buildings.some((b) => b.key === "wall")) this._unlockAchievement("noWall");
-        if (clearedWave >= 3 && !buildings.some((b) => ["arrow", "frost", "cannon", "poison", "support"].includes(b.key))) {
+        if (clearedWave >= 3 && !buildings.some((b) => b.isTower || b.isSupport)) {
           this._unlockAchievement("noTower");
         }
       }
@@ -16136,6 +16538,7 @@ button.corner.mute.off { opacity: 0.5; }
       if (s2.ca !== void 0) this.world.crystal.armorLv = s2.ca;
       if (s2.cr !== void 0) this.world.crystal.regenLv = s2.cr;
       if (s2.cx !== void 0) this.world.crystal.auraLv = s2.cx;
+      if (s2.crf !== void 0) this.world.crystal.reflectLv = s2.crf;
       this.world.crystal.hp = s2.c;
       if (s2.c < prevHp) {
         this.ui?.shake();
@@ -16145,6 +16548,9 @@ button.corner.mute.off { opacity: 0.5; }
       }
       if (s2.mt) this.world.setMeteor(s2.mt[0], s2.mt[1], s2.mt[2], CFG.meteor.radius);
       else this.world.clearMeteor();
+      if (!this._merchant && s2.mc) this.ui?.toast("\u{1F9F3} \uB5A0\uB3CC\uC774 \uC0C1\uC778\uC774 \uC654\uB2E4! \uC774\uBC88 \uC900\uBE44 \uC2DC\uAC04\uC5D0\uB9CC \uBB3C\uAC74\uC744 \uD310\uB2E4", "good");
+      this._merchant = s2.mc ? { offers: s2.mc.offers, boughtBy: s2.mc.boughtBy || {} } : null;
+      if (s2.tb) Object.assign(this.tempBoon, s2.tb);
       if (s2.r.team) this.pools.team = s2.r.team;
       if (s2.r.byId) this.pools.byId = s2.r.byId;
       for (const [id, pd2] of Object.entries(s2.p || {})) {
@@ -16161,6 +16567,7 @@ button.corner.mute.off { opacity: 0.5; }
         Object.assign(this.stats, s2.st);
         if (this.stats.trapsTriggered >= 3) this._unlockAchievement("trapMaster");
         if (this.stats.elitesKilled >= 5) this._unlockAchievement("eliteHunter");
+        if (this.stats.treasuresCaught >= 5) this._unlockAchievement("treasureHunter");
         if (this.stats.bossKillsSeen.includes("boss") && this.stats.bossKillsSeen.includes("frostlord")) {
           this._unlockAchievement("bothBosses");
         }
@@ -16175,6 +16582,7 @@ button.corner.mute.off { opacity: 0.5; }
       if (this.wave.phase === PHASE.WON && !this.result) {
         this.result = "win";
         if (this.difficulty === "hard") this._unlockAchievement("ironWill");
+        if (this.difficulty === "nightmare") this._unlockAchievement("nightmareConqueror");
         this.ui?.showResult(true, this.stats, this.wave.wave);
       }
       if ((this.wave.phase === PHASE.PREP || this.wave.phase === PHASE.COMBAT) && this.result === "win") {
@@ -16196,6 +16604,7 @@ button.corner.mute.off { opacity: 0.5; }
         return;
       }
       if (!over) this.stats.time += dt2;
+      if (this._pingCd > 0) this._pingCd -= dt2;
       this._handleInput(dt2, over);
       if (!over) this.local.update(dt2, this.input, this.sm, this.grid, this.world, [...this.players.values()]);
       for (const p2 of this.players.values()) {
@@ -16207,6 +16616,8 @@ button.corner.mute.off { opacity: 0.5; }
         this._updateTraps();
         this._updateSupplyDrops(dt2);
         this._updateMeteor(dt2);
+        this._updateTreasure(dt2);
+        this._updateMerchant();
         this._updateCrystalUpgrades(dt2);
       } else {
         this.enemyMgr.interpolate(dt2);
@@ -16399,6 +16810,7 @@ button.corner.mute.off { opacity: 0.5; }
       if (s2.ca !== void 0) this.world.crystal.armorLv = s2.ca;
       if (s2.cr !== void 0) this.world.crystal.regenLv = s2.cr;
       if (s2.cx !== void 0) this.world.crystal.auraLv = s2.cx;
+      if (s2.crf !== void 0) this.world.crystal.reflectLv = s2.crf;
       this.world.crystal.hp = s2.c;
       if (s2.r.team) this.pools.team = s2.r.team;
       if (s2.r.byId) this.pools.byId = s2.r.byId;
@@ -16415,6 +16827,7 @@ button.corner.mute.off { opacity: 0.5; }
       if (!this.stats.bossKillsSeen) this.stats.bossKillsSeen = [];
       if (!this.stats.trapsTriggered) this.stats.trapsTriggered = 0;
       if (!this.stats.elitesKilled) this.stats.elitesKilled = 0;
+      if (!this.stats.treasuresCaught) this.stats.treasuresCaught = 0;
       this.ui?.toast(`\uC774\uC5B4\uD558\uAE30 \u2014 \uC6E8\uC774\uBE0C ${this.wave.displayWave}`, "good");
     }
     render() {
@@ -16424,6 +16837,7 @@ button.corner.mute.off { opacity: 0.5; }
 
   // js/ui.js
   var $2 = (id) => document.getElementById(id);
+  var RESERVED_KEYS = /* @__PURE__ */ new Set(["w", "a", "s", "d", "arrowup", "arrowdown", "arrowleft", "arrowright"]);
   var TUTORIAL_STEPS = [
     "\u{1F333} \uB098\uBB34\uB97C \uC9C1\uC811 \uD074\uB9AD\uD558\uBA74 \uCEA1\uB2C8\uB2E4 (\uBC14\uC704\uB294 \uACE1\uAD2D\uC774\uB97C \uB9CC\uB4E4\uC5B4 \uC950\uC5B4\uC57C \uCE98 \uC218 \uC788\uC5B4\uC694)",
     "\u{1F392} \uBAA9\uC7AC 20\uC744 \uBAA8\uC558\uC73C\uBA74 <kbd>I</kbd> \uB85C \uC778\uBCA4\uD1A0\uB9AC\uB97C \uC5F4\uC5B4 \u{1FA9A} \uC81C\uC791\uB300\uB97C \uC9C0\uC73C\uC138\uC694 (\uBCBD\xB7\uD0C0\uC6CC\uB294 \uADF8 \uB2E4\uC74C)",
@@ -16476,7 +16890,10 @@ button.corner.mute.off { opacity: 0.5; }
         touch: $2("touch"),
         mute: $2("btn-mute"),
         pauseOverlay: $2("pause-overlay"),
+        wavePanel: $2("wave-panel"),
         wavePreview: $2("wave-preview"),
+        merchantPanel: $2("merchant-panel"),
+        merchantOffers: $2("merchant-offers"),
         btnContinue: $2("btn-continue"),
         tutorial: $2("tutorial"),
         tutorialText: $2("tutorial-text"),
@@ -16958,6 +17375,16 @@ button.corner.mute.off { opacity: 0.5; }
         };
       }
       $2("btn-help").onclick = () => this.el.help.classList.toggle("hidden");
+      this.el.minimap.onclick = (e) => {
+        const rect = this.el.minimap.getBoundingClientRect();
+        const px = (e.clientX - rect.left) / rect.width * this.el.minimap.width;
+        const pz = (e.clientY - rect.top) / rect.height * this.el.minimap.height;
+        const size = this.el.minimap.width;
+        const s2 = size / CFG.world.size;
+        const x2 = (px - size / 2) / s2;
+        const z2 = (pz - size / 2) / s2;
+        g2.requestPing(x2, z2);
+      };
       $2("tutorial-skip").onclick = () => this._endTutorial();
       addEventListener("keydown", (e) => {
         if (e.target.closest("input")) return;
@@ -17448,15 +17875,20 @@ button.corner.mute.off { opacity: 0.5; }
         this.el.waveState.textContent = `\uC900\uBE44 \uC2DC\uAC04 ${fmtTime(w2.prepLeft)}`;
         this.el.waveBtn.classList.remove("hidden");
         this._showWavePreview(nextWave);
+        this._updateMerchantPanel();
       } else if (w2.phase === PHASE.COMBAT) {
         this.el.waveState.textContent = `\uB0A8\uC740 \uBAAC\uC2A4\uD130 ${w2.remaining}`;
         this.el.waveBtn.classList.add("hidden");
         this.el.wavePreview.classList.add("hidden");
+        this.el.merchantPanel.classList.add("hidden");
       } else {
         this.el.waveState.textContent = w2.phase === PHASE.WON ? "\uBC29\uC5B4 \uC131\uACF5" : "\uD328\uBC30";
         this.el.waveBtn.classList.add("hidden");
         this.el.wavePreview.classList.add("hidden");
+        this.el.merchantPanel.classList.add("hidden");
       }
+      const waveBottom = this.el.wavePanel.getBoundingClientRect().bottom;
+      this.el.toasts.style.top = `${Math.round(waveBottom + 8)}px`;
       const p2 = g2.local;
       const hpR = clamp(p2.hp / p2.maxHp, 0, 1);
       this.el.hpFill.style.transform = `scaleX(${hpR})`;
@@ -17498,7 +17930,7 @@ button.corner.mute.off { opacity: 0.5; }
       const hunting = g2.wave.phase === PHASE.COMBAT && g2.wave.remaining <= 3;
       for (const e of g2.enemyMgr.list) {
         if (e.dead) continue;
-        const isNotable = hunting || this.colorblind || e.st.boss || e.type === "shooter" || e.type === "raider" || e.type === "healer" || e.elite;
+        const isNotable = hunting || this.colorblind || e.st.boss || e.type === "shooter" || e.type === "raider" || e.type === "healer" || e.type === "bomber" || e.type === "treasure" || e.elite;
         const slowed = now < e.slowUntil;
         const poisoned = now < e.poisonUntil;
         if (!isNotable && !slowed && !poisoned && !e.variant) continue;
@@ -17561,6 +17993,42 @@ button.corner.mute.off { opacity: 0.5; }
       this.el.wavePreview.classList.toggle("special-wave", !!special);
       this.el.wavePreview.title = special ? SPECIAL_WAVES[special].desc : "";
       this.el.wavePreview.classList.remove("hidden");
+    }
+    // 떠돌이 상인 패널 — 등장 여부·품목 목록이 바뀔 때만 카드를 새로 그리고(캐시 키: offers
+    // 조합), 그 사이 프레임에는 구매 가능 여부(자원 부족·이미 구매함)만 갱신해 버튼이 깜빡이거나
+    // 클릭 도중 사라지는 일이 없게 한다 — 우측 파티 패널의 캐시 패턴과 동일하다.
+    _updateMerchantPanel() {
+      const g2 = this.game;
+      const m = g2._merchant;
+      if (!m) {
+        this.el.merchantPanel.classList.add("hidden");
+        this._merchantSig = null;
+        return;
+      }
+      const sig = m.offers.join(",");
+      if (this._merchantSig !== sig) {
+        this._merchantSig = sig;
+        this.el.merchantOffers.innerHTML = m.offers.map((key) => {
+          const o = CFG.merchant.pool[key];
+          return `<button type="button" class="merchant-card" data-offer="${key}">
+<span class="mc-icon">${o.icon}</span>
+<span class="mc-body"><span class="mc-name">${o.name}</span><span class="mc-desc">${o.desc}</span><span class="mc-cost">${costText(o.cost)}</span></span>
+</button>`;
+        }).join("");
+        for (const btn of this.el.merchantOffers.querySelectorAll(".merchant-card")) {
+          btn.onclick = () => g2.requestBuyMerchant(btn.dataset.offer);
+        }
+      }
+      const pool = g2.myPool;
+      const myBought = m.boughtBy?.[g2.local.id] || [];
+      for (const btn of this.el.merchantOffers.querySelectorAll(".merchant-card")) {
+        const key = btn.dataset.offer;
+        const o = CFG.merchant.pool[key];
+        const bought = myBought.includes(key);
+        btn.disabled = bought || !canAfford(pool, o.cost);
+        btn.classList.toggle("bought", bought);
+      }
+      this.el.merchantPanel.classList.remove("hidden");
     }
     _updateParty() {
       const g2 = this.game;
@@ -17695,6 +18163,16 @@ button.corner.mute.off { opacity: 0.5; }
         ctx.lineTo(ex - r * 0.87, ez + r * 0.5);
         ctx.closePath();
         ctx.fill();
+      }
+      ctx.strokeStyle = "#ffcc55";
+      for (const ping of g2.fx.pings) {
+        const k2 = ping.t / ping.life;
+        ctx.globalAlpha = 1 - k2;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(tx(ping.ring.position.x), tz(ping.ring.position.z), 3 + k2 * 6, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.globalAlpha = 1;
       }
       ctx.fillStyle = "#7fe6ff";
       ctx.beginPath();

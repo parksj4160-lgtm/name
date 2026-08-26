@@ -104,6 +104,26 @@ button.go:disabled { opacity: 0.4; cursor: not-allowed; }
   background: rgba(255,204,85,0.16); border: 1px solid rgba(255,204,85,0.3);
 }
 
+/* ---------- 떠돌이 상인 ---------- */
+.merchant-panel {
+  margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line);
+}
+.merchant-head { font-size: 12px; font-weight: 700; color: var(--warn); margin-bottom: 6px; }
+.merchant-offers { display: flex; gap: 8px; flex-wrap: wrap; }
+.merchant-card {
+  flex: 1 1 160px; display: flex; align-items: center; gap: 8px; text-align: left;
+  background: rgba(255,204,85,0.08); border: 1px solid rgba(255,204,85,0.28); border-radius: 8px;
+  padding: 6px 8px; cursor: pointer; color: var(--text); font-family: inherit;
+}
+.merchant-card:hover { background: rgba(255,204,85,0.18); }
+.merchant-card:disabled { opacity: 0.45; cursor: not-allowed; }
+.merchant-card .mc-icon { font-size: 20px; flex: none; }
+.merchant-card .mc-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.merchant-card .mc-name { font-weight: 700; font-size: 12px; }
+.merchant-card .mc-desc { font-size: 11px; color: var(--dim); }
+.merchant-card .mc-cost { font-size: 11px; color: var(--cyan); }
+.merchant-card.bought .mc-cost::after { content: " · 구매함"; color: var(--dim); }
+
 /* ---------- 파티 ---------- */
 #party-panel { right: 14px; top: 14px; min-width: 180px; max-width: 240px; }
 #party-panel .head { font-weight: 700; display: flex; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
@@ -150,7 +170,7 @@ button.go:disabled { opacity: 0.4; cursor: not-allowed; }
 #minimap {
   position: fixed; right: 14px; bottom: 14px; width: 176px; height: 176px;
   border-radius: 12px; border: 1px solid var(--line); background: rgba(10,14,24,0.72);
-  backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px); cursor: pointer;
 }
 
 /* ---------- 토스트 ---------- */
