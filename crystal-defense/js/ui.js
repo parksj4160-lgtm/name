@@ -6,6 +6,7 @@ import { canAfford, clamp, costText, fmtTime, roomCode } from './utils.js';
 import { PHASE } from './wave.js';
 
 var $2 = (id) => document.getElementById(id);
+var RESERVED_KEYS = /* @__PURE__ */ new Set(["w", "a", "s", "d", "arrowup", "arrowdown", "arrowleft", "arrowright"]);
 var TUTORIAL_STEPS = [
   "🌳 나무를 직접 클릭하면 캡니다 (바위는 곡괭이를 만들어 쥐어야 캘 수 있어요)",
   "🎒 목재 20을 모았으면 <kbd>I</kbd> 로 인벤토리를 열어 🪚 제작대를 지으세요 (벽·타워는 그 다음)",
@@ -58,7 +59,10 @@ export var UI = class {
       touch: $2("touch"),
       mute: $2("btn-mute"),
       pauseOverlay: $2("pause-overlay"),
+      wavePanel: $2("wave-panel"),
       wavePreview: $2("wave-preview"),
+      merchantPanel: $2("merchant-panel"),
+      merchantOffers: $2("merchant-offers"),
       btnContinue: $2("btn-continue"),
       tutorial: $2("tutorial"),
       tutorialText: $2("tutorial-text"),
@@ -540,6 +544,16 @@ export var UI = class {
       };
     }
     $2("btn-help").onclick = () => this.el.help.classList.toggle("hidden");
+    this.el.minimap.onclick = (e) => {
+      const rect = this.el.minimap.getBoundingClientRect();
+      const px = (e.clientX - rect.left) / rect.width * this.el.minimap.width;
+      const pz = (e.clientY - rect.top) / rect.height * this.el.minimap.height;
+      const size = this.el.minimap.width;
+      const s2 = size / CFG.world.size;
+      const x2 = (px - size / 2) / s2;
+      const z2 = (pz - size / 2) / s2;
+      g2.requestPing(x2, z2);
+    };
     $2("tutorial-skip").onclick = () => this._endTutorial();
     addEventListener("keydown", (e) => {
       if (e.target.closest("input")) return;
@@ -824,9 +838,9 @@ export var UI = class {
     const afford = canAfford(this.game.myPool, cost);
     this.el.specTitle.textContent = `${b.def.icon} ${b.def.name} 특화`;
     this.el.specSub.textContent = `비용 ${costText(cost)} · 되돌릴 수 없다 — 바꾸려면 철거하고 다시 지어야 한다.`;
-    this.el.specChoices.innerHTML = Object.entries(opts).map(([k2, sp]) => `<button type="button" class="boon-card" data-spec="${k2}"${afford ? "" : " disabled"}>
-<span class="bc-icon">${sp.icon}</span>
-<span><span class="bc-name">${sp.name}</span><br><span class="bc-desc">${sp.desc}</span></span>
+    this.el.specChoices.innerHTML = Object.entries(opts).map(([k2, sp2]) => `<button type="button" class="boon-card" data-spec="${k2}"${afford ? "" : " disabled"}>
+<span class="bc-icon">${sp2.icon}</span>
+<span><span class="bc-name">${sp2.name}</span><br><span class="bc-desc">${sp2.desc}</span></span>
 </button>`).join("");
     for (const btn of this.el.specChoices.querySelectorAll(".boon-card")) {
       btn.onclick = () => {
@@ -1030,15 +1044,20 @@ export var UI = class {
       this.el.waveState.textContent = `준비 시간 ${fmtTime(w2.prepLeft)}`;
       this.el.waveBtn.classList.remove("hidden");
       this._showWavePreview(nextWave);
+      this._updateMerchantPanel();
     } else if (w2.phase === PHASE.COMBAT) {
       this.el.waveState.textContent = `남은 몬스터 ${w2.remaining}`;
       this.el.waveBtn.classList.add("hidden");
       this.el.wavePreview.classList.add("hidden");
+      this.el.merchantPanel.classList.add("hidden");
     } else {
       this.el.waveState.textContent = w2.phase === PHASE.WON ? "방어 성공" : "패배";
       this.el.waveBtn.classList.add("hidden");
       this.el.wavePreview.classList.add("hidden");
+      this.el.merchantPanel.classList.add("hidden");
     }
+    const waveBottom = this.el.wavePanel.getBoundingClientRect().bottom;
+    this.el.toasts.style.top = `${Math.round(waveBottom + 8)}px`;
     const p2 = g2.local;
     const hpR = clamp(p2.hp / p2.maxHp, 0, 1);
     this.el.hpFill.style.transform = `scaleX(${hpR})`;
@@ -1080,7 +1099,7 @@ export var UI = class {
     const hunting = g2.wave.phase === PHASE.COMBAT && g2.wave.remaining <= 3;
     for (const e of g2.enemyMgr.list) {
       if (e.dead) continue;
-      const isNotable = hunting || this.colorblind || e.st.boss || e.type === "shooter" || e.type === "raider" || e.type === "healer" || e.elite;
+      const isNotable = hunting || this.colorblind || e.st.boss || e.type === "shooter" || e.type === "raider" || e.type === "healer" || e.type === "bomber" || e.type === "treasure" || e.elite;
       const slowed = now < e.slowUntil;
       const poisoned = now < e.poisonUntil;
       if (!isNotable && !slowed && !poisoned && !e.variant) continue;
@@ -1143,6 +1162,42 @@ export var UI = class {
     this.el.wavePreview.classList.toggle("special-wave", !!special);
     this.el.wavePreview.title = special ? SPECIAL_WAVES[special].desc : "";
     this.el.wavePreview.classList.remove("hidden");
+  }
+  // 떠돌이 상인 패널 — 등장 여부·품목 목록이 바뀔 때만 카드를 새로 그리고(캐시 키: offers
+  // 조합), 그 사이 프레임에는 구매 가능 여부(자원 부족·이미 구매함)만 갱신해 버튼이 깜빡이거나
+  // 클릭 도중 사라지는 일이 없게 한다 — 우측 파티 패널의 캐시 패턴과 동일하다.
+  _updateMerchantPanel() {
+    const g2 = this.game;
+    const m = g2._merchant;
+    if (!m) {
+      this.el.merchantPanel.classList.add("hidden");
+      this._merchantSig = null;
+      return;
+    }
+    const sig = m.offers.join(",");
+    if (this._merchantSig !== sig) {
+      this._merchantSig = sig;
+      this.el.merchantOffers.innerHTML = m.offers.map((key) => {
+        const o = CFG.merchant.pool[key];
+        return `<button type="button" class="merchant-card" data-offer="${key}">
+<span class="mc-icon">${o.icon}</span>
+<span class="mc-body"><span class="mc-name">${o.name}</span><span class="mc-desc">${o.desc}</span><span class="mc-cost">${costText(o.cost)}</span></span>
+</button>`;
+      }).join("");
+      for (const btn of this.el.merchantOffers.querySelectorAll(".merchant-card")) {
+        btn.onclick = () => g2.requestBuyMerchant(btn.dataset.offer);
+      }
+    }
+    const pool = g2.myPool;
+    const myBought = m.boughtBy?.[g2.local.id] || [];
+    for (const btn of this.el.merchantOffers.querySelectorAll(".merchant-card")) {
+      const key = btn.dataset.offer;
+      const o = CFG.merchant.pool[key];
+      const bought = myBought.includes(key);
+      btn.disabled = bought || !canAfford(pool, o.cost);
+      btn.classList.toggle("bought", bought);
+    }
+    this.el.merchantPanel.classList.remove("hidden");
   }
   _updateParty() {
     const g2 = this.game;
@@ -1277,6 +1332,16 @@ export var UI = class {
       ctx.lineTo(ex - r * 0.87, ez + r * 0.5);
       ctx.closePath();
       ctx.fill();
+    }
+    ctx.strokeStyle = "#ffcc55";
+    for (const ping of g2.fx.pings) {
+      const k2 = ping.t / ping.life;
+      ctx.globalAlpha = 1 - k2;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(tx(ping.ring.position.x), tz(ping.ring.position.z), 3 + k2 * 6, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
     }
     ctx.fillStyle = "#7fe6ff";
     ctx.beginPath();

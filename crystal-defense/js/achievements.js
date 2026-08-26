@@ -11,7 +11,9 @@ export var ACHIEVEMENTS = {
   trapMaster: { name: "덫사냥꾼", icon: "🪤", desc: "한 판에서 함정을 3번 이상 발동시켰다" },
   ironWill: { name: "강철 의지", icon: "🔩", desc: "어려움 난이도로 10웨이브를 막아냈다" },
   eliteHunter: { name: "정예 사냥꾼", icon: "⭐", desc: "정예 몬스터를 5마리 처치했다" },
-  weaponMaster: { name: "장인의 손길", icon: "🛠️", desc: "무기 하나를 최대 레벨까지 강화했다" }
+  weaponMaster: { name: "장인의 손길", icon: "🛠️", desc: "무기 하나를 최대 레벨까지 강화했다" },
+  treasureHunter: { name: "보물 사냥꾼", icon: "🦀", desc: "보물게를 5마리 잡았다" },
+  nightmareConqueror: { name: "악몽 정복", icon: "😱", desc: "악몽 난이도로 10웨이브를 막아냈다" }
 };
 var STORE_KEY = "cd.achievements";
 export function loadUnlocked() {

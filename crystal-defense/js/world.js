@@ -59,7 +59,7 @@ export var World = class {
     this.portals = [];
     this.drops = [];
     this.biome = biomeOf(seed);
-    this.crystal = { hp: CFG.crystal.hp, maxHp: CFG.crystal.hp, shieldUntil: 0, armorLv: 0, regenLv: 0, auraLv: 0, _regenAccum: 0, _auraTimer: 0 };
+    this.crystal = { hp: CFG.crystal.hp, maxHp: CFG.crystal.hp, shieldUntil: 0, armorLv: 0, regenLv: 0, auraLv: 0, reflectLv: 0, _regenAccum: 0, _auraTimer: 0 };
     this.meteor = null;
     this._build();
     this._buildMeteorRing();
