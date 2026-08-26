@@ -13,7 +13,8 @@ export var ACHIEVEMENTS = {
   eliteHunter: { name: "정예 사냥꾼", icon: "⭐", desc: "정예 몬스터를 5마리 처치했다" },
   weaponMaster: { name: "장인의 손길", icon: "🛠️", desc: "무기 하나를 최대 레벨까지 강화했다" },
   treasureHunter: { name: "보물 사냥꾼", icon: "🦀", desc: "보물게를 5마리 잡았다" },
-  nightmareConqueror: { name: "악몽 정복", icon: "😱", desc: "악몽 난이도로 10웨이브를 막아냈다" }
+  nightmareConqueror: { name: "악몽 정복", icon: "😱", desc: "악몽 난이도로 10웨이브를 막아냈다" },
+  fourKings: { name: "사천왕", icon: "🐉", desc: "한 판에서 네 보스(파괴자·서리 군주·침묵의 군주·갈취자)를 전부 처치했다" }
 };
 var STORE_KEY = "cd.achievements";
 export function loadUnlocked() {

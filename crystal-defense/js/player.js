@@ -1,6 +1,6 @@
 import * as THREE from '../vendor/three.module.js';
 import { CFG, WEATHER, needsPickaxe } from './config.js';
-import { clamp, dist } from './utils.js';
+import { clamp, dist, payCost } from './utils.js';
 
 var GEO4 = {
   body: new THREE.CapsuleGeometry(0.38, 0.7, 4, 10),
@@ -13,6 +13,7 @@ var GEO4 = {
   spear: new THREE.CylinderGeometry(0.035, 0.1, 1.9, 6),
   hammer: new THREE.CylinderGeometry(0.09, 0.34, 1, 6),
   bomb: new THREE.SphereGeometry(0.22, 10, 8),
+  whip: new THREE.TorusGeometry(0.16, 0.04, 6, 14),
   ring: new THREE.RingGeometry(0.62, 0.76, 20)
 };
 var WEAPON_MAT = {
@@ -22,7 +23,8 @@ var WEAPON_MAT = {
   pickaxe: new THREE.MeshStandardMaterial({ color: 11119017, roughness: 0.45, metalness: 0.6 }),
   spear: new THREE.MeshStandardMaterial({ color: 13227747, roughness: 0.35, metalness: 0.75 }),
   hammer: new THREE.MeshStandardMaterial({ color: 7034692, roughness: 0.55, metalness: 0.4 }),
-  bomb: new THREE.MeshStandardMaterial({ color: 2829103, roughness: 0.5, metalness: 0.2 })
+  bomb: new THREE.MeshStandardMaterial({ color: 2829103, roughness: 0.5, metalness: 0.2 }),
+  whip: new THREE.MeshStandardMaterial({ color: 4210752, roughness: 0.4, metalness: 0.8 })
 };
 var WEAPON_LOOK = {
   default: { geo: GEO4.tool, mat: WEAPON_MAT.default, ry: 0, rz: 0 },
@@ -31,7 +33,8 @@ var WEAPON_LOOK = {
   pickaxe: { geo: GEO4.pickaxe, mat: WEAPON_MAT.pickaxe, ry: 0, rz: 0.9 },
   spear: { geo: GEO4.spear, mat: WEAPON_MAT.spear, ry: 0, rz: 0.05 },
   hammer: { geo: GEO4.hammer, mat: WEAPON_MAT.hammer, ry: 0, rz: 0.85 },
-  bomb: { geo: GEO4.bomb, mat: WEAPON_MAT.bomb, ry: 0, rz: 0 }
+  bomb: { geo: GEO4.bomb, mat: WEAPON_MAT.bomb, ry: 0, rz: 0 },
+  whip: { geo: GEO4.whip, mat: WEAPON_MAT.whip, ry: Math.PI / 2, rz: 0 }
 };
 var PALETTE = [6280447, 10354539, 16757599, 16739286, 14065919, 7077840];
 var Player = class {
@@ -51,6 +54,7 @@ var Player = class {
     this.shards = 0;
     this.tools = {};
     this.weaponLv = {};
+    this.weaponSpec = {};
     this.equipped = null;
     this.harvestLv = 1;
     this.harvesting = null;
@@ -106,12 +110,51 @@ var Player = class {
   // 기본 공격치에 지금 손에 든 무기의 효과만 더한다 (여러 자루를 동시에 들 수는 없다)
   get attackStats() {
     const base = CFG.player.attack;
-    const out = { dmg: base.dmg, range: base.range, arc: base.arc, cd: base.cd };
+    const out = { dmg: base.dmg, range: base.range, arc: base.arc, cd: base.cd, knockback: 0 };
     const eff = CFG.craft[this.heldWeapon]?.effect;
     if (eff) for (const k2 of Object.keys(eff)) out[k2] += eff[k2];
     const bonus = CFG.weaponUpgrade.perLv[this.heldWeapon];
     const lv = this.weaponLv[this.heldWeapon] || 0;
     if (bonus && lv) for (const k2 of Object.keys(bonus)) out[k2] = (out[k2] || 0) + bonus[k2] * lv;
+    const specKey = this.weaponSpec[this.heldWeapon];
+    const spec = specKey && CFG.weaponSpec[this.heldWeapon]?.[specKey];
+    if (spec) {
+      for (const [k2, m] of Object.entries(spec.mods || {})) if (typeof out[k2] === "number") out[k2] *= m;
+      for (const [k2, v] of Object.entries(spec.add || {})) out[k2] = v;
+    }
+    return out;
+  }
+  // 활은 근접 판정(attackStats)이 아니라 별도의 조준 사격 배관을 타므로, 특화 mods/add 도
+  // 그 배관의 기본값(CFG.craft.bow.shoot) 위에 따로 얹어야 한다 — attackStats와 같은 계산 순서.
+  get shootStats() {
+    const base = CFG.craft.bow.shoot;
+    const out = { ...base };
+    const bonus = CFG.weaponUpgrade.perLv.bow;
+    const lv = this.weaponLv.bow || 0;
+    if (bonus && lv) for (const k2 of Object.keys(bonus)) out[k2] = (out[k2] || 0) + bonus[k2] * lv;
+    const specKey = this.weaponSpec.bow;
+    const spec = specKey && CFG.weaponSpec.bow?.[specKey];
+    if (spec) {
+      for (const [k2, m] of Object.entries(spec.mods || {})) if (typeof out[k2] === "number") out[k2] *= m;
+      for (const [k2, v] of Object.entries(spec.add || {})) out[k2] = v;
+    }
+    return out;
+  }
+  // 폭탄가방도 활과 같은 이유로 별도 getter — 투척 배관(craft.bomb.throw) 위에 특화를 얹는다.
+  // cost 는 숫자가 아닌 객체라 mods 대상에서 자연히 제외된다(공유 참조를 그대로 반환해도 무해 —
+  // 아무도 그 객체를 직접 변형하지 않고 payCost 가 매번 새 값을 읽어 차감할 뿐이다).
+  get throwStats() {
+    const base = CFG.craft.bomb.throw;
+    const out = { ...base };
+    const bonus = CFG.weaponUpgrade.perLv.bomb;
+    const lv = this.weaponLv.bomb || 0;
+    if (bonus && lv) for (const k2 of Object.keys(bonus)) out[k2] = (out[k2] || 0) + bonus[k2] * lv;
+    const specKey = this.weaponSpec.bomb;
+    const spec = specKey && CFG.weaponSpec.bomb?.[specKey];
+    if (spec) {
+      for (const [k2, m] of Object.entries(spec.mods || {})) if (typeof out[k2] === "number") out[k2] *= m;
+      for (const [k2, v] of Object.entries(spec.add || {})) out[k2] = v;
+    }
     return out;
   }
   // 지금 손에 든 무기의 강화 레벨 (없으면 0). 폭탄가방은 근접 판정이 아니라 투척 대미지에 따로 적용된다
@@ -344,7 +387,7 @@ export var LocalPlayer = class extends Player {
   // 폭탄가방을 들었을 때 공격 입력이 대신 이걸 부른다 — 같은 attackCd 를 공유하니 근접과 동시에 못 쓴다
   tryThrow() {
     if (!this.alive || this.attackCd > 0) return false;
-    this.attackCd = CFG.craft.bomb.throw.cd;
+    this.attackCd = this.throwStats.cd;
     this.swing = 1;
     this.cancelHarvest();
     return true;
@@ -352,7 +395,7 @@ export var LocalPlayer = class extends Player {
   // 활을 들었을 때 — 폭탄과 같은 구조로 같은 attackCd 를 공유한다
   tryShoot() {
     if (!this.alive || this.attackCd > 0) return false;
-    this.attackCd = CFG.craft.bow.shoot.cd;
+    this.attackCd = this.shootStats.cd;
     this.swing = 1;
     this.cancelHarvest();
     return true;

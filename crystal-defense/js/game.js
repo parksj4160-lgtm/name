@@ -89,7 +89,7 @@ export var Game = class {
     this._seenBomb = false;
     this._seenBow = false;
     this._seenHealer = false;
-    this.boonMult = { atk: 1, towerDmg: 1, skillCostDelta: 0, bounty: 1, crystalUpgradeCostDelta: 0, weaponUpgradeCostDelta: 0 };
+    this.boonMult = { atk: 1, towerDmg: 1, skillCostDelta: 0, bounty: 1, crystalUpgradeCostDelta: 0, weaponUpgradeCostDelta: 0, weaponSpecCostDelta: 0 };
     this.pendingBoon = null;
     this._dropTimer = CFG.supplyDrop.firstDelay;
     this._dropIdSeq = 1;
@@ -223,6 +223,9 @@ export var Game = class {
       } else if (kind === "silenceGo") {
         this.ui?.toast(`🔇 침묵 장판 발동! 반경 안의 타워가 멈췄다 — 직접 막아라`, "bad");
         this.fx.ring(e.x, e.z, 8011711, CFG.bossPattern.silenceRadius);
+      } else if (kind === "drain") {
+        this.ui?.toast(`${nm}가 자원을 훔칠 준비를 한다 — 지금 화력을 몰아 끊어라!`, "warn");
+        this.sfx.bossWaveStart();
       } else if (kind === "charge") {
         this.ui?.toast(`${nm}가 돌진 자세를 잡는다 — 길을 비켜라!`, "warn");
         this.sfx.bossWaveStart();
@@ -237,6 +240,32 @@ export var Game = class {
       const msg = e.st.summonVariant === "shield" ? `🛡️ 방패 두른 잡졸 ${n}마리가 튀어나왔다 — 등 뒤를 노려라` : `잡졸 ${n}마리가 튀어나왔다`;
       this.ui?.toast(msg, "bad");
       this.fx.burst(e.x, 1.6, e.z, 16733525, 18, 6);
+    };
+    this.enemyMgr.onBossDrain = (e) => {
+      if (!this.isHost) return;
+      const c2 = CFG.bossPattern;
+      let wood = 0, stone = 0;
+      if (this.shared) {
+        wood = Math.min(this.pools.team.wood, c2.drainWood);
+        stone = Math.min(this.pools.team.stone, c2.drainStone);
+        this.pools.team.wood -= wood;
+        this.pools.team.stone -= stone;
+      } else {
+        for (const p2 of this.players.values()) {
+          const pool = this._poolOf(p2.id);
+          const w2 = Math.min(pool.wood, c2.drainWood);
+          const s2 = Math.min(pool.stone, c2.drainStone);
+          pool.wood -= w2;
+          pool.stone -= s2;
+          wood += w2;
+          stone += s2;
+        }
+      }
+      const heal = Math.round(e.maxHp * c2.drainHealPct);
+      e.hp = Math.min(e.maxHp, e.hp + heal);
+      this.fx.float(`-${wood}🪵 -${stone}🪨`, e.x, e.st.scale * 1.6 + 0.6, e.z, "bad");
+      this.fx.burst(e.x, 1.6, e.z, 16766720, 18, 6);
+      this.ui?.toast(`🦂 갈취자가 목재 ${wood}·광물 ${stone}을 훔쳐 체력을 회복했다!`, "bad");
     };
     this.enemyMgr.onBossCharge = (e) => {
       const reach = e.st.radius + 1.4;
@@ -587,8 +616,6 @@ export var Game = class {
   // 자동 동기화되므로(enemyMgr.snapshot 이 타입을 가리지 않는다) 별도 네트워크 코드가 필요 없다.
   _updateTreasure(dt2) {
     const c2 = CFG.treasureEvent;
-    // 이미 나와 있는 게의 수명은 단계와 무관하게 계속 흐른다 — 보물게는 웨이브 클리어를 막지 않으므로
-    // 전투가 끝난 뒤에도 살아 있을 수 있는데, 여기서 같이 멈춰 버리면 준비 시간 내내 안 사라진다
     if (this._treasureId != null) {
       const e2 = this.enemyMgr.list.find((x2) => x2.id === this._treasureId);
       if (!e2) {
@@ -608,7 +635,6 @@ export var Game = class {
       }
       return;
     }
-    // 새로 내보내는 것은 전투 중에만 — 준비 시간에 튀어나오면 쫓아갈 이유가 없다
     if (this.wave.phase !== PHASE.COMBAT || this.wave.wave + 1 < c2.minWave) return;
     this._treasureTimer -= dt2;
     if (this._treasureTimer > 0) return;
@@ -673,6 +699,9 @@ export var Game = class {
         if (["boss", "frostlord", "warden"].every((t2) => this.stats.bossKillsSeen.includes(t2))) {
           this._unlockAchievement("allBosses");
         }
+        if (["boss", "frostlord", "warden", "looter"].every((t2) => this.stats.bossKillsSeen.includes(t2))) {
+          this._unlockAchievement("fourKings");
+        }
       } else {
         this.sfx.enemyDeath();
       }
@@ -687,8 +716,9 @@ export var Game = class {
         if (this.stats.elitesKilled >= 5) this._unlockAchievement("eliteHunter");
       }
       const b = e.st.bounty;
-      const bw = Math.round(b.wood * this.boonMult.bounty);
-      const bs2 = Math.round(b.stone * this.boonMult.bounty);
+      const nightMult = (this.wave.wave + 1) % CFG.wave.nightEvery === 0 ? CFG.wave.nightBountyMult : 1;
+      const bw = Math.round(b.wood * this.boonMult.bounty * nightMult);
+      const bs2 = Math.round(b.stone * this.boonMult.bounty * nightMult);
       const gotShard = e.st.shardChance && Math.random() < e.st.shardChance;
       if (this.shared) {
         this.pools.team.wood += bw;
@@ -794,7 +824,7 @@ export var Game = class {
       const kind = specialWaveKind(w2);
       base = kind ? `${SPECIAL_WAVES[kind].icon} 웨이브 ${w2} 시작! ${SPECIAL_WAVES[kind].name} 웨이브 — ${SPECIAL_WAVES[kind].desc} (몬스터 ${total}마리)` : `웨이브 ${w2} 시작! 몬스터 ${total}마리`;
     }
-    if (w2 % CFG.wave.nightEvery === 0) return `🌙 ${base} — 밤이라 시야가 좁다`;
+    if (w2 % CFG.wave.nightEvery === 0) return `🌙 ${base} — 밤이라 시야가 좁지만, 처치 보상은 ${Math.round((CFG.wave.nightBountyMult - 1) * 100)}% 더 후하다`;
     const weatherKind = weatherOf(w2);
     if (weatherKind) return `${WEATHER[weatherKind].icon} ${base} — ${WEATHER[weatherKind].desc}`;
     return base;
@@ -891,6 +921,29 @@ export var Game = class {
     this._notify(playerId, `${sp2.icon} ${b.def.name} → ${sp2.name} 특화 완료!`, "good");
     if (playerId === this.local.id) this.sfx.upgrade();
   }
+  // 무기 특화 — 타워 특화(hostSpecialize)와 정확히 같은 구조를 개인 무기 쪽으로 옮긴 것.
+  // 건물과 달리 id가 없다 — 플레이어별로 무기 종류당 하나만 가질 수 있어 key만으로 충분하다.
+  requestSpecializeWeapon(key, spec) {
+    if (this.isHost) this.hostSpecializeWeapon(this.local.id, key, spec);
+    else this.net.send("specializeWeapon", { key, spec });
+  }
+  hostSpecializeWeapon(playerId, key, spec) {
+    const p2 = this.players.get(playerId);
+    const sp2 = CFG.weaponSpec[key]?.[spec];
+    if (!p2 || !sp2 || !p2.tools[key] || p2.weaponSpec[key] || (p2.weaponLv[key] || 0) < CFG.weaponUpgrade.maxLv) return;
+    const cost = this._weaponSpecCost();
+    const pool = this._poolOf(playerId);
+    if (!canAfford(pool, cost)) {
+      this._notify(playerId, "자원이 부족합니다", "bad");
+      return;
+    }
+    payCost(pool, cost);
+    this._trackSpend(cost, "upgrade");
+    p2.weaponSpec[key] = spec;
+    const def = CFG.craft[key];
+    this._notify(playerId, `${sp2.icon} ${def.name} → ${sp2.name} 특화 완료!`, "good");
+    if (playerId === this.local.id) this.sfx.upgrade();
+  }
   requestSell(id) {
     this.sfx.sell();
     if (this.isHost) this.hostSell(this.local.id, id);
@@ -983,7 +1036,7 @@ export var Game = class {
   // 폭탄가방을 들었을 때의 공격 — 근접 대신 조준한 지점(포인터가 가리키는 바닥)에 던진다.
   // 사거리를 넘는 곳을 가리키면 사거리 끝까지만 날아간다
   _requestThrow(aim = null) {
-    const cfg = CFG.craft.bomb.throw;
+    const cfg = this.local.throwStats;
     if (!canAfford(this.myPool, cfg.cost)) {
       this._notify(this.local.id, "자원이 부족합니다", "bad");
       return;
@@ -1012,7 +1065,7 @@ export var Game = class {
   // 활을 들었을 때의 공격 — 근접 대신 조준한 쪽으로 화살이 날아간다. 폭탄과 같은 배관을 쓰지만
   // 자원을 안 먹고 명중 지점에서 가장 가까운 한 마리만 맞힌다.
   _requestShoot(aim = null) {
-    const cfg = CFG.craft.bow.shoot;
+    const cfg = this.local.shootStats;
     const pointer = aim || this.sm.updatePointerWorld();
     if (!pointer) return;
     if (!this.local.tryShoot()) return;
@@ -1026,7 +1079,6 @@ export var Game = class {
       this.hostShootArrow(this.local.id, this.local.x, this.local.z, tx, tz);
     } else {
       this.net.send("shootArrow", { x: this.local.x, z: this.local.z, tx, tz });
-      // 참가자 화면에서도 자기가 쏜 화살이 보이도록 연출 전용으로 한 발 더 쏜다(피해 계산은 호스트 몫)
       const from = new THREE.Vector3(this.local.x, 1.4, this.local.z);
       const to2 = new THREE.Vector3(tx, 0.9, tz);
       this.projectiles.fire(from, to2, cfg.speed, 16772829, (pos) => this._arrowVFX(pos));
@@ -1040,14 +1092,12 @@ export var Game = class {
     this.fx.burst(pos.x, pos.y, pos.z, 16772829, 5, 3);
   }
   hostShootArrow(playerId, fromX, fromZ, tx, tz) {
-    const cfg = CFG.craft.bow.shoot;
-    const lv = this._weaponLvOf("bow", playerId);
-    const dmg = Math.round((cfg.dmg + (CFG.weaponUpgrade.perLv.bow?.dmg || 0) * lv) * this.boonMult.atk * this._desperationMult);
+    const cfg = this.players.get(playerId)?.shootStats ?? CFG.craft.bow.shoot;
+    const dmg = Math.round(cfg.dmg * this.boonMult.atk * this._desperationMult);
     const from = new THREE.Vector3(fromX, 1.4, fromZ);
     const to2 = new THREE.Vector3(tx, 0.9, tz);
     this.projectiles.fire(from, to2, cfg.speed, 16772829, (pos) => {
       this._arrowVFX(pos);
-      // 명중 지점에서 가장 가까운 한 마리만 — 폭탄의 광역과 달리 점사다
       let best = null, bestD = cfg.hitRadius;
       for (const e of this.enemyMgr.list) {
         if (e.dead) continue;
@@ -1066,7 +1116,7 @@ export var Game = class {
     this.sfx.buildingHit();
   }
   hostThrowBomb(playerId, fromX, fromZ, tx, tz) {
-    const cfg = CFG.craft.bomb.throw;
+    const cfg = this.players.get(playerId)?.throwStats ?? CFG.craft.bomb.throw;
     const pool = this._poolOf(playerId);
     if (!canAfford(pool, cfg.cost)) {
       this._notify(playerId, "자원이 부족합니다", "bad");
@@ -1074,7 +1124,7 @@ export var Game = class {
     }
     payCost(pool, cfg.cost);
     this._trackSpend(cfg.cost, "craft");
-    const dmg = Math.round((cfg.dmg + (CFG.weaponUpgrade.perLv.bomb?.dmg || 0) * this._weaponLvOf("bomb", playerId)) * this._desperationMult);
+    const dmg = Math.round(cfg.dmg * this._desperationMult);
     const from = new THREE.Vector3(fromX, 1.1, fromZ);
     const to2 = new THREE.Vector3(tx, 0.4, tz);
     this.projectiles.fire(from, to2, cfg.speed, 3355443, (pos) => {
@@ -1132,6 +1182,15 @@ export var Game = class {
       if (diff > a.arc) continue;
       this._hurtEnemy(e, dmg, "player", x2, z2);
       if (e.variant === "thorn") thornDmg += Math.round(dmg * CFG.variants.thorn.reflectPct);
+      if (a.knockback && !e.dead) {
+        const kd = Math.max(d2, 0.4);
+        e.x += (e.x - x2) / kd * a.knockback;
+        e.z += (e.z - z2) / kd * a.knockback;
+        if (!this._seenKnockback) {
+          this._seenKnockback = true;
+          this.ui?.toast("🔗 채찍이 적을 뒤로 밀쳐냈다! 거리를 벌리거나 무리를 흩어놓을 때 유용하다", "good");
+        }
+      }
     }
     if (thornDmg > 0) this._reflectThorns(playerId, thornDmg, x2, z2);
   }
@@ -1191,9 +1250,9 @@ export var Game = class {
   // 자기 사거리를 쓴다 — 이게 없으면 사거리 9~16짜리 무기를 들고도 멀리 있는 적을 클릭했을 때
   // "더 가까이 가세요" 라고 거부당한다
   get attackReach() {
-    const def = CFG.craft[this.local.heldWeapon];
-    const ranged = def?.shoot || def?.throw;
-    return ranged ? ranged.range : this.local.attackStats.range;
+    if (this.local.heldWeapon === "bow") return this.local.shootStats.range;
+    if (this.local.heldWeapon === "bomb") return this.local.throwStats.range;
+    return this.local.attackStats.range;
   }
   clickWorld(pointer) {
     if (!pointer) {
@@ -1319,6 +1378,10 @@ export var Game = class {
   }
   _weaponLvOf(key, playerId = this.local.id) {
     return this.players.get(playerId)?.weaponLv[key] || 0;
+  }
+  // 무기 특화 비용 (숙련 축복이 깎아 준다) — 강화 비용(_weaponUpgradeCost)과 같은 구조
+  _weaponSpecCost() {
+    return { iron: Math.max(1, CFG.weaponSpec.cost.iron + this.boonMult.weaponSpecCostDelta) };
   }
   requestUpgradeWeapon(key) {
     if (this.isHost) this.hostUpgradeWeapon(this.local.id, key);
@@ -1546,9 +1609,12 @@ export var Game = class {
     to2.tools[key] = true;
     to2.weaponLv[key] = from.weaponLv[key] || 0;
     from.weaponLv[key] = 0;
+    to2.weaponSpec[key] = from.weaponSpec[key] || null;
+    from.weaponSpec[key] = null;
     const def = CFG.craft[key];
     const lvNote = to2.weaponLv[key] ? ` (강화 Lv.${to2.weaponLv[key]})` : "";
-    this._notify(toId, `${def.icon} ${def.name}을(를) 받았다${lvNote} — 인벤토리 장비 탭에서 손에 쥘 수 있다`, "good");
+    const specNote = to2.weaponSpec[key] ? ` ${CFG.weaponSpec[key][to2.weaponSpec[key]].icon} ${CFG.weaponSpec[key][to2.weaponSpec[key]].name} 특화` : "";
+    this._notify(toId, `${def.icon} ${def.name}을(를) 받았다${lvNote}${specNote} — 인벤토리 장비 탭에서 손에 쥘 수 있다`, "good");
   }
   _notify(playerId, text, kind) {
     if (playerId === this.local.id) {
@@ -1613,6 +1679,9 @@ export var Game = class {
     });
     net.on("specialize", (d2, from) => {
       if (this.isHost) this.hostSpecialize(from, d2.id, d2.spec);
+    });
+    net.on("specializeWeapon", (d2, from) => {
+      if (this.isHost) this.hostSpecializeWeapon(from, d2.key, d2.spec);
     });
     net.on("sell", (d2, from) => {
       if (this.isHost) this.hostSell(from, d2.id);
@@ -1741,7 +1810,7 @@ export var Game = class {
   _snapshot() {
     const players = {};
     for (const p2 of this.players.values()) {
-      players[p2.id] = { hv: p2.harvestLv, tl: Object.keys(p2.tools).filter((k2) => p2.tools[k2]), eq: p2.equipped || null, wl: p2.weaponLv };
+      players[p2.id] = { hv: p2.harvestLv, tl: Object.keys(p2.tools).filter((k2) => p2.tools[k2]), eq: p2.equipped || null, wl: p2.weaponLv, ws: p2.weaponSpec };
     }
     return {
       e: this.enemyMgr.snapshot(),
@@ -1758,6 +1827,10 @@ export var Game = class {
       mt: this._meteorPending ? [Math.round(this._meteorPending.x * 10) / 10, Math.round(this._meteorPending.z * 10) / 10, Math.round(this._meteorPending.timeLeft * 10) / 10] : null,
       mc: this._merchant ? { offers: this._merchant.offers, boughtBy: this._merchant.boughtBy } : null,
       tb: { atk: this.tempBoon.atk, towerDmg: this.tempBoon.towerDmg },
+      // 엔드리스 축복(영구 배율·할인)은 호스트만 고르고 이 필드로만 전파된다 — 없으면 참가자
+      // 화면의 강화·특화 비용 미리보기가 호스트가 이미 적용한 할인을 못 보고 "자원 부족"으로
+      // 잘못 비활성화되고, 솔로 저장·재개 시에도 그동안 고른 축복이 전부 초기화된다.
+      bm: this.boonMult,
       r: this.shared ? { team: this.pools.team } : { byId: this.pools.byId },
       p: players,
       sh: this.shared,
@@ -1822,6 +1895,7 @@ export var Game = class {
     if (!this._merchant && s2.mc) this.ui?.toast("🧳 떠돌이 상인이 왔다! 이번 준비 시간에만 물건을 판다", "good");
     this._merchant = s2.mc ? { offers: s2.mc.offers, boughtBy: s2.mc.boughtBy || {} } : null;
     if (s2.tb) Object.assign(this.tempBoon, s2.tb);
+    if (s2.bm) Object.assign(this.boonMult, s2.bm);
     if (s2.r.team) this.pools.team = s2.r.team;
     if (s2.r.byId) this.pools.byId = s2.r.byId;
     for (const [id, pd2] of Object.entries(s2.p || {})) {
@@ -1831,6 +1905,7 @@ export var Game = class {
         p2.tools = {};
         for (const k2 of pd2.tl || []) p2.tools[k2] = true;
         p2.weaponLv = pd2.wl || {};
+        p2.weaponSpec = pd2.ws || {};
         if (p2 !== this.local) p2.equipped = pd2.eq || null;
       }
     }
@@ -1844,6 +1919,9 @@ export var Game = class {
       }
       if (["boss", "frostlord", "warden"].every((t2) => this.stats.bossKillsSeen.includes(t2))) {
         this._unlockAchievement("allBosses");
+      }
+      if (["boss", "frostlord", "warden", "looter"].every((t2) => this.stats.bossKillsSeen.includes(t2))) {
+        this._unlockAchievement("fourKings");
       }
     }
     if (this.wave.phase === PHASE.LOST && !this.result) {
@@ -2082,6 +2160,7 @@ export var Game = class {
     if (s2.cr !== void 0) this.world.crystal.regenLv = s2.cr;
     if (s2.cx !== void 0) this.world.crystal.auraLv = s2.cx;
     if (s2.crf !== void 0) this.world.crystal.reflectLv = s2.crf;
+    if (s2.bm) Object.assign(this.boonMult, s2.bm);
     this.world.crystal.hp = s2.c;
     if (s2.r.team) this.pools.team = s2.r.team;
     if (s2.r.byId) this.pools.byId = s2.r.byId;
@@ -2091,6 +2170,7 @@ export var Game = class {
       this.local.tools = {};
       for (const k2 of savedPlayer.tl || []) this.local.tools[k2] = true;
       this.local.weaponLv = savedPlayer.wl || {};
+      this.local.weaponSpec = savedPlayer.ws || {};
       this.local.equipped = savedPlayer.eq || null;
     }
     if (save.stats) this.stats = save.stats;

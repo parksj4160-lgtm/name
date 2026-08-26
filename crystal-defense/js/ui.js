@@ -178,6 +178,36 @@ export var UI = class {
         const lv = g2.local.weaponLv[key] || 0;
         const maxed = lv >= CFG.weaponUpgrade.maxLv;
         const cost = g2._weaponUpgradeCost(key);
+        const specOpts = CFG.weaponSpec[key];
+        const specKey = g2.local.weaponSpec[key];
+        if (maxed && specOpts && specKey) {
+          const sp2 = specOpts[specKey];
+          rows2.push({
+            key: "upgrade:" + key + ":" + specKey,
+            icon: sp2.icon,
+            name: `${r.name} — ${sp2.name}`,
+            desc: sp2.desc,
+            cost: null,
+            state: "owned",
+            note: "특화 완료",
+            action: () => {
+            }
+          });
+          continue;
+        }
+        if (maxed && specOpts) {
+          rows2.push({
+            key: "upgrade:" + key + ":choose",
+            icon: r.icon,
+            name: `${r.name} 특화 선택`,
+            desc: `최대 레벨 도달 — 두 갈래 중 하나를 골라 성격을 바꾼다. 비용 ${costText(g2._weaponSpecCost())}`,
+            cost: null,
+            state: "",
+            note: "특화 가능",
+            action: () => this.showWeaponSpecChoice(key)
+          });
+          continue;
+        }
         rows2.push({
           key: "upgrade:" + key,
           icon: r.icon,
@@ -854,6 +884,30 @@ export var UI = class {
   }
   hideSpecChoice() {
     this.el.specOverlay.classList.add("hidden");
+  }
+  // 최대 레벨 무기를 두 갈래 중 하나로 특화하는 선택창. 타워 특화(showSpecChoice)와 같은
+  // 오버레이·카드 UI 를 그대로 재사용한다 — 인벤토리 제작 탭의 "특화 선택" 카드에서 연다.
+  showWeaponSpecChoice(key) {
+    const opts = CFG.weaponSpec[key];
+    const def = CFG.craft[key];
+    if (!opts || !def) return;
+    const cost = this.game._weaponSpecCost();
+    const afford = canAfford(this.game.myPool, cost);
+    this.el.specTitle.textContent = `${def.icon} ${def.name} 특화`;
+    this.el.specSub.textContent = `비용 ${costText(cost)} · 되돌릴 수 없다.`;
+    this.el.specChoices.innerHTML = Object.entries(opts).map(([k2, sp2]) => `<button type="button" class="boon-card" data-spec="${k2}"${afford ? "" : " disabled"}>
+<span class="bc-icon">${sp2.icon}</span>
+<span><span class="bc-name">${sp2.name}</span><br><span class="bc-desc">${sp2.desc}</span></span>
+</button>`).join("");
+    for (const btn of this.el.specChoices.querySelectorAll(".boon-card")) {
+      btn.onclick = () => {
+        this.hideSpecChoice();
+        this.game.requestSpecializeWeapon(key, btn.dataset.spec);
+      };
+    }
+    if (!afford) this.toast("특화할 자원이 부족합니다", "bad");
+    this.el.specCancel.onclick = () => this.hideSpecChoice();
+    this.el.specOverlay.classList.remove("hidden");
   }
   showResult(win, stats, wave) {
     this.el.result.classList.remove("hidden");
