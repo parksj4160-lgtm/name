@@ -46,7 +46,7 @@ var MAT2 = {
   buffRing: new THREE.MeshBasicMaterial({ color: 14061311, transparent: true, opacity: 0.5, side: THREE.DoubleSide })
 };
 var RANGE_RING_GEO = new THREE.RingGeometry(0.96, 1, 40);
-var PROJECTILE_COLOR = { arrow: 16769162, frost: 8382719, cannon: 16751178, poison: 3526479, snare: 13215862 };
+var PROJECTILE_COLOR = { arrow: 16769162, frost: 8382719, cannon: 16751178, poison: 3526479, snare: 13215862, lightning: 16769126 };
 var nextId = 1;
 function resetBuildingIds() {
   nextId = 1;
@@ -72,22 +72,21 @@ var Building = class {
     this.mesh.userData.building = this;
     this._makeBar();
   }
-  // 특화를 고른 타워는 레벨 스탯에 배율\xB7추가 속성을 얹은 값을 쓴다. 매 프레임 조준\xB7사격에서
-  // 읽히므로 레벨\xB7특화가 바뀔 때만 다시 만들고 그 뒤로는 캐시를 돌려준다.
+  // 특화를 고른 타워는 레벨 스탯에 배율·추가 속성을 얹은 값을 쓴다. 매 프레임 조준·사격에서
+  // 읽히므로 레벨·특화가 바뀔 때만 다시 만들고 그 뒤로는 캐시를 돌려준다.
   get stats() {
     const base = this.def.levels[this.level - 1];
     if (!this.spec) return base;
-    const sp = CFG.towerSpec[this.key]?.[this.spec];
-    if (!sp) return base;
+    const sp2 = CFG.towerSpec[this.key]?.[this.spec];
+    if (!sp2) return base;
     const ck = `${this.level}|${this.spec}`;
     if (this._specKey === ck) return this._specStats;
     const out = { ...base };
-    for (const [k2, m] of Object.entries(sp.mods || {})) {
+    for (const [k2, m] of Object.entries(sp2.mods || {})) {
       if (typeof out[k2] === "number") out[k2] = out[k2] * m;
     }
-    for (const [k2, v] of Object.entries(sp.add || {})) out[k2] = v;
+    for (const [k2, v] of Object.entries(sp2.add || {})) out[k2] = v;
     if (out.dmg) out.dmg = Math.round(out.dmg);
-    // 둔화는 100% 가 되면 사실상 root 라 덫탑의 자리를 빼앗는다 — 상한을 둔다
     if (out.slow) out.slow = Math.min(0.85, out.slow);
     this._specKey = ck;
     this._specStats = out;
@@ -166,11 +165,11 @@ var Building = class {
     this.synergyRing.material.color.setHex(colorHex);
     this.synergyRing.material.opacity = 0.5;
   }
-  // 특화 표시 — 보루 버프(y 0.06)\xB7시너지(y 0.13) 고리와 높이를 달리해 셋이 같이 떠도 안 겹친다.
+  // 특화 표시 — 보루 버프(y 0.06)·시너지(y 0.13) 고리와 높이를 달리해 셋이 같이 떠도 안 겹친다.
   // 고리 색이 곧 특화 종류라, 지어 놓은 방어선을 멀리서 봐도 어떤 갈래인지 바로 읽힌다.
   showSpecRing() {
-    const sp = this.specDef;
-    if (!sp) return;
+    const sp2 = this.specDef;
+    if (!sp2) return;
     if (!this.specRing) {
       const r = new THREE.Mesh(GEO2.buffRing, MAT2.buffRing.clone());
       r.rotation.x = -Math.PI / 2;
@@ -179,7 +178,7 @@ var Building = class {
       this.specRing = r;
     }
     this.specRing.visible = true;
-    this.specRing.material.color.setHex(sp.ring);
+    this.specRing.material.color.setHex(sp2.ring);
     this.specRing.material.opacity = 0.62;
   }
   applyLevel(level) {
@@ -204,8 +203,6 @@ var Building = class {
     this.specRing = null;
     this._makeBar();
     this.turret = nm.userData.turret;
-    // 메시를 통째로 갈아끼웠으니 고리도 다시 붙인다(원격 클라이언트가 스냅샷으로
-    // 레벨을 맞춘 뒤 특화까지 받은 경우, 이 재부착이 없으면 표시가 사라진다)
     if (this.spec) this.showSpecRing();
   }
   damage(amount) {
@@ -507,8 +504,6 @@ export var BuildManager = class {
   }
   refund(b) {
     const inv = this.investedCost(b);
-    // 특화 비용도 투자한 자원이므로 환급 대상에 포함한다. 단 수리비(repairCost)에는 넣지 않는다 —
-    // 수리는 "레벨만큼 지어진 몸체를 고치는 것"이라 특화 여부로 비싸질 이유가 없다.
     if (b.spec) {
       const sc = CFG.towerSpec.cost;
       inv.wood += sc.wood || 0;
@@ -676,8 +671,6 @@ export var BuildManager = class {
         b.applyLevel(level);
         this.root.add(b.mesh);
       }
-      // 특화는 호스트가 정하고 스냅샷으로만 내려온다 — 참가자 화면의 사거리\xB7피해 계산과
-      // 고리 표시가 호스트와 어긋나지 않도록 여기서 맞춘다
       if ((spec || null) !== b.spec) {
         b.spec = spec || null;
         if (b.spec) b.showSpecRing();

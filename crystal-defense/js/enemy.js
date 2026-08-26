@@ -48,6 +48,7 @@ var Enemy = class {
       st.scale *= statMult.scale ?? 1;
       st.radius *= statMult.scale ?? 1;
       if (statMult.dmg) st.dmg = Math.round(st.dmg * statMult.dmg);
+      if (statMult.dmg && st.explode) st.explode = { ...st.explode, dmg: Math.round(st.explode.dmg * statMult.dmg), playerDmg: Math.round(st.explode.playerDmg * statMult.dmg) };
       if (statMult.bounty) st.bounty = { wood: Math.round(st.bounty.wood * statMult.bounty), stone: Math.round(st.bounty.stone * statMult.bounty) };
     }
     this.id = id || nextId2++;
@@ -342,6 +343,20 @@ export var EnemyManager = class {
       const dashMult = e.variant === "dash" && now < e.dashUntil ? CFG.variants.dash.speedMult : 1;
       const rootMult = now < e.rootUntil ? 0 : 1;
       const speed = e.st.speed * e.slowFactor * dashMult * rootMult * (e.isCharging ? CFG.bossPattern.chargeSpeed / e.st.speed : 1);
+      if (e.st.flees) {
+        const p22 = this._nearestPlayer(players, e.x, e.z, 16);
+        const fx2 = p22 ? e.x - p22.x : e.x, fz2 = p22 ? e.z - p22.z : e.z;
+        const len3 = Math.hypot(fx2, fz2) || 1;
+        let mx3 = fx2 / len3 * speed, mz3 = fz2 / len3 * speed;
+        const sep3 = this._separation(e);
+        mx3 += sep3.x * speed * 0.6;
+        mz3 += sep3.z * speed * 0.6;
+        e.x += mx3 * dt2;
+        e.z += mz3 * dt2;
+        this._face(e, e.x + mx3, e.z + mz3, dt2);
+        this._applyPosition(e, dt2, now);
+        continue;
+      }
       e.attackCd -= dt2;
       const dc2 = Math.hypot(e.x, e.z);
       const atkRange = e.st.ranged ? e.st.atkRange : CFG.crystal.hitRange;

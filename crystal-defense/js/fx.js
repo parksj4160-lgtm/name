@@ -8,6 +8,7 @@ export var Fx = class {
     this.sparks = [];
     this.floats = [];
     this.rings = [];
+    this.pings = [];
     this._pool = [];
   }
   _spark(color) {
@@ -44,6 +45,24 @@ export var Fx = class {
     m2.position.set(x2, 0.2, z2);
     this.sm.scene.add(m2);
     this.rings.push({ mesh: m2, t: 0, life: 0.5, radius });
+  }
+  // 미니맵 핑 — 일반 ring()보다 훨씬 오래(3.5초) 남고, 땅 위 고리뿐 아니라 하늘로 뻗는 기둥도
+  // 같이 세워서 나무·건물에 가려도 멀리서부터 눈에 띈다. 협동 플레이에서 "여기로 와" 신호로 쓴다.
+  pingMarker(x2, z2, color = 16763904) {
+    const ring = new THREE.Mesh(
+      new THREE.RingGeometry(0.15, 0.24, 28),
+      new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.95, side: THREE.DoubleSide })
+    );
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.set(x2, 0.15, z2);
+    this.sm.scene.add(ring);
+    const beam = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.1, 0.1, 6, 8, 1, true),
+      new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.55, side: THREE.DoubleSide })
+    );
+    beam.position.set(x2, 3, z2);
+    this.sm.scene.add(beam);
+    this.pings.push({ ring, beam, t: 0, life: 3.5 });
   }
   // 3D 좌표 위에 뜨는 데미지/획득 텍스트
   float(text, x2, y2, z2, cls = "") {
@@ -87,6 +106,23 @@ export var Fx = class {
       }
       r.mesh.scale.setScalar(0.4 + k2 * r.radius * 1.2);
       r.mesh.material.opacity = 0.9 * (1 - k2);
+    }
+    for (let i = this.pings.length - 1; i >= 0; i--) {
+      const p2 = this.pings[i];
+      p2.t += dt2;
+      const k2 = p2.t / p2.life;
+      if (k2 >= 1) {
+        this.sm.scene.remove(p2.ring);
+        this.sm.scene.remove(p2.beam);
+        p2.ring.geometry.dispose();
+        p2.beam.geometry.dispose();
+        this.pings.splice(i, 1);
+        continue;
+      }
+      p2.ring.scale.setScalar(0.4 + k2 * 5);
+      p2.ring.material.opacity = 0.95 * (1 - k2);
+      const pulse = 0.4 + Math.abs(Math.sin(p2.t * 6)) * 0.3;
+      p2.beam.material.opacity = pulse * (1 - k2);
     }
     const v2 = new THREE.Vector3();
     for (let i = this.floats.length - 1; i >= 0; i--) {

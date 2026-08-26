@@ -37,7 +37,13 @@ export var CFG = {
     maxLv: 5,
     armor: { name: "강화", icon: "💪", desc: "최대 체력 +150 (즉시 그만큼 회복도 됨)", hpPerLv: 150, baseCost: 2, costStep: 1 },
     regen: { name: "재생", icon: "💚", desc: "매초 최대 체력의 0.6% 만큼 자동 회복", pctPerLv: 6e-3, baseCost: 2, costStep: 1 },
-    aura: { name: "오라", icon: "⚡", desc: "주변 적에게 1초마다 피해를 준다", radius: 6.5, dmgPerLv: 12, tickTime: 1, baseCost: 3, costStep: 1 }
+    aura: { name: "오라", icon: "⚡", desc: "주변 적에게 1초마다 피해를 준다", radius: 6.5, dmgPerLv: 12, tickTime: 1, baseCost: 3, costStep: 1 },
+    // 몬스터의 공격 판정(onCrystalHit)으로 크리스탈이 맞을 때만 발동 — 근접이든 주술사의 원거리
+    // 저격이든 "누가 때렸는지"가 있으면 다 걸리지만, 운석·폭탄병 폭발처럼 특정 공격자 없이
+    // 들어오는 광역 피해에는 걸리지 않는다. 오라(주변 전체에 상시 피해)와 달리 "크리스탈이 실제로
+    // 맞아야" 발동해서, 방어선이 뚫려 크리스탈이 두들겨 맞는 위기 상황일수록 존재감이 커진다 —
+    // 오라가 평시의 화력이라면 반사는 위기의 보험에 가깝다.
+    reflect: { name: "반사", icon: "🪞", desc: "크리스탈을 직접 공격한 적에게 받은 피해의 일부를 그대로 돌려준다", pctPerLv: 0.08, baseCost: 3, costStep: 1 }
   },
   player: {
     speed: 7.4,
@@ -54,7 +60,10 @@ export var CFG = {
     attack: { dmg: 16, range: 2.8, arc: 1.5, cd: 0.42 },
     // 회피 돌진 — 짧게 무적 상태로 튀어나간다. 보스 돌진이나 다구리를 피할 때, 결계 몹에게 순식간에
     // 붙을 때 쓴다. 쿨다운 중엔 다시 못 쓴다
-    dash: { speed: 20, duration: 0.16, cooldown: 3 }
+    dash: { speed: 20, duration: 0.16, cooldown: 3 },
+    // 미니맵 핑 — 협동 플레이에서 위치를 알리는 신호. 자원도 안 쓰고 되돌릴 상태도 없어서
+    // 쿨다운은 순전히 도배 방지용이다
+    pingCooldown: 2.5
   },
   harvest: {
     range: 3.2,
@@ -215,6 +224,24 @@ export var CFG = {
         { hp: 260, dmg: 6, range: 10.5, rate: 0.6, root: 1.8, cost: { wood: 60, stone: 40 } },
         { hp: 380, dmg: 9, range: 12, rate: 0.7, root: 2.2, cost: { wood: 110, stone: 90, iron: 5 } }
       ]
+    },
+    // 다른 타워는 전부 한 놈만 맞추거나(단일 표적) 한 자리를 지정해서 넓게 맞춘다(대포 splash).
+    // 번개탑은 그 중간 — 명중한 적에서 가까운 다른 적으로 튀어 옮겨붙는다(순차적으로, 튈수록 약해짐).
+    // 뭉쳐서 오는 잡몹 무리엔 대포탑만큼 강하면서, 흩어진 적에게는 화살탑처럼 한 놈에 집중된다 —
+    // "지금 뭉쳐 오나 흩어져 오나"에 따라 대포탑과 다른 선택지가 되는 게 목적.
+    lightning: {
+      name: "번개탑",
+      icon: "🌩️",
+      hotkey: "c",
+      cost: { wood: 45, stone: 35 },
+      hp: 170,
+      blocks: true,
+      desc: "명중한 적에서 가까운 다른 적으로 튀어 옮겨붙는다(튈수록 피해 감소). 뭉쳐 오는 잡몹 무리에 강하다.",
+      levels: [
+        { hp: 170, dmg: 9, range: 11, rate: 0.85, chain: { count: 3, range: 4.5, falloff: 0.6 } },
+        { hp: 260, dmg: 14, range: 12.5, rate: 0.95, chain: { count: 4, range: 5, falloff: 0.65 }, cost: { wood: 55, stone: 65 } },
+        { hp: 400, dmg: 21, range: 14, rate: 1.05, chain: { count: 5, range: 5.5, falloff: 0.7 }, cost: { wood: 100, stone: 130, iron: 6 } }
+      ]
     }
   },
   // 시설에 다가가 클릭하면 열리는 작업창. range 는 상호작용 가능 거리.
@@ -307,7 +334,15 @@ export var CFG = {
     frostlord: { name: "서리 군주", icon: "🧊", hp: 1050, speed: 1.7, dmg: 55, rate: 0.65, radius: 1.5, color: 10479871, bounty: { wood: 32, stone: 38 }, scale: 2.4, boss: true, summonVariant: "shield" },
     // 세 번째 보스(15웨이브 주기로 파괴자·서리 군주와 순환). 소환 대신 자기 발밑에 침묵 장판을 깐다 —
     // 장판 반경 안의 타워는 조준·사격이 전부 멈춘다(`buildings.js`의 `updateTowers` 참고). 돌진 패턴은 공유.
-    warden: { name: "침묵의 군주", icon: "🔇", hp: 1100, speed: 1.8, dmg: 50, rate: 0.65, radius: 1.5, color: 8011711, bounty: { wood: 34, stone: 34 }, scale: 2.35, boss: true, silenceBoss: true }
+    warden: { name: "침묵의 군주", icon: "🔇", hp: 1100, speed: 1.8, dmg: 50, rate: 0.65, radius: 1.5, color: 8011711, bounty: { wood: 34, stone: 34 }, scale: 2.35, boss: true, silenceBoss: true },
+    // 체력이 낮아 금방 죽지만, 죽는 순간(어떻게 죽었든) 그 자리에서 폭발해 주변 크리스탈·건물·플레이어에게
+    // 피해를 준다 — 근접으로 마지막 일격을 넣으면 그 폭발을 그대로 맞는다. "닥치고 근접"이 항상 안전하지
+    // 않게 만드는 가시(thorn) 변종과 목적은 비슷하지만, 이쪽은 변종이 아니라 종류 자체라 항상 그렇다.
+    bomber: { name: "폭탄병", icon: "🧨", hp: 42, speed: 2.7, dmg: 8, rate: 1, radius: 0.55, color: 16733491, bounty: { wood: 2, stone: 2 }, scale: 1, explode: { radius: 3.2, dmg: 55, buildingDmgMult: 0.5, playerDmg: 42 } },
+    // 웨이브 구성에 안 끼고 전투 중 독립적으로(운석·보급품처럼) 튀어나온다. 공격을 아예 안 하고
+    // 가장 가까운 플레이어에게서 도망만 친다(체력이 낮아 잡기는 쉽지만 안 쫓아가면 금방 사라진다) —
+    // "지금 하던 걸 멈추고 쫓아갈지" 순간 판단을 만드는 게 목적. 못 잡으면 보상 없이 그냥 사라진다.
+    treasure: { name: "보물게", icon: "🦀", hp: 16, speed: 5.4, dmg: 0, rate: 0, radius: 0.4, color: 16766720, bounty: { wood: 16, stone: 12 }, scale: 0.85, flees: true, shardChance: 0.5 }
   },
   // 몬스터 변종 접두사 — 종류를 늘리는 대신 기존 몬스터에 가끔 붙는다. 웨이브가 오를수록 등장 확률이 오른다.
   // 색 틴트 + 머리 위 아이콘으로 항상 표시되어(색약 여부와 무관하게) 눈에 띈다.
@@ -323,8 +358,8 @@ export var CFG = {
     // 타워가 조준하지 못한다(자동 사격 대상에서 제외) — 함정·근접 공격·정수 스킬은 그대로 통한다.
     // 타워만 믿고 있으면 절대 안 죽으니 직접 달려가 처리해야 한다
     ward: { name: "결계", icon: "🌀", tint: 11800063 },
-    // 근접 공격(칼\xB7창\xB7망치 등)으로 때리면 준 피해의 일부를 그대로 되돌려 받는다. 타워\xB7함정\xB7
-    // 폭탄\xB7정수 스킬처럼 거리를 둔 공격에는 안 걸린다 — 무기 강화나 필사의 반격으로 근접 대미지가
+    // 근접 공격(칼·창·망치 등)으로 때리면 준 피해의 일부를 그대로 되돌려 받는다. 타워·함정·
+    // 폭탄·정수 스킬처럼 거리를 둔 공격에는 안 걸린다 — 무기 강화나 필사의 반격으로 근접 대미지가
     // 오른 만큼 반사 피해도 커지므로, "닥치고 근접"만으로는 항상 안전하지 않게 만드는 게 목적
     thorn: { name: "가시", icon: "🌵", tint: 9127187, reflectPct: 0.4 }
   },
@@ -351,7 +386,7 @@ export var CFG = {
   towerSpec: {
     cost: { wood: 50, stone: 80, iron: 4 },
     arrow: {
-      sniper: { name: "저격", icon: "🔭", ring: 16764006, desc: "사거리와 한 방이 크게 늘지만 발사가 느려진다 — 단단한 적\xB7보스에 강하다", mods: { dmg: 2.1, range: 1.35, rate: 0.5 } },
+      sniper: { name: "저격", icon: "🔭", ring: 16764006, desc: "사거리와 한 방이 크게 늘지만 발사가 느려진다 — 단단한 적·보스에 강하다", mods: { dmg: 2.1, range: 1.35, rate: 0.5 } },
       rapid: { name: "연사", icon: "⚡", ring: 5891071, desc: "사거리와 한 방을 내주고 발사 속도를 크게 올린다 — 몰려오는 잡졸에 강하다", mods: { dmg: 0.62, range: 0.85, rate: 2 } }
     },
     frost: {
@@ -360,7 +395,7 @@ export var CFG = {
     },
     cannon: {
       barrage: { name: "융단폭격", icon: "🎇", ring: 16752640, desc: "폭발 범위가 크게 넓어진다(한 방은 약해진다) — 뭉친 무리를 통째로 쓸어담는다", mods: { dmg: 0.7, splash: 1.5, rate: 1.15 } },
-      breaker: { name: "철갑탄", icon: "🛡️", ring: 12105912, desc: "범위를 좁히는 대신 한 방이 훨씬 무거워진다 — 브루트\xB7보스를 부순다", mods: { dmg: 1.75, splash: 0.55 } }
+      breaker: { name: "철갑탄", icon: "🛡️", ring: 12105912, desc: "범위를 좁히는 대신 한 방이 훨씬 무거워진다 — 브루트·보스를 부순다", mods: { dmg: 1.75, splash: 0.55 } }
     },
     poison: {
       virulent: { name: "맹독", icon: "☣️", ring: 9419324, desc: "독이 훨씬 빠르게 갉아먹는다(대신 짧다) — 단단한 한 놈을 녹인다", mods: { poisonDps: 1.9, poisonTime: 0.6 } },
@@ -369,6 +404,13 @@ export var CFG = {
     snare: {
       bind: { name: "속박", icon: "⛓️", ring: 16764006, desc: "묶는 시간이 크게 늘어난다 — 위험한 한 놈을 오래 세워 둔다", mods: { root: 1.55, rate: 0.85 } },
       net: { name: "그물", icon: "🕸️", ring: 11800063, desc: "주변 적까지 함께 묶는다(묶는 시간은 짧다) — 무리를 통째로 세운다", mods: { root: 0.7 }, add: { splash: 3.6 } }
+    },
+    // chain 은 숫자가 아니라 객체라 mods 로는 못 건드린다(stats getter가 숫자 필드만 곱한다) — add로
+    // 통째로 새 chain 객체를 얹어서(기존 값을 완전히 대체) 갈래마다 완전히 다른 체인 모양을 만든다.
+    // focus는 count:1로 사실상 체인을 끄는 셈이라 새 로직 없이 자연스럽게 단일 표적 타워가 된다.
+    lightning: {
+      spread: { name: "확산", icon: "🌐", ring: 6739199, desc: "튀는 대상 수와 사거리가 늘어난다(한 방은 약해진다) — 흩어진 잡몹 무리를 한 번에 쓸어담는다", mods: { dmg: 0.6, rate: 1.15 }, add: { chain: { count: 7, range: 6.5, falloff: 0.75 } } },
+      focus: { name: "집속", icon: "🎯", ring: 16752640, desc: "튐을 포기하고 한 놈에게 모든 전력을 쏟는다 — 보스·브루트를 순식간에 녹인다", mods: { dmg: 2.5, range: 1.25 }, add: { chain: { count: 1, range: 0, falloff: 1 } } }
     }
   },
   // 보급품 투하 — 전투 중(웨이브 2부터) 가끔 지도 위에 상자가 떨어진다. 한 번에 최대 1개만 떠 있고,
@@ -379,6 +421,28 @@ export var CFG = {
   // 내 캐릭터가 그 자리에 있으면 그대로 맞는다 — 순수 이득이던 보급품 투하와 반대로 양날의 검이다.
   // 건물·자원 노드를 피하지 않는다 — 그래서 위험하다.
   meteor: { minWave: 4, firstDelay: 22, minGap: 40, maxGap: 65, telegraphTime: 2.5, radius: 5, dmg: 150, buildingDmgMult: 0.5, playerDmg: 35 },
+  // 보물게 — 전투 중(3웨이브부터) 가끔 튀어나와 도망만 다니는 몬스터. 웨이브 구성에 안 끼는 독립
+  // 이벤트라 운석·보급품과 같은 패턴(호스트 전용 타이머)으로 처리한다. lifetime 안에 못 잡으면
+  // 보상 없이 사라진다 — 보급품처럼 순수 이득이 아니라, 잡으려면 지금 하던 걸 멈추고 쫓아가야 한다.
+  treasureEvent: { minWave: 3, firstDelay: 20, minGap: 35, maxGap: 55, lifetime: 13 },
+  // 떠돌이 상인 — 웨이브를 클리어하고 준비 시간에 들어갈 때(2웨이브부터) 확률적으로 나타나,
+  // 그 준비 시간 동안만 무작위 2개 품목을 판다. 축복(엔드리스 전용, 정수로 구매, 영구 적용)과
+  // 달리 표준 캠페인부터 목재·광물로 살 수 있고, 물약 종류는 해당 웨이브 한 번만 지속되는
+  // 일회성 효과라 "지금 자원을 아껴 쌓을지, 당장의 이득으로 바꿀지"라는 준비 시간의 선택지를 넓힌다.
+  // 품목은 플레이어별로 각자 한 번씩 살 수 있다(공유 자원 모드에서도 동일 — 팀 전체가 아니라
+  // 인당 1회). 웨이브가 시작되면(전투 진입) 즉시 사라진다.
+  merchant: {
+    minWave: 2,
+    chance: 0.65,
+    offerCount: 2,
+    pool: {
+      heal: { name: "치유 물약", icon: "🧪", desc: "크리스탈 체력을 즉시 300 회복한다", cost: { wood: 40, stone: 30 }, kind: "heal", value: 300 },
+      atkTonic: { name: "힘의 물약", icon: "💪", desc: "다음 웨이브 동안 근접 공격력 +40%", cost: { wood: 35, stone: 20 }, kind: "tempAtk", value: 1.4 },
+      towerTonic: { name: "포격 물약", icon: "🗼", desc: "다음 웨이브 동안 모든 타워 공격력 +25%", cost: { wood: 30, stone: 35 }, kind: "tempTower", value: 1.25 },
+      shardTrade: { name: "정수 감정", icon: "💠", desc: "목재·광물을 정수 1개로 바꾼다", cost: { wood: 50, stone: 50 }, kind: "shard", value: 1 },
+      ironTrade: { name: "철 주괴 거래", icon: "⚙️", desc: "목재·광물을 철 3개로 바꾼다", cost: { wood: 60, stone: 40 }, kind: "iron", value: 3 }
+    }
+  },
   // 엔드리스 축복 — 10웨이브 승리 이후(엔드리스)에만 등장한다. 표준 캠페인 밸런스에는 영향이 없다.
   // n웨이브마다 무작위 2개 중 하나를 골라 영구 적용(응급 처치만 즉시 1회성). 전부 호스트가 계산하는
   // 값(근접 공격력·타워 공격력·스킬 비용·크리스탈 체력)에만 걸려 있어서 별도 동기화 없이 참가자에게도 그대로 반영된다.
@@ -462,6 +526,7 @@ function _standardTotal(w2) {
   if (w2 >= 5) n += 1 + Math.floor((w2 - 3) / 3);
   if (w2 >= 6) n += 1 + Math.floor((w2 - 4) / 2);
   if (w2 >= 7) n += 1 + Math.floor((w2 - 5) / 3);
+  if (w2 >= 8) n += 1 + Math.floor((w2 - 6) / 3);
   return n;
 }
 export var SPECIAL_WAVES = {
@@ -471,12 +536,18 @@ export var SPECIAL_WAVES = {
   // 이번 웨이브의 몬스터는(정예로 뽑히지 않는 한) 전부 결계(ward)를 두르고 나온다 — 타워가
   // 아예 조준을 못 하니 트랩·근접·정수 스킬로 직접 정리해야 한다. 평소엔 가끔 섞여 나오는
   // 변종 하나를 "이번 웨이브 전체의 규칙"으로 확대한 것 — 방어선을 잠깐 내려놓고 뛰어들게 만든다.
-  ward: { name: "결계", icon: "🌀", desc: "몬스터 전부가 결계에 씌워 타워가 조준하지 못한다 — 트랩·근접·정수 스킬로 직접 정리해야 한다" }
+  ward: { name: "결계", icon: "🌀", desc: "몬스터 전부가 결계에 씌워 타워가 조준하지 못한다 — 트랩·근접·정수 스킬로 직접 정리해야 한다" },
+  // 평소엔 무리에 한둘만 섞여 나오는 치유사(healer)를 이번 웨이브 전체의 핵심으로 확대한 것 —
+  // rush가 물량, siege가 건물 파괴, elite가 강한 개체, ward가 조준 불가라는 축이었다면 healers는
+  // "안 죽이면 끝나지 않는다"는 축이다. 치유사를 먼저 솎아내지 않으면 나머지 그런트가 계속
+  // 회복되어 웨이브가 실질적으로 안 끝난다 — 타워가 알아서 잡아 주길 기다리지 말고 직접
+  // 우선순위를 정해 뛰어들어야 한다.
+  healers: { name: "치유단", icon: "💉", desc: "치유사가 잔뜩 섞여 나와 서로를 회복시킨다 — 먼저 솎아내지 않으면 무리 전체가 안 죽는다" }
 };
 var SPECIAL_KEYS = Object.keys(SPECIAL_WAVES);
 export function specialWaveKind(w2) {
   if (w2 < 3 || w2 % 5 === 0 || w2 % 3 !== 0) return null;
-  const occurrence = w2 / 3;
+  const occurrence = Math.floor(w2 / 3) - Math.floor(w2 / 15);
   return SPECIAL_KEYS[(occurrence - 1) % SPECIAL_KEYS.length];
 }
 var BOSS_CYCLE = ["boss", "frostlord", "warden"];
@@ -492,6 +563,12 @@ function _specialComposition(w2, kind) {
       { type: otherType, count: Math.max(2, Math.round(total * 0.4)) }
     ];
   }
+  if (kind === "healers") {
+    return [
+      { type: "grunt", count: Math.max(3, Math.round(total * 0.34)) },
+      { type: "healer", count: Math.max(2, Math.round(total * 0.22)) }
+    ];
+  }
   return [{ type: "grunt", count: Math.max(3, Math.round(total * 0.32)) }];
 }
 export function waveComposition(w2) {
@@ -505,6 +582,7 @@ export function waveComposition(w2) {
     if (w2 >= 5) l2.push({ type: "raider", count: 1 + Math.floor((w2 - 3) / 3) });
     if (w2 >= 6) l2.push({ type: "flyer", count: 1 + Math.floor((w2 - 4) / 2) });
     if (w2 >= 7) l2.push({ type: "healer", count: 1 + Math.floor((w2 - 5) / 3) });
+    if (w2 >= 8) l2.push({ type: "bomber", count: 1 + Math.floor((w2 - 6) / 3) });
     return l2;
   })();
   if (w2 % 5 === 0) {
@@ -557,7 +635,11 @@ export function enemyStats(type, wave) {
 export var DIFFICULTIES = {
   normal: { key: "normal", label: "보통", desc: "맨손으로 시작 · 나무부터 캔다", startWood: 0, startStone: 0, prepBonus: 0, hpMult: 1, dmgMult: 1 },
   easy: { key: "easy", label: "쉬움", desc: "준비 시간 +30초 · 시작 자원은 똑같이 0", startWood: 0, startStone: 0, prepBonus: 30, hpMult: 1, dmgMult: 1 },
-  hard: { key: "hard", label: "어려움", desc: "준비 시간 -15초 · 몬스터 체력·공격력 +15% · 시작 자원 0", startWood: 0, startStone: 0, prepBonus: -15, hpMult: 1.15, dmgMult: 1.15 }
+  hard: { key: "hard", label: "어려움", desc: "준비 시간 -15초 · 몬스터 체력·공격력 +15% · 시작 자원 0", startWood: 0, startStone: 0, prepBonus: -15, hpMult: 1.15, dmgMult: 1.15 },
+  // "어려움"보다 한 단계 더 — 파고들어 볼 사람들을 위한 선택지. 기존 두 축(준비 시간, 몬스터
+  // 체력·공격력)을 그대로 더 세게 미는 것뿐이라 새 로직이 필요 없다(둘 다 CFG.wave에 이미
+  // 걸려 있는 배율이라 여기 숫자만 바꾸면 웨이브 구성 전체에 자동으로 반영된다).
+  nightmare: { key: "nightmare", label: "악몽", desc: "준비 시간 -25초 · 몬스터 체력·공격력 +30% · 시작 자원 0", startWood: 0, startStone: 0, prepBonus: -25, hpMult: 1.3, dmgMult: 1.3 }
 };
 var BASE_PREP_TIME = CFG.wave.prepTime;
 var BASE_FIRST_PREP_TIME = CFG.wave.firstPrepTime;
