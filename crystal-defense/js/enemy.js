@@ -334,6 +334,11 @@ export var EnemyManager = class {
           if (healedAny) this.onHealPulse?.(e);
         }
       }
+      // 야생 동물은 크리스탈 길찾기·건물 공격을 아예 타지 않는다 — 전용 분기로 빠진다
+      if (e.st.wild) {
+        this._wildTick(e, dt2, now, players);
+        continue;
+      }
       if (e.st.boss && this._bossTick(e, dt2, now)) {
         this._applyPosition(e, dt2, now);
         continue;
@@ -558,6 +563,63 @@ export var EnemyManager = class {
       }
     }
     return { x: clamp(sx, -1, 1), z: clamp(sz, -1, 1) };
+  }
+  // 야생 동물 전용 이동. 셋 다 크리스탈에는 관심이 없다.
+  //  - 도망형(토끼·사슴): 사거리 안에 사람이 보이면 반대로 달아나고, 없으면 느긋하게 배회한다.
+  //  - 반격형(멧돼지): 평소엔 배회하다가 맞으면 때린 사람을 aggroTime 동안 쫓아가 들이받는다.
+  _wildTick(e, dt2, now, players) {
+    const st = e.st;
+    const speed = st.speed * e.slowFactor * (now < e.rootUntil ? 0 : 1);
+    let tx = null, tz = null, chasing = false;
+    if (e.aggroUntil > now && e.aggroTarget) {
+      const p2 = players.find((p3) => p3.id === e.aggroTarget && p3.alive);
+      if (p2) {
+        tx = p2.x;
+        tz = p2.z;
+        chasing = true;
+      } else {
+        e.aggroUntil = 0;
+      }
+    }
+    if (!chasing) {
+      const near = st.flees ? this._nearestPlayer(players, e.x, e.z, st.fleeRange || 12) : null;
+      if (near) {
+        tx = e.x + (e.x - near.x);
+        tz = e.z + (e.z - near.z);
+      } else {
+        e._wanderCd = (e._wanderCd || 0) - dt2;
+        if (e._wanderCd <= 0) {
+          e._wanderCd = 2 + Math.random() * 3;
+          e._wanderAng = Math.random() * Math.PI * 2;
+        }
+        tx = e.x + Math.cos(e._wanderAng) * 4;
+        tz = e.z + Math.sin(e._wanderAng) * 4;
+      }
+    }
+    const dx = tx - e.x, dz = tz - e.z;
+    const len = Math.hypot(dx, dz) || 1;
+    // 쫓기거나 달아날 땐 전력으로, 그냥 배회할 땐 느긋하게
+    const mult = chasing ? 1 : this._nearestPlayer(players, e.x, e.z, st.fleeRange || 12) ? 1 : 0.35;
+    let mx = dx / len * speed * mult, mz = dz / len * speed * mult;
+    const sep = this._separation(e);
+    mx += sep.x * speed * 0.5;
+    mz += sep.z * speed * 0.5;
+    e.x += mx * dt2;
+    e.z += mz * dt2;
+    // 맵 밖으로 도망가 버리지 않게 가둔다
+    const lim = CFG.world.size / 2 - 2;
+    e.x = clamp(e.x, -lim, lim);
+    e.z = clamp(e.z, -lim, lim);
+    e.attackCd -= dt2;
+    if (chasing && st.dmg > 0) {
+      const p2 = players.find((p3) => p3.id === e.aggroTarget);
+      if (p2 && dist(e.x, e.z, p2.x, p2.z) <= 1.5 + st.radius && e.attackCd <= 0) {
+        e.attackCd = 1 / st.rate;
+        this.onPlayerHit?.(e, p2);
+      }
+    }
+    this._face(e, e.x + mx, e.z + mz, dt2);
+    this._applyPosition(e, dt2, now);
   }
   _nearestPlayer(players, x2, z2, range) {
     let best = null, bd2 = range * range;

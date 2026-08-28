@@ -536,6 +536,7 @@ button.corner.mute.off { opacity: 0.5; }
     <div class="res"><span class="ic">🪨</span><b id="res-stone">0</b><span class="lbl">광물</span></div>
     <div class="res"><span class="ic">⚙️</span><b id="res-iron">0</b><span class="lbl">철</span></div>
     <div class="res"><span class="ic">💠</span><b id="res-shard">0</b><span class="lbl">정수 (스킬)</span></div>
+    <div id="meat-row" class="tag hidden"></div>
     <button id="btn-hup" class="mini">채집속도 <b id="hup-lv">Lv.1</b> <span id="hup-cost" class="cost"></span></button>
     <div id="tool-row" class="tools"></div>
     <div id="pool-mode" class="tag">팀 공유 자원</div>
@@ -638,6 +639,7 @@ button.corner.mute.off { opacity: 0.5; }
       <tr><td>📍 미니맵 핑</td><td>우하단 미니맵을 클릭하면 그 위치에 표시가 뜨고(고리+빛기둥, 3.5초간 유지) 파티원 전원의 화면에도 똑같이 나타난다 — 말 없이 "여기로 와" · "여기 위험해"를 전달하는 협동 신호. 도배 방지로 2.5초 쿨다운이 있다</td></tr>
       <tr><td>장비</td><td>인벤토리 <b>장비</b> 탭에서 고르면 손에 든다. ⛏️ 곡괭이도 쥐어야 정수석을 캘 수 있다</td></tr>
       <tr><td>몬스터</td><td>🧙 주술사는 벽을 무시하고 멀리서 크리스탈을 저격 · 🪓 약탈자는 가장 가까운 건물로 직행해 부순다 · 🦇 박쥐(6웨이브부터)는 벽·함정을 전부 무시하고 하늘로 크리스탈까지 직선 비행한다 — 체력이 낮아 타워로 요격하는 게 사실상 유일한 대응 · 🧨 폭탄병(8웨이브부터)은 죽는 순간 주변에 폭발 피해를 남긴다 — 코앞에서 마무리하면 같이 맞으니 거리를 두고 처리할 것</td></tr>
+      <tr><td>🏹 사냥과 요리</td><td><b>준비 시간에만</b> 맵 바깥쪽에 야생 동물이 돌아다닌다 — 🐇 토끼(빠르고 잘 도망친다) · 🦌 사슴 · 🐗 멧돼지(<b>도망치지 않고 때리면 오히려 달려들어 들이받는다</b>). 잡으면 자원이 아니라 <b>생고기</b>가 나오고, 생고기는 그대로는 쓸모가 없다 — <b>화로</b>에서 목재를 태워 구워 먹어야 <b>다음 웨이브 한 판</b> 동안 효과가 붙는다: 🍢 토끼 꼬치(이동 속도 +18%) · 🥩 사슴 스테이크(최대 체력 +40, 즉시 회복) · 🍖 멧돼지 구이(근접 공격력 +25%). 웨이브가 시작되면 동물은 전부 흩어져 사라지니, 짧은 준비 시간을 <b>채집·건설·업그레이드·사냥</b> 중 어디에 쓸지가 매번 선택이 된다</td></tr>
       <tr><td>🦀 보물게</td><td>3웨이브부터 전투 중 가끔 튀어나와 공격은 안 하고 도망만 다닌다. 시간 안에 못 잡으면 보상 없이 사라지니 지금 하던 걸 멈추고 쫓아갈지 판단해야 한다 — 잡으면 자원을 두둑히, 가끔 정수(💠)까지 준다</td></tr>
       <tr><td>변종</td><td>웨이브가 오를수록 몬스터에 접두사가 붙는다: 🛡️ 방패(정면 피해 대폭 감소, 등 뒤를 쳐야 함) · ➗ 분열(죽으면 약한 개체 2마리로) · 💨 질주(주기적으로 폭발적 가속) · 💚 재생(잠시 안 맞으면 체력이 차오름, 끝까지 몰아쳐야 함) · 🌀 결계(타워가 조준 못함, 직접 처치해야 함). 색 틴트 + 머리 위 아이콘으로 항상 표시된다</td></tr>
       <tr><td>⭐ 정예</td><td>3웨이브부터 웨이브당 최대 1마리, 확률적으로 골드빛 정예가 섞여 나온다. 체력·공격력이 크게 세지지만 처치 보상(목재·광물)은 3배 — 등장하면 토스트로 알려주니 그놈부터 집중해서 잡을지 무시할지는 선택</td></tr>
@@ -10222,7 +10224,8 @@ button.corner.mute.off { opacity: 0.5; }
     weaponMaster: { name: "\uC7A5\uC778\uC758 \uC190\uAE38", icon: "\u{1F6E0}\uFE0F", desc: "\uBB34\uAE30 \uD558\uB098\uB97C \uCD5C\uB300 \uB808\uBCA8\uAE4C\uC9C0 \uAC15\uD654\uD588\uB2E4" },
     treasureHunter: { name: "\uBCF4\uBB3C \uC0AC\uB0E5\uAFBC", icon: "\u{1F980}", desc: "\uBCF4\uBB3C\uAC8C\uB97C 5\uB9C8\uB9AC \uC7A1\uC558\uB2E4" },
     nightmareConqueror: { name: "\uC545\uBABD \uC815\uBCF5", icon: "\u{1F631}", desc: "\uC545\uBABD \uB09C\uC774\uB3C4\uB85C 10\uC6E8\uC774\uBE0C\uB97C \uB9C9\uC544\uB0C8\uB2E4" },
-    fourKings: { name: "\uC0AC\uCC9C\uC655", icon: "\u{1F409}", desc: "\uD55C \uD310\uC5D0\uC11C \uB124 \uBCF4\uC2A4(\uD30C\uAD34\uC790\xB7\uC11C\uB9AC \uAD70\uC8FC\xB7\uCE68\uBB35\uC758 \uAD70\uC8FC\xB7\uAC08\uCDE8\uC790)\uB97C \uC804\uBD80 \uCC98\uCE58\uD588\uB2E4" }
+    fourKings: { name: "\uC0AC\uCC9C\uC655", icon: "\u{1F409}", desc: "\uD55C \uD310\uC5D0\uC11C \uB124 \uBCF4\uC2A4(\uD30C\uAD34\uC790\xB7\uC11C\uB9AC \uAD70\uC8FC\xB7\uCE68\uBB35\uC758 \uAD70\uC8FC\xB7\uAC08\uCDE8\uC790)\uB97C \uC804\uBD80 \uCC98\uCE58\uD588\uB2E4" },
+    hunter: { name: "\uC0AC\uB0E5\uAFBC", icon: "\u{1F356}", desc: "\uC57C\uC0DD \uB3D9\uBB3C\uC744 10\uB9C8\uB9AC \uC0AC\uB0E5\uD588\uB2E4" }
   };
   var STORE_KEY = "cd.achievements";
   function loadUnlocked() {
@@ -11079,6 +11082,14 @@ button.corner.mute.off { opacity: 0.5; }
       // event: 웨이브 구성에 안 끼는 독립 이벤트 몬스터라는 표시 — 웨이브 클리어 판정과 "남은 몬스터"
       // 표시에서 제외한다. 이게 없으면 적을 다 잡아도 도망 다니는 보물게 한 마리 때문에 웨이브가
       // 게 사라질 때까지(최대 13초) 안 끝나고, HUD에는 잡을 수 없는 "남은 몬스터 1" 이 계속 떠 있다.
+      // ── 야생 동물 ──────────────────────────────────────────────────────────────
+      // 몬스터가 아니라 준비 시간에만 돌아다니는 사냥감이다. wild:true 가 붙으면 크리스탈로 향하는
+      // 길찾기를 아예 타지 않고(_wildTick 이 따로 처리) event:true 라 웨이브 클리어 판정에서도 빠진다.
+      // 잡으면 자원이 아니라 생고기(meat)를 주고, 그건 화로에서 구워야 쓸모가 생긴다.
+      rabbit: { name: "\uD1A0\uB07C", icon: "\u{1F407}", hp: 10, speed: 6.4, dmg: 0, rate: 0, radius: 0.3, color: 14803425, bounty: { wood: 0, stone: 0 }, scale: 0.55, flees: true, wild: true, event: true, fleeRange: 13, meat: "rabbit" },
+      deer: { name: "\uC0AC\uC2B4", icon: "\u{1F98C}", hp: 30, speed: 4.9, dmg: 0, rate: 0, radius: 0.5, color: 11106111, bounty: { wood: 0, stone: 0 }, scale: 1.05, flees: true, wild: true, event: true, fleeRange: 11, meat: "deer" },
+      // 유일하게 도망치지 않는다 — 때리면 오히려 달려들어 반격한다. 공짜 사냥감이 아니게 만드는 장치.
+      boar: { name: "\uBA67\uB3FC\uC9C0", icon: "\u{1F417}", hp: 70, speed: 3.6, dmg: 16, rate: 0.8, radius: 0.6, color: 6048829, bounty: { wood: 0, stone: 0 }, scale: 0.95, wild: true, event: true, retaliates: true, aggroTime: 6, meat: "boar" },
       treasure: { name: "\uBCF4\uBB3C\uAC8C", icon: "\u{1F980}", hp: 16, speed: 5.4, dmg: 0, rate: 0, radius: 0.4, color: 16766720, bounty: { wood: 16, stone: 12 }, scale: 0.85, flees: true, event: true, shardChance: 0.5 }
     },
     // 몬스터 변종 접두사 — 종류를 늘리는 대신 기존 몬스터에 가끔 붙는다. 웨이브가 오를수록 등장 확률이 오른다.
@@ -11194,6 +11205,31 @@ button.corner.mute.off { opacity: 0.5; }
     // 내 캐릭터가 그 자리에 있으면 그대로 맞는다 — 순수 이득이던 보급품 투하와 반대로 양날의 검이다.
     // 건물·자원 노드를 피하지 않는다 — 그래서 위험하다.
     meteor: { minWave: 4, firstDelay: 22, minGap: 40, maxGap: 65, telegraphTime: 2.5, radius: 5, dmg: 150, buildingDmgMult: 0.5, playerDmg: 35 },
+    // ── 사냥과 요리 ────────────────────────────────────────────────────────────────
+    // 준비 시간에만 야생 동물이 맵을 돌아다닌다. 잡으면 생고기가 나오고, 생고기는 그 자체로는
+    // 아무 쓸모가 없다 — 화로에서 구워 먹어야 다음 웨이브 한 판짜리 버프가 된다.
+    // 설계 의도: 준비 시간은 원래도 모자란다(채집할지, 지을지, 업그레이드할지). 여기에 "사냥하러
+    // 나갈지" 라는 네 번째 선택지를 얹되, 공짜가 아니게 만든다 — 동물은 도망치고(시간을 먹는다),
+    // 멧돼지는 반격하며(체력을 먹는다), 굽는 데 목재도 든다. 그리고 웨이브가 시작되면 전부 흩어져
+    // 사라지므로 "지금 나갈지" 를 매 준비 시간마다 다시 판단하게 된다.
+    hunt: {
+      maxAlive: 5,
+      // 준비 시간에 이 간격으로 한 마리씩 나타난다
+      spawnGap: 4.5,
+      // 크리스탈에서 이만큼 떨어진 링 안쪽 어딘가에 나타난다(건설 구역 밖 -> 자연히 나가야 한다)
+      minDist: 16,
+      maxDist: 34,
+      // 종류별 등장 가중치 — 흔한 토끼, 가끔 사슴, 드물게 멧돼지
+      weights: { rabbit: 5, deer: 3, boar: 2 }
+    },
+    // 화로에서 굽는다. 생고기 1 + 목재를 태워 그 자리에서 먹고, 효과는 다음 웨이브 한 판 동안 간다.
+    // 상인의 물약(tempBoon)과 같은 "한 판짜리" 수명이지만, 자원이 아니라 사냥한 전리품으로만
+    // 살 수 있다는 점이 다르다 — 돈으로 못 사는 버프다.
+    cook: {
+      rabbit: { name: "\uD1A0\uB07C \uAF2C\uCE58", icon: "\u{1F362}", wood: 4, desc: "\uB2E4\uC74C \uC6E8\uC774\uBE0C \uB3D9\uC548 \uC774\uB3D9 \uC18D\uB3C4 +18%", kind: "speed", value: 1.18 },
+      deer: { name: "\uC0AC\uC2B4 \uC2A4\uD14C\uC774\uD06C", icon: "\u{1F969}", wood: 6, desc: "\uB2E4\uC74C \uC6E8\uC774\uBE0C \uB3D9\uC548 \uCD5C\uB300 \uCCB4\uB825 +40 (\uC989\uC2DC \uADF8\uB9CC\uD07C \uD68C\uBCF5)", kind: "vigor", value: 40 },
+      boar: { name: "\uBA67\uB3FC\uC9C0 \uAD6C\uC774", icon: "\u{1F356}", wood: 8, desc: "\uB2E4\uC74C \uC6E8\uC774\uBE0C \uB3D9\uC548 \uADFC\uC811 \uACF5\uACA9\uB825 +25%", kind: "might", value: 1.25 }
+    },
     // 보물게 — 전투 중(3웨이브부터) 가끔 튀어나와 도망만 다니는 몬스터. 웨이브 구성에 안 끼는 독립
     // 이벤트라 운석·보급품과 같은 패턴(호스트 전용 타이머)으로 처리한다. lifetime 안에 못 잡으면
     // 보상 없이 사라진다 — 보급품처럼 순수 이득이 아니라, 잡으려면 지금 하던 걸 멈추고 쫓아가야 한다.
@@ -12034,6 +12070,7 @@ button.corner.mute.off { opacity: 0.5; }
       for (const e of enemies) {
         if (e.dead) continue;
         if (e.variant === "ward") continue;
+        if (e.st.wild) continue;
         const d2 = (e.x - b.x) ** 2 + (e.z - b.z) ** 2;
         if (d2 > r2) continue;
         const score = e.x * e.x + e.z * e.z;
@@ -12472,6 +12509,10 @@ button.corner.mute.off { opacity: 0.5; }
             if (healedAny) this.onHealPulse?.(e);
           }
         }
+        if (e.st.wild) {
+          this._wildTick(e, dt2, now, players);
+          continue;
+        }
         if (e.st.boss && this._bossTick(e, dt2, now)) {
           this._applyPosition(e, dt2, now);
           continue;
@@ -12696,6 +12737,61 @@ button.corner.mute.off { opacity: 0.5; }
         }
       }
       return { x: clamp(sx, -1, 1), z: clamp(sz, -1, 1) };
+    }
+    // 야생 동물 전용 이동. 셋 다 크리스탈에는 관심이 없다.
+    //  - 도망형(토끼·사슴): 사거리 안에 사람이 보이면 반대로 달아나고, 없으면 느긋하게 배회한다.
+    //  - 반격형(멧돼지): 평소엔 배회하다가 맞으면 때린 사람을 aggroTime 동안 쫓아가 들이받는다.
+    _wildTick(e, dt2, now, players) {
+      const st = e.st;
+      const speed = st.speed * e.slowFactor * (now < e.rootUntil ? 0 : 1);
+      let tx = null, tz = null, chasing = false;
+      if (e.aggroUntil > now && e.aggroTarget) {
+        const p2 = players.find((p3) => p3.id === e.aggroTarget && p3.alive);
+        if (p2) {
+          tx = p2.x;
+          tz = p2.z;
+          chasing = true;
+        } else {
+          e.aggroUntil = 0;
+        }
+      }
+      if (!chasing) {
+        const near = st.flees ? this._nearestPlayer(players, e.x, e.z, st.fleeRange || 12) : null;
+        if (near) {
+          tx = e.x + (e.x - near.x);
+          tz = e.z + (e.z - near.z);
+        } else {
+          e._wanderCd = (e._wanderCd || 0) - dt2;
+          if (e._wanderCd <= 0) {
+            e._wanderCd = 2 + Math.random() * 3;
+            e._wanderAng = Math.random() * Math.PI * 2;
+          }
+          tx = e.x + Math.cos(e._wanderAng) * 4;
+          tz = e.z + Math.sin(e._wanderAng) * 4;
+        }
+      }
+      const dx = tx - e.x, dz = tz - e.z;
+      const len = Math.hypot(dx, dz) || 1;
+      const mult = chasing ? 1 : this._nearestPlayer(players, e.x, e.z, st.fleeRange || 12) ? 1 : 0.35;
+      let mx = dx / len * speed * mult, mz = dz / len * speed * mult;
+      const sep = this._separation(e);
+      mx += sep.x * speed * 0.5;
+      mz += sep.z * speed * 0.5;
+      e.x += mx * dt2;
+      e.z += mz * dt2;
+      const lim = CFG.world.size / 2 - 2;
+      e.x = clamp(e.x, -lim, lim);
+      e.z = clamp(e.z, -lim, lim);
+      e.attackCd -= dt2;
+      if (chasing && st.dmg > 0) {
+        const p2 = players.find((p3) => p3.id === e.aggroTarget);
+        if (p2 && dist(e.x, e.z, p2.x, p2.z) <= 1.5 + st.radius && e.attackCd <= 0) {
+          e.attackCd = 1 / st.rate;
+          this.onPlayerHit?.(e, p2);
+        }
+      }
+      this._face(e, e.x + mx, e.z + mz, dt2);
+      this._applyPosition(e, dt2, now);
     }
     _nearestPlayer(players, x2, z2, range) {
       let best = null, bd2 = range * range;
@@ -13906,7 +14002,7 @@ button.corner.mute.off { opacity: 0.5; }
       this.cancelHarvest();
       return true;
     }
-    update(dt2, input, sm2, grid, world, others) {
+    update(dt2, input, sm2, grid, world, others, speedMult = 1) {
       const now = performance.now() / 1e3;
       if (!this.alive) {
         const rc = CFG.player.revive;
@@ -13939,7 +14035,7 @@ button.corner.mute.off { opacity: 0.5; }
           this.cancelHarvest();
           const sprint = input.down("shift");
           const weatherMult = world.weatherKind === "rain" ? WEATHER.rain.playerSpeedMult : 1;
-          const spd = (sprint ? CFG.player.sprint : CFG.player.speed) * weatherMult;
+          const spd = (sprint ? CFG.player.sprint : CFG.player.speed) * weatherMult * speedMult;
           const len = Math.hypot(mx, mz);
           mx /= len;
           mz /= len;
@@ -14959,7 +15055,7 @@ button.corner.mute.off { opacity: 0.5; }
       this.local = new LocalPlayer(this.net.selfId, this.net.name, this._colorIndex(this.net.selfId));
       this.sm.scene.add(this.local.mesh);
       this.players.set(this.local.id, this.local);
-      this.pools.team = { wood: this.difficultyPreset.startWood, stone: this.difficultyPreset.startStone, iron: 0, shard: 0 };
+      this.pools.team = { wood: this.difficultyPreset.startWood, stone: this.difficultyPreset.startStone, iron: 0, shard: 0, meat: { rabbit: 0, deer: 0, boar: 0 } };
       this.pools.byId = {};
       this._poolOf(this.local.id);
       this._wireCallbacks();
@@ -14984,7 +15080,8 @@ button.corner.mute.off { opacity: 0.5; }
         bossKillsSeen: [],
         trapsTriggered: 0,
         elitesKilled: 0,
-        treasuresCaught: 0
+        treasuresCaught: 0,
+        animalsHunted: 0
       };
       this._waveMark = { time: 0, kills: 0 };
       this._bossActive = false;
@@ -15006,6 +15103,8 @@ button.corner.mute.off { opacity: 0.5; }
       this._dropIdSeq = 1;
       this._meteorTimer = CFG.meteor.firstDelay;
       this._rift = null;
+      this._huntTimer = 0;
+      this.feast = { kind: null, wavesLeft: 0 };
       this._meteorPending = null;
       this.world.clearMeteor();
       this._treasureTimer = CFG.treasureEvent.firstDelay;
@@ -15047,7 +15146,7 @@ button.corner.mute.off { opacity: 0.5; }
     }
     _poolOf(id) {
       if (this.shared) return this.pools.team;
-      if (!this.pools.byId[id]) this.pools.byId[id] = { wood: this.difficultyPreset.startWood, stone: this.difficultyPreset.startStone, iron: 0, shard: 0 };
+      if (!this.pools.byId[id]) this.pools.byId[id] = { wood: this.difficultyPreset.startWood, stone: this.difficultyPreset.startStone, iron: 0, shard: 0, meat: { rabbit: 0, deer: 0, boar: 0 } };
       return this.pools.byId[id];
     }
     get myPool() {
@@ -15279,6 +15378,7 @@ button.corner.mute.off { opacity: 0.5; }
         else this.net.send("hurt", { to: p2.id, dmg: e.st.dmg });
       };
       this.wave.onWaveStart = (w2, total) => {
+        this._clearWildlife();
         this.ui?.toast(this._waveStartLabel(w2, total), "warn");
         const bossEntry = waveComposition(w2).find((c2) => CFG.enemies[c2.type]?.boss);
         this.fx.ring(0, 0, 16734834, 10);
@@ -15351,6 +15451,7 @@ button.corner.mute.off { opacity: 0.5; }
       const t2 = this.tempBoon;
       if (t2.atkWavesLeft > 0 && --t2.atkWavesLeft <= 0) t2.atk = 1;
       if (t2.towerWavesLeft > 0 && --t2.towerWavesLeft <= 0) t2.towerDmg = 1;
+      this._decayFeast();
     }
     // 떠돌이 상인: 웨이브 클리어 직후(호스트에서만) 확률적으로 등장해, 이번 준비 시간에만
     // 무작위 품목 2개를 판다. 다음 웨이브가 시작되면(_updateMerchant) 자동으로 사라진다.
@@ -15422,7 +15523,7 @@ button.corner.mute.off { opacity: 0.5; }
         if (!b.isTrap) continue;
         const st = b.stats;
         for (const e of this.enemyMgr.list) {
-          if (e.dead || e.st.flies) continue;
+          if (e.dead || e.st.flies || e.st.wild) continue;
           if (dist(b.x, b.z, e.x, e.z) <= st.triggerRadius) {
             this._triggerTrap(b, e, st);
             break;
@@ -15526,6 +15627,100 @@ button.corner.mute.off { opacity: 0.5; }
     // 독립 이벤트라 운석·보급품과 같은 패턴(호스트 전용 타이머)으로 처리한다. 최대 1마리만 떠 있고,
     // lifetime 안에 못 잡으면 보상 없이 그냥 사라진다 — 보물게 자체는 일반 몬스터처럼 스냅샷으로
     // 자동 동기화되므로(enemyMgr.snapshot 이 타입을 가리지 않는다) 별도 네트워크 코드가 필요 없다.
+    // 사냥감 스폰 — 준비 시간에만. 웨이브가 시작되면 전부 흩어져 사라진다(_clearWildlife).
+    // 크리스탈에서 멀리(minDist~maxDist) 내보내서, 사냥하려면 방어선을 실제로 비우고 나가야 하게 만든다.
+    _updateHunt(dt2) {
+      if (!this.isHost) return;
+      if (this.wave.phase !== PHASE.PREP) return;
+      const c2 = CFG.hunt;
+      const alive = this.enemyMgr.list.filter((e2) => !e2.dead && e2.st.wild).length;
+      if (alive >= c2.maxAlive) return;
+      this._huntTimer -= dt2;
+      if (this._huntTimer > 0) return;
+      this._huntTimer = c2.spawnGap;
+      const total = Object.values(c2.weights).reduce((a2, b2) => a2 + b2, 0);
+      let roll = Math.random() * total, type = "rabbit";
+      for (const [k2, w2] of Object.entries(c2.weights)) {
+        roll -= w2;
+        if (roll <= 0) {
+          type = k2;
+          break;
+        }
+      }
+      const ang = Math.random() * Math.PI * 2;
+      const r = c2.minDist + Math.random() * (c2.maxDist - c2.minDist);
+      const e = this.enemyMgr.spawn(type, 1, Math.cos(ang) * r, Math.sin(ang) * r);
+      if (e && !this._seenHunt) {
+        this._seenHunt = true;
+        this.ui?.toast("\u{1F98C} \uC57C\uC0DD \uB3D9\uBB3C\uC774 \uBCF4\uC778\uB2E4! \uC900\uBE44 \uC2DC\uAC04\uC5D0\uB9CC \uB098\uD0C0\uB09C\uB2E4 \u2014 \uC7A1\uC73C\uBA74 \uC0DD\uACE0\uAE30\uB97C \uC5BB\uACE0, \uD654\uB85C\uC5D0\uC11C \uAD6C\uC6CC \uBA39\uC73C\uBA74 \uB2E4\uC74C \uC6E8\uC774\uBE0C \uB3D9\uC548 \uAC15\uD574\uC9C4\uB2E4", "good");
+      }
+    }
+    // 웨이브가 시작되면 사냥감은 전부 도망친다 — 전투 중에 섞여 있으면 표적이 헷갈리고,
+    // "준비 시간에만 사냥할 수 있다" 는 규칙도 흐려진다.
+    _clearWildlife() {
+      if (!this.isHost) return;
+      for (const e of this.enemyMgr.list) {
+        if (!e.dead && e.st.wild) {
+          this.fx.burst(e.x, 1, e.z, e.tintColor, 6, 3);
+          this.enemyMgr.kill(e);
+        }
+      }
+    }
+    requestCook(key) {
+      if (this.isHost) this.hostCook(this.local.id, key);
+      else this.net.send("cook", { key });
+    }
+    hostCook(playerId, key) {
+      const r = CFG.cook[key];
+      if (!r || !this.players.get(playerId)) return;
+      if (!this.hasStation("furnace")) {
+        this._notify(playerId, "\uD654\uB85C\uAC00 \uC788\uC5B4\uC57C \uAD6C\uC6B8 \uC218 \uC788\uC2B5\uB2C8\uB2E4", "bad");
+        return;
+      }
+      const pool = this._poolOf(playerId);
+      const meat = pool.meat || (pool.meat = { rabbit: 0, deer: 0, boar: 0 });
+      if ((meat[key] || 0) < 1) {
+        this._notify(playerId, `${CFG.enemies[key].icon} ${CFG.enemies[key].name} \uC0DD\uACE0\uAE30\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4`, "bad");
+        return;
+      }
+      if ((pool.wood || 0) < r.wood) {
+        this._notify(playerId, "\uBAA9\uC7AC\uAC00 \uBD80\uC871\uD569\uB2C8\uB2E4", "bad");
+        return;
+      }
+      meat[key] -= 1;
+      pool.wood -= r.wood;
+      this._trackSpend({ wood: r.wood }, "craft");
+      this.feast = { kind: r.kind, wavesLeft: 1 };
+      if (r.kind === "vigor") this._applyVigor(playerId, r.value);
+      this._notify(playerId, `${r.icon} ${r.name}\uC744(\uB97C) \uBA39\uC5C8\uB2E4! ${r.desc}`, "good");
+      if (playerId === this.local.id) this.sfx.upgrade();
+    }
+    // 사슴 스테이크: 최대 체력을 올리고 그만큼 즉시 회복시킨다(크리스탈 강화의 armor 와 같은 방식)
+    _applyVigor(playerId, amount) {
+      const p2 = this.players.get(playerId);
+      if (!p2) return;
+      p2.maxHp = CFG.player.hp + amount;
+      p2.hp = Math.min(p2.maxHp, p2.hp + amount);
+    }
+    // 한 판이 끝나면 잔치 효과도 같이 끝난다(상인 물약과 같은 수명)
+    _decayFeast() {
+      if (this.feast.wavesLeft > 0 && --this.feast.wavesLeft <= 0) {
+        const was = this.feast.kind;
+        this.feast.kind = null;
+        if (was === "vigor") {
+          const p2 = this.local;
+          p2.maxHp = CFG.player.hp;
+          p2.hp = Math.min(p2.hp, p2.maxHp);
+        }
+        if (was) this.ui?.toast("\uBC30\uBD80\uB984\uC774 \uAC00\uC168\uB2E4 \u2014 \uC794\uCE58 \uD6A8\uACFC\uAC00 \uB05D\uB0AC\uB2E4", "warn");
+      }
+    }
+    get feastSpeedMult() {
+      return this.feast.kind === "speed" ? CFG.cook.rabbit.value : 1;
+    }
+    get feastMightMult() {
+      return this.feast.kind === "might" ? CFG.cook.boar.value : 1;
+    }
     _updateTreasure(dt2) {
       const c2 = CFG.treasureEvent;
       if (this._treasureId != null) {
@@ -15593,6 +15788,10 @@ button.corner.mute.off { opacity: 0.5; }
       this._notify(playerId, `\u{1F4E6} \uBCF4\uAE09\uD488 \uD68D\uB4DD! \u{1FAB5}+${c2.reward.wood} \u{1FAA8}+${c2.reward.stone}${gotShard ? " \u{1F4A0}+1" : ""}`, "good");
     }
     _hurtEnemy(e, dmg, kind = "tower", fromX, fromZ) {
+      if (e.st.retaliates && kind === "player" && !e.dead) {
+        e.aggroTarget = this.local.id;
+        e.aggroUntil = performance.now() / 1e3 + (e.st.aggroTime || 5);
+      }
       const { died, applied } = e.damage(dmg, fromX, fromZ);
       this.fx.float(String(Math.round(applied)), e.x, 1.9, e.z, kind === "player" ? "player" : "");
       if (kind === "player") this.sfx.meleeHit();
@@ -15627,6 +15826,14 @@ button.corner.mute.off { opacity: 0.5; }
           this.fx.ring(e.x, e.z, 16763904, 3);
           if (this.stats.elitesKilled >= 5) this._unlockAchievement("eliteHunter");
         }
+        if (e.st.meat) {
+          const pool = this.shared ? this.pools.team : this._poolOf(this.local.id);
+          if (!pool.meat) pool.meat = { rabbit: 0, deer: 0, boar: 0 };
+          pool.meat[e.st.meat] = (pool.meat[e.st.meat] || 0) + 1;
+          this.ui?.toast(`${e.st.icon} ${e.st.name} \uC0AC\uB0E5! \uC0DD\uACE0\uAE30\uB97C \uC5BB\uC5C8\uB2E4 \u2014 \uD654\uB85C\uC5D0\uC11C \uAD6C\uC6CC \uBA39\uC5B4\uB77C`, "good");
+          this.stats.animalsHunted = (this.stats.animalsHunted || 0) + 1;
+          if (this.stats.animalsHunted >= 10) this._unlockAchievement("hunter");
+        }
         const b = e.st.bounty;
         const nightMult = (this.wave.wave + 1) % CFG.wave.nightEvery === 0 ? CFG.wave.nightBountyMult : 1;
         const bw = Math.round(b.wood * this.boonMult.bounty * nightMult);
@@ -15650,6 +15857,7 @@ button.corner.mute.off { opacity: 0.5; }
           this.ui?.toast(gotShard ? "\u{1F980} \uBCF4\uBB3C\uAC8C \uCC98\uCE58! \uBAA9\uC7AC\xB7\uAD11\uBB3C \uB450\uB451\uD788 + \u{1F4A0} \uC815\uC218 1" : "\u{1F980} \uBCF4\uBB3C\uAC8C \uCC98\uCE58! \uBAA9\uC7AC\xB7\uAD11\uBB3C\uC744 \uB450\uB451\uD788 \uCC59\uACBC\uB2E4", "good");
           this.stats.treasuresCaught = (this.stats.treasuresCaught || 0) + 1;
           if (this.stats.treasuresCaught >= 5) this._unlockAchievement("treasureHunter");
+          if (this.stats.animalsHunted >= 10) this._unlockAchievement("hunter");
         }
         this.enemyMgr.kill(e);
       }
@@ -16083,7 +16291,7 @@ button.corner.mute.off { opacity: 0.5; }
     }
     hostAttack(playerId, x2, z2, rot) {
       const a = this.players.get(playerId)?.attackStats ?? CFG.player.attack;
-      const dmg = Math.round(a.dmg * this.boonMult.atk * this.tempBoon.atk * this._desperationMult);
+      const dmg = Math.round(a.dmg * this.boonMult.atk * this.tempBoon.atk * this.feastMightMult * this._desperationMult);
       let thornDmg = 0;
       for (const e of this.enemyMgr.list) {
         if (e.dead) continue;
@@ -16712,6 +16920,9 @@ button.corner.mute.off { opacity: 0.5; }
       net.on("skillChill", (d2, from) => {
         if (this.isHost) this.hostSkillChill(from);
       });
+      net.on("cook", (d2, from) => {
+        if (this.isHost) this.hostCook(from, d2.key);
+      });
       net.on("skillRift", (d2, from) => {
         if (this.isHost) this.hostSkillRift(from, d2.tx, d2.tz);
       });
@@ -16823,7 +17034,8 @@ button.corner.mute.off { opacity: 0.5; }
           bossKillsSeen: this.stats.bossKillsSeen,
           trapsTriggered: this.stats.trapsTriggered,
           elitesKilled: this.stats.elitesKilled,
-          treasuresCaught: this.stats.treasuresCaught
+          treasuresCaught: this.stats.treasuresCaught,
+          animalsHunted: this.stats.animalsHunted
         }
       };
     }
@@ -16930,7 +17142,7 @@ button.corner.mute.off { opacity: 0.5; }
       if (!over) this.stats.time += dt2;
       if (this._pingCd > 0) this._pingCd -= dt2;
       this._handleInput(dt2, over);
-      if (!over) this.local.update(dt2, this.input, this.sm, this.grid, this.world, [...this.players.values()]);
+      if (!over) this.local.update(dt2, this.input, this.sm, this.grid, this.world, [...this.players.values()], this.feastSpeedMult);
       for (const p2 of this.players.values()) {
         if (p2 !== this.local && p2.update) p2.update(dt2);
       }
@@ -16942,6 +17154,7 @@ button.corner.mute.off { opacity: 0.5; }
         this._updateMeteor(dt2);
         this._updateTreasure(dt2);
         this._updateRift(dt2);
+        this._updateHunt(dt2);
         this._updateMerchant();
         this._updateCrystalUpgrades(dt2);
       } else {
@@ -17226,6 +17439,7 @@ button.corner.mute.off { opacity: 0.5; }
         btnContinue: $2("btn-continue"),
         tutorial: $2("tutorial"),
         resPanel: $2("res-panel"),
+        meatRow: $2("meat-row"),
         tutorialText: $2("tutorial-text"),
         achList: $2("ach-list"),
         achCount: $2("ach-count"),
@@ -17322,6 +17536,22 @@ button.corner.mute.off { opacity: 0.5; }
           note: g2.local.tools[key] ? "\uBCF4\uC720 \uC911" : !g2.hasStation("workbench") ? "\uC81C\uC791\uB300 \uD544\uC694" : null,
           action: () => g2.requestCraft(key)
         }));
+        const meat = g2.myPool.meat || {};
+        for (const [mk, r] of Object.entries(CFG.cook)) {
+          const have = meat[mk] || 0;
+          if (!have) continue;
+          const a2 = CFG.enemies[mk];
+          rows2.push({
+            key: `cook-${mk}`,
+            icon: r.icon,
+            name: `${r.name} (${a2.icon}\uC0DD\uACE0\uAE30 ${have})`,
+            desc: r.desc,
+            cost: { wood: r.wood },
+            state: !g2.hasStation("furnace") ? "locked" : (g2.myPool.wood || 0) >= r.wood ? "" : "poor",
+            note: !g2.hasStation("furnace") ? "\uD654\uB85C \uD544\uC694" : null,
+            action: () => g2.requestCook(mk)
+          });
+        }
         rows2.push({
           key: "smelt",
           icon: "\u2699\uFE0F",
@@ -18237,6 +18467,10 @@ button.corner.mute.off { opacity: 0.5; }
       this.el.hupCost.textContent = nextUp ? costText(nextUp.cost) : "\uCD5C\uB300";
       this.el.hupBtn.disabled = !nextUp || !canAfford(pool, nextUp.cost);
       this.el.iron.textContent = Math.floor(pool.iron || 0);
+      const meat = pool.meat || {};
+      const meatParts = Object.keys(CFG.cook).filter((k2) => meat[k2] > 0).map((k2) => `${CFG.enemies[k2].icon}${meat[k2]}`);
+      this.el.meatRow.classList.toggle("hidden", meatParts.length === 0);
+      if (meatParts.length) this.el.meatRow.textContent = `\u{1F969} \uC0DD\uACE0\uAE30 ${meatParts.join(" ")}`;
       this._refreshTools();
       const c2 = g2.world.crystal;
       const ratio = clamp(c2.hp / c2.maxHp, 0, 1);

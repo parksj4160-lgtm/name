@@ -49,7 +49,7 @@ export var Game = class {
     this.local = new LocalPlayer(this.net.selfId, this.net.name, this._colorIndex(this.net.selfId));
     this.sm.scene.add(this.local.mesh);
     this.players.set(this.local.id, this.local);
-    this.pools.team = { wood: this.difficultyPreset.startWood, stone: this.difficultyPreset.startStone, iron: 0, shard: 0 };
+    this.pools.team = { wood: this.difficultyPreset.startWood, stone: this.difficultyPreset.startStone, iron: 0, shard: 0, meat: { rabbit: 0, deer: 0, boar: 0 } };
     this.pools.byId = {};
     this._poolOf(this.local.id);
     this._wireCallbacks();
@@ -74,7 +74,8 @@ export var Game = class {
       bossKillsSeen: [],
       trapsTriggered: 0,
       elitesKilled: 0,
-      treasuresCaught: 0
+      treasuresCaught: 0,
+      animalsHunted: 0
     };
     this._waveMark = { time: 0, kills: 0 };
     this._bossActive = false;
@@ -96,6 +97,8 @@ export var Game = class {
     this._dropIdSeq = 1;
     this._meteorTimer = CFG.meteor.firstDelay;
     this._rift = null;
+    this._huntTimer = 0;
+    this.feast = { kind: null, wavesLeft: 0 };
     this._meteorPending = null;
     this.world.clearMeteor();
     this._treasureTimer = CFG.treasureEvent.firstDelay;
@@ -137,7 +140,7 @@ export var Game = class {
   }
   _poolOf(id) {
     if (this.shared) return this.pools.team;
-    if (!this.pools.byId[id]) this.pools.byId[id] = { wood: this.difficultyPreset.startWood, stone: this.difficultyPreset.startStone, iron: 0, shard: 0 };
+    if (!this.pools.byId[id]) this.pools.byId[id] = { wood: this.difficultyPreset.startWood, stone: this.difficultyPreset.startStone, iron: 0, shard: 0, meat: { rabbit: 0, deer: 0, boar: 0 } };
     return this.pools.byId[id];
   }
   get myPool() {
@@ -369,6 +372,7 @@ export var Game = class {
       else this.net.send("hurt", { to: p2.id, dmg: e.st.dmg });
     };
     this.wave.onWaveStart = (w2, total) => {
+      this._clearWildlife();
       this.ui?.toast(this._waveStartLabel(w2, total), "warn");
       const bossEntry = waveComposition(w2).find((c2) => CFG.enemies[c2.type]?.boss);
       this.fx.ring(0, 0, 16734834, 10);
@@ -441,6 +445,7 @@ export var Game = class {
     const t2 = this.tempBoon;
     if (t2.atkWavesLeft > 0 && --t2.atkWavesLeft <= 0) t2.atk = 1;
     if (t2.towerWavesLeft > 0 && --t2.towerWavesLeft <= 0) t2.towerDmg = 1;
+    this._decayFeast();
   }
   // 떠돌이 상인: 웨이브 클리어 직후(호스트에서만) 확률적으로 등장해, 이번 준비 시간에만
   // 무작위 품목 2개를 판다. 다음 웨이브가 시작되면(_updateMerchant) 자동으로 사라진다.
@@ -512,7 +517,7 @@ export var Game = class {
       if (!b.isTrap) continue;
       const st = b.stats;
       for (const e of this.enemyMgr.list) {
-        if (e.dead || e.st.flies) continue;
+        if (e.dead || e.st.flies || e.st.wild) continue;
         if (dist(b.x, b.z, e.x, e.z) <= st.triggerRadius) {
           this._triggerTrap(b, e, st);
           break;
@@ -616,6 +621,100 @@ export var Game = class {
   // 독립 이벤트라 운석·보급품과 같은 패턴(호스트 전용 타이머)으로 처리한다. 최대 1마리만 떠 있고,
   // lifetime 안에 못 잡으면 보상 없이 그냥 사라진다 — 보물게 자체는 일반 몬스터처럼 스냅샷으로
   // 자동 동기화되므로(enemyMgr.snapshot 이 타입을 가리지 않는다) 별도 네트워크 코드가 필요 없다.
+  // 사냥감 스폰 — 준비 시간에만. 웨이브가 시작되면 전부 흩어져 사라진다(_clearWildlife).
+  // 크리스탈에서 멀리(minDist~maxDist) 내보내서, 사냥하려면 방어선을 실제로 비우고 나가야 하게 만든다.
+  _updateHunt(dt2) {
+    if (!this.isHost) return;
+    if (this.wave.phase !== PHASE.PREP) return;
+    const c2 = CFG.hunt;
+    const alive = this.enemyMgr.list.filter((e) => !e.dead && e.st.wild).length;
+    if (alive >= c2.maxAlive) return;
+    this._huntTimer -= dt2;
+    if (this._huntTimer > 0) return;
+    this._huntTimer = c2.spawnGap;
+    const total = Object.values(c2.weights).reduce((a2, b2) => a2 + b2, 0);
+    let roll = Math.random() * total, type = "rabbit";
+    for (const [k2, w2] of Object.entries(c2.weights)) {
+      roll -= w2;
+      if (roll <= 0) {
+        type = k2;
+        break;
+      }
+    }
+    const ang = Math.random() * Math.PI * 2;
+    const r = c2.minDist + Math.random() * (c2.maxDist - c2.minDist);
+    const e = this.enemyMgr.spawn(type, 1, Math.cos(ang) * r, Math.sin(ang) * r);
+    if (e && !this._seenHunt) {
+      this._seenHunt = true;
+      this.ui?.toast("🦌 야생 동물이 보인다! 준비 시간에만 나타난다 — 잡으면 생고기를 얻고, 화로에서 구워 먹으면 다음 웨이브 동안 강해진다", "good");
+    }
+  }
+  // 웨이브가 시작되면 사냥감은 전부 도망친다 — 전투 중에 섞여 있으면 표적이 헷갈리고,
+  // "준비 시간에만 사냥할 수 있다" 는 규칙도 흐려진다.
+  _clearWildlife() {
+    if (!this.isHost) return;
+    for (const e of this.enemyMgr.list) {
+      if (!e.dead && e.st.wild) {
+        this.fx.burst(e.x, 1, e.z, e.tintColor, 6, 3);
+        this.enemyMgr.kill(e);
+      }
+    }
+  }
+  requestCook(key) {
+    if (this.isHost) this.hostCook(this.local.id, key);
+    else this.net.send("cook", { key });
+  }
+  hostCook(playerId, key) {
+    const r = CFG.cook[key];
+    if (!r || !this.players.get(playerId)) return;
+    if (!this.hasStation("furnace")) {
+      this._notify(playerId, "화로가 있어야 구울 수 있습니다", "bad");
+      return;
+    }
+    const pool = this._poolOf(playerId);
+    const meat = pool.meat || (pool.meat = { rabbit: 0, deer: 0, boar: 0 });
+    if ((meat[key] || 0) < 1) {
+      this._notify(playerId, `${CFG.enemies[key].icon} ${CFG.enemies[key].name} 생고기가 없습니다`, "bad");
+      return;
+    }
+    if ((pool.wood || 0) < r.wood) {
+      this._notify(playerId, "목재가 부족합니다", "bad");
+      return;
+    }
+    meat[key] -= 1;
+    pool.wood -= r.wood;
+    this._trackSpend({ wood: r.wood }, "craft");
+    this.feast = { kind: r.kind, wavesLeft: 1 };
+    if (r.kind === "vigor") this._applyVigor(playerId, r.value);
+    this._notify(playerId, `${r.icon} ${r.name}을(를) 먹었다! ${r.desc}`, "good");
+    if (playerId === this.local.id) this.sfx.upgrade();
+  }
+  // 사슴 스테이크: 최대 체력을 올리고 그만큼 즉시 회복시킨다(크리스탈 강화의 armor 와 같은 방식)
+  _applyVigor(playerId, amount) {
+    const p2 = this.players.get(playerId);
+    if (!p2) return;
+    p2.maxHp = CFG.player.hp + amount;
+    p2.hp = Math.min(p2.maxHp, p2.hp + amount);
+  }
+  // 한 판이 끝나면 잔치 효과도 같이 끝난다(상인 물약과 같은 수명)
+  _decayFeast() {
+    if (this.feast.wavesLeft > 0 && --this.feast.wavesLeft <= 0) {
+      const was = this.feast.kind;
+      this.feast.kind = null;
+      if (was === "vigor") {
+        const p2 = this.local;
+        p2.maxHp = CFG.player.hp;
+        p2.hp = Math.min(p2.hp, p2.maxHp);
+      }
+      if (was) this.ui?.toast("배부름이 가셨다 — 잔치 효과가 끝났다", "warn");
+    }
+  }
+  get feastSpeedMult() {
+    return this.feast.kind === "speed" ? CFG.cook.rabbit.value : 1;
+  }
+  get feastMightMult() {
+    return this.feast.kind === "might" ? CFG.cook.boar.value : 1;
+  }
   _updateTreasure(dt2) {
     const c2 = CFG.treasureEvent;
     if (this._treasureId != null) {
@@ -683,6 +782,11 @@ export var Game = class {
     this._notify(playerId, `📦 보급품 획득! 🪵+${c2.reward.wood} 🪨+${c2.reward.stone}${gotShard ? " 💠+1" : ""}`, "good");
   }
   _hurtEnemy(e, dmg, kind = "tower", fromX, fromZ) {
+    // 멧돼지처럼 반격하는 야생 동물은 때린 사람을 기억해 잠시 쫓아온다 — 사냥이 공짜가 아니게 한다
+    if (e.st.retaliates && kind === "player" && !e.dead) {
+      e.aggroTarget = this.local.id;
+      e.aggroUntil = performance.now() / 1e3 + (e.st.aggroTime || 5);
+    }
     const { died, applied } = e.damage(dmg, fromX, fromZ);
     this.fx.float(String(Math.round(applied)), e.x, 1.9, e.z, kind === "player" ? "player" : "");
     if (kind === "player") this.sfx.meleeHit();
@@ -717,6 +821,15 @@ export var Game = class {
         this.fx.ring(e.x, e.z, 16763904, 3);
         if (this.stats.elitesKilled >= 5) this._unlockAchievement("eliteHunter");
       }
+      // 사냥감은 목재·광물이 아니라 생고기를 준다 — 화로에서 구워야 쓸모가 생긴다
+      if (e.st.meat) {
+        const pool = this.shared ? this.pools.team : this._poolOf(this.local.id);
+        if (!pool.meat) pool.meat = { rabbit: 0, deer: 0, boar: 0 };
+        pool.meat[e.st.meat] = (pool.meat[e.st.meat] || 0) + 1;
+        this.ui?.toast(`${e.st.icon} ${e.st.name} 사냥! 생고기를 얻었다 — 화로에서 구워 먹어라`, "good");
+        this.stats.animalsHunted = (this.stats.animalsHunted || 0) + 1;
+        if (this.stats.animalsHunted >= 10) this._unlockAchievement("hunter");
+      }
       const b = e.st.bounty;
       const nightMult = (this.wave.wave + 1) % CFG.wave.nightEvery === 0 ? CFG.wave.nightBountyMult : 1;
       const bw = Math.round(b.wood * this.boonMult.bounty * nightMult);
@@ -740,6 +853,7 @@ export var Game = class {
         this.ui?.toast(gotShard ? "🦀 보물게 처치! 목재·광물 두둑히 + 💠 정수 1" : "🦀 보물게 처치! 목재·광물을 두둑히 챙겼다", "good");
         this.stats.treasuresCaught = (this.stats.treasuresCaught || 0) + 1;
         if (this.stats.treasuresCaught >= 5) this._unlockAchievement("treasureHunter");
+      if (this.stats.animalsHunted >= 10) this._unlockAchievement("hunter");
       }
       this.enemyMgr.kill(e);
     }
@@ -1176,7 +1290,7 @@ export var Game = class {
   }
   hostAttack(playerId, x2, z2, rot) {
     const a = this.players.get(playerId)?.attackStats ?? CFG.player.attack;
-    const dmg = Math.round(a.dmg * this.boonMult.atk * this.tempBoon.atk * this._desperationMult);
+    const dmg = Math.round(a.dmg * this.boonMult.atk * this.tempBoon.atk * this.feastMightMult * this._desperationMult);
     let thornDmg = 0;
     for (const e of this.enemyMgr.list) {
       if (e.dead) continue;
@@ -1805,6 +1919,9 @@ export var Game = class {
     net.on("skillChill", (d2, from) => {
       if (this.isHost) this.hostSkillChill(from);
     });
+    net.on("cook", (d2, from) => {
+      if (this.isHost) this.hostCook(from, d2.key);
+    });
     net.on("skillRift", (d2, from) => {
       if (this.isHost) this.hostSkillRift(from, d2.tx, d2.tz);
     });
@@ -1916,7 +2033,8 @@ export var Game = class {
         bossKillsSeen: this.stats.bossKillsSeen,
         trapsTriggered: this.stats.trapsTriggered,
         elitesKilled: this.stats.elitesKilled,
-        treasuresCaught: this.stats.treasuresCaught
+        treasuresCaught: this.stats.treasuresCaught,
+        animalsHunted: this.stats.animalsHunted
       }
     };
   }
@@ -2023,7 +2141,7 @@ export var Game = class {
     if (!over) this.stats.time += dt2;
     if (this._pingCd > 0) this._pingCd -= dt2;
     this._handleInput(dt2, over);
-    if (!over) this.local.update(dt2, this.input, this.sm, this.grid, this.world, [...this.players.values()]);
+    if (!over) this.local.update(dt2, this.input, this.sm, this.grid, this.world, [...this.players.values()], this.feastSpeedMult);
     for (const p2 of this.players.values()) {
       if (p2 !== this.local && p2.update) p2.update(dt2);
     }
@@ -2035,6 +2153,7 @@ export var Game = class {
       this._updateMeteor(dt2);
       this._updateTreasure(dt2);
       this._updateRift(dt2);
+      this._updateHunt(dt2);
       this._updateMerchant();
       this._updateCrystalUpgrades(dt2);
     } else {

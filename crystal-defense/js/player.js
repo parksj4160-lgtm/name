@@ -256,7 +256,7 @@ export var LocalPlayer = class extends Player {
     this.cancelHarvest();
     return true;
   }
-  update(dt2, input, sm2, grid, world, others) {
+  update(dt2, input, sm2, grid, world, others, speedMult = 1) {
     const now = performance.now() / 1e3;
     if (!this.alive) {
       const rc = CFG.player.revive;
@@ -289,7 +289,7 @@ export var LocalPlayer = class extends Player {
         this.cancelHarvest();
         const sprint = input.down("shift");
         const weatherMult = world.weatherKind === "rain" ? WEATHER.rain.playerSpeedMult : 1;
-        const spd = (sprint ? CFG.player.sprint : CFG.player.speed) * weatherMult;
+        const spd = (sprint ? CFG.player.sprint : CFG.player.speed) * weatherMult * speedMult;
         const len = Math.hypot(mx, mz);
         mx /= len;
         mz /= len;

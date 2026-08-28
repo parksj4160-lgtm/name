@@ -66,6 +66,7 @@ export var UI = class {
       btnContinue: $2("btn-continue"),
       tutorial: $2("tutorial"),
       resPanel: $2("res-panel"),
+      meatRow: $2("meat-row"),
       tutorialText: $2("tutorial-text"),
       achList: $2("ach-list"),
       achCount: $2("ach-count"),
@@ -162,6 +163,23 @@ export var UI = class {
         note: g2.local.tools[key] ? "보유 중" : !g2.hasStation("workbench") ? "제작대 필요" : null,
         action: () => g2.requestCraft(key)
       }));
+      // 사냥한 생고기를 굽는 칸 — 화로가 있어야 하고, 고기가 있을 때만 목록에 뜬다
+      const meat = g2.myPool.meat || {};
+      for (const [mk, r] of Object.entries(CFG.cook)) {
+        const have = meat[mk] || 0;
+        if (!have) continue;
+        const a2 = CFG.enemies[mk];
+        rows2.push({
+          key: `cook-${mk}`,
+          icon: r.icon,
+          name: `${r.name} (${a2.icon}생고기 ${have})`,
+          desc: r.desc,
+          cost: { wood: r.wood },
+          state: !g2.hasStation("furnace") ? "locked" : (g2.myPool.wood || 0) >= r.wood ? "" : "poor",
+          note: !g2.hasStation("furnace") ? "화로 필요" : null,
+          action: () => g2.requestCook(mk)
+        });
+      }
       rows2.push({
         key: "smelt",
         icon: "⚙️",
@@ -1077,6 +1095,11 @@ export var UI = class {
     this.el.hupCost.textContent = nextUp ? costText(nextUp.cost) : "최대";
     this.el.hupBtn.disabled = !nextUp || !canAfford(pool, nextUp.cost);
     this.el.iron.textContent = Math.floor(pool.iron || 0);
+    // 생고기는 종류별로 세서 자원 패널에 한 줄로 보여준다(0마리면 줄 자체를 숨긴다)
+    const meat = pool.meat || {};
+    const meatParts = Object.keys(CFG.cook).filter((k2) => meat[k2] > 0).map((k2) => `${CFG.enemies[k2].icon}${meat[k2]}`);
+    this.el.meatRow.classList.toggle("hidden", meatParts.length === 0);
+    if (meatParts.length) this.el.meatRow.textContent = `🥩 생고기 ${meatParts.join(" ")}`;
     this._refreshTools();
     const c2 = g2.world.crystal;
     const ratio = clamp(c2.hp / c2.maxHp, 0, 1);

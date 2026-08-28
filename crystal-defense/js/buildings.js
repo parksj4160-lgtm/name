@@ -584,6 +584,9 @@ export var BuildManager = class {
     for (const e of enemies) {
       if (e.dead) continue;
       if (e.variant === "ward") continue;
+      // 야생 동물은 타워의 사냥감이 아니다 — 타워가 대신 잡아 주면 "직접 나가서 사냥한다"는
+      // 설계가 통째로 무너진다(실제로 검증 중 타워만으로 8마리가 잡혔다)
+      if (e.st.wild) continue;
       const d2 = (e.x - b.x) ** 2 + (e.z - b.z) ** 2;
       if (d2 > r2) continue;
       const score = e.x * e.x + e.z * e.z;
