@@ -17,7 +17,9 @@ var GEO = {
   dropBeam: new THREE.CylinderGeometry(0.07, 0.07, 6, 6),
   meteorRing: new THREE.RingGeometry(0.92, 1, 48),
   riftRing: new THREE.RingGeometry(0.86, 1, 48),
-  riftCore: new THREE.CircleGeometry(1, 32)
+  riftCore: new THREE.CircleGeometry(1, 32),
+  spiritCore: new THREE.IcosahedronGeometry(0.42, 1),
+  spiritRing: new THREE.RingGeometry(0.5, 0.64, 24)
 };
 var MAT = {
   trunk: new THREE.MeshStandardMaterial({ color: 5979428, roughness: 0.95 }),
@@ -50,7 +52,9 @@ var MAT = {
   dropGlow: new THREE.MeshBasicMaterial({ color: 16759043, transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false }),
   meteorWarn: new THREE.MeshBasicMaterial({ color: 16729139, transparent: true, opacity: 0.6, side: THREE.DoubleSide, depthWrite: false }),
   riftRing: new THREE.MeshBasicMaterial({ color: 11239935, transparent: true, opacity: 0.75, side: THREE.DoubleSide, depthWrite: false }),
-  riftCore: new THREE.MeshBasicMaterial({ color: 4530126, transparent: true, opacity: 0.4, side: THREE.DoubleSide, depthWrite: false })
+  riftCore: new THREE.MeshBasicMaterial({ color: 4530126, transparent: true, opacity: 0.4, side: THREE.DoubleSide, depthWrite: false }),
+  spiritCore: new THREE.MeshStandardMaterial({ color: 9430015, emissive: 6736127, emissiveIntensity: 1.6, roughness: 0.2, transparent: true, opacity: 0.92 }),
+  spiritRing: new THREE.MeshBasicMaterial({ color: 9430015, transparent: true, opacity: 0.5, side: THREE.DoubleSide, depthWrite: false })
 };
 export var World = class {
   constructor(sceneMgr, seed = 1) {
@@ -213,6 +217,7 @@ export var World = class {
       g2.add(stump);
     }
     this.scene.add(g2);
+    const mimic = type !== "gem" && rng() < CFG.mimic.chance;
     return {
       id,
       type,
@@ -225,7 +230,8 @@ export var World = class {
       group: g2,
       body,
       stump,
-      radius: type === "tree" ? 1 : type === "gem" ? 0.8 : 1.3
+      radius: type === "tree" ? 1 : type === "gem" ? 0.8 : 1.3,
+      mimic
     };
   }
   _buildScenery() {
@@ -316,17 +322,25 @@ export var World = class {
     ring.visible = false;
     this.scene.add(ring);
     this.meteorRing = ring;
-    // 중력 균열 — 운석 경고와 같은 방식(호스트가 위치·잔여시간만 알려주면 여기서 순수하게 그리기만)
-    const rr = new THREE.Mesh(GEO.riftRing, MAT.riftRing.clone());
-    rr.rotation.x = -Math.PI / 2;
-    rr.visible = false;
-    this.scene.add(rr);
-    this.riftRing = rr;
+    const rr2 = new THREE.Mesh(GEO.riftRing, MAT.riftRing.clone());
+    rr2.rotation.x = -Math.PI / 2;
+    rr2.visible = false;
+    this.scene.add(rr2);
+    this.riftRing = rr2;
     const rc = new THREE.Mesh(GEO.riftCore, MAT.riftCore.clone());
     rc.rotation.x = -Math.PI / 2;
     rc.visible = false;
     this.scene.add(rc);
     this.riftCore = rc;
+    const sc = new THREE.Mesh(GEO.spiritCore, MAT.spiritCore.clone());
+    sc.visible = false;
+    this.scene.add(sc);
+    this.spiritCore = sc;
+    const sr2 = new THREE.Mesh(GEO.spiritRing, MAT.spiritRing.clone());
+    sr2.rotation.x = -Math.PI / 2;
+    sr2.visible = false;
+    this.scene.add(sr2);
+    this.spiritRing = sr2;
   }
   setRift(x2, z2, timeLeft, radius) {
     this.rift = { x: x2, z: z2, timeLeft, radius };
@@ -348,11 +362,33 @@ export var World = class {
     this.riftRing.scale.setScalar(radius);
     this.riftRing.rotation.z = now * 1.6;
     this.riftRing.material.opacity = 0.55 + Math.abs(Math.sin(now * 4)) * 0.35;
-    // 안쪽 원반은 빨려 들어가는 느낌이 나도록 주기적으로 오므라든다
     this.riftCore.visible = true;
     this.riftCore.position.set(x2, 0.06, z2);
     this.riftCore.scale.setScalar(radius * (0.35 + (1 - now * 1.2 % 1) * 0.5));
-    this.riftCore.material.opacity = 0.18 + (now * 1.2 % 1) * 0.3;
+    this.riftCore.material.opacity = 0.18 + now * 1.2 % 1 * 0.3;
+  }
+  setSpirit(x2, z2, timeLeft) {
+    this.spirit = { x: x2, z: z2, timeLeft };
+  }
+  clearSpirit() {
+    this.spirit = null;
+    if (this.spiritCore) this.spiritCore.visible = false;
+    if (this.spiritRing) this.spiritRing.visible = false;
+  }
+  updateSpiritVisual(now) {
+    if (!this.spirit) {
+      if (this.spiritCore) this.spiritCore.visible = false;
+      if (this.spiritRing) this.spiritRing.visible = false;
+      return;
+    }
+    const { x: x2, z: z2 } = this.spirit;
+    this.spiritCore.visible = true;
+    this.spiritCore.position.set(x2, 1.3 + Math.sin(now * 3) * 0.15, z2);
+    this.spiritCore.rotation.y = now * 1.8;
+    this.spiritCore.rotation.x = now * 1.1;
+    this.spiritRing.visible = true;
+    this.spiritRing.position.set(x2, 0.06, z2);
+    this.spiritRing.material.opacity = 0.35 + Math.abs(Math.sin(now * 4)) * 0.25;
   }
   setMeteor(x2, z2, timeLeft, radius) {
     this.meteor = { x: x2, z: z2, timeLeft, radius };
@@ -472,5 +508,6 @@ export var World = class {
     this.updateDrops(dt2, now);
     this.updateMeteorVisual(now);
     this.updateRiftVisual(now);
+    this.updateSpiritVisual(now);
   }
 };

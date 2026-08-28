@@ -16,7 +16,18 @@ var GEO2 = {
   bar: new THREE.PlaneGeometry(1.5, 0.16),
   buffRing: new THREE.RingGeometry(1.05, 1.25, 24),
   trapBase: new THREE.CylinderGeometry(0.85, 0.85, 0.12, 8),
-  trapSpike: new THREE.ConeGeometry(0.1, 0.38, 4)
+  trapSpike: new THREE.ConeGeometry(0.1, 0.38, 4),
+  gatePost: new THREE.BoxGeometry(0.42, 2.3, 1.88),
+  gateLintel: new THREE.BoxGeometry(1.88, 0.3, 1.88),
+  watchPillar: new THREE.CylinderGeometry(0.3, 0.42, 3.2, 8),
+  watchEye: new THREE.OctahedronGeometry(0.4, 0),
+  watchRing: new THREE.TorusGeometry(0.58, 0.05, 6, 16),
+  harvesterPost: new THREE.CylinderGeometry(0.12, 0.14, 1.5, 6),
+  harvesterWheel: new THREE.TorusGeometry(0.55, 0.09, 8, 16),
+  harvesterSpoke: new THREE.BoxGeometry(0.06, 1, 0.06),
+  harvesterBasket: new THREE.CylinderGeometry(0.32, 0.24, 0.4, 8),
+  repairCrossV: new THREE.BoxGeometry(0.24, 0.74, 0.24),
+  repairCrossH: new THREE.BoxGeometry(0.74, 0.24, 0.24)
 };
 var MAT2 = {
   wall: [
@@ -38,6 +49,12 @@ var MAT2 = {
   furnaceFire: new THREE.MeshStandardMaterial({ color: 16750899, emissive: 15693600, emissiveIntensity: 1.4, roughness: 0.4 }),
   trapBase: new THREE.MeshStandardMaterial({ color: 4863530, roughness: 0.85, metalness: 0.3 }),
   trapSpike: new THREE.MeshStandardMaterial({ color: 14238251, roughness: 0.4, metalness: 0.6 }),
+  gateLintel: new THREE.MeshStandardMaterial({ color: 13211199, roughness: 0.6, metalness: 0.25 }),
+  watchtower: new THREE.MeshStandardMaterial({ color: 16764245, emissive: 12886835, emissiveIntensity: 1, roughness: 0.3 }),
+  harvesterPost: new THREE.MeshStandardMaterial({ color: 6971297, roughness: 0.9 }),
+  harvesterWheel: new THREE.MeshStandardMaterial({ color: 10309763, roughness: 0.7, metalness: 0.15 }),
+  harvesterBasket: new THREE.MeshStandardMaterial({ color: 12159565, roughness: 0.8 }),
+  repairpost: new THREE.MeshStandardMaterial({ color: 6274976, emissive: 2790492, emissiveIntensity: 0.85, roughness: 0.35 }),
   ghostOk: new THREE.MeshStandardMaterial({ color: 5570463, transparent: true, opacity: 0.45, emissive: 2002770, emissiveIntensity: 0.6 }),
   ghostBad: new THREE.MeshStandardMaterial({ color: 16734826, transparent: true, opacity: 0.4, emissive: 9379372, emissiveIntensity: 0.6 }),
   barBg: new THREE.MeshBasicMaterial({ color: 1119519, transparent: true, opacity: 0.8, depthTest: false }),
@@ -100,10 +117,16 @@ var Building = class {
     return this.spec ? CFG.towerSpec[this.key]?.[this.spec] || null : null;
   }
   get isSupport() {
-    return this.key === "support";
+    return this.key === "support" || this.key === "watchtower";
   }
   get isWorkbench() {
     return this.key === "workbench";
+  }
+  get isHarvester() {
+    return this.key === "harvester";
+  }
+  get isRepairPost() {
+    return this.key === "repairpost";
   }
   // 다가가서 클릭하면 작업창이 열리는 시설이면 그 종류("craft"/"smelt")
   get stationKind() {
@@ -113,7 +136,7 @@ var Building = class {
     return this.key === "trap";
   }
   get isTower() {
-    return this.key !== "wall" && this.key !== "trap" && !this.isSupport && !this.stationKind;
+    return this.key !== "wall" && this.key !== "gate" && this.key !== "trap" && !this.isSupport && !this.isHarvester && !this.isRepairPost && !this.stationKind;
   }
   get nextCost() {
     const nxt = this.def.levels[this.level];
@@ -125,7 +148,7 @@ var Building = class {
     const fg = new THREE.Mesh(GEO2.bar, MAT2.barFg.clone());
     fg.position.z = 0.01;
     g2.add(bg, fg);
-    g2.position.y = this.key === "wall" ? 2.7 : this.key === "workbench" ? 1.6 : this.key === "trap" ? 0.7 : 3.4;
+    g2.position.y = this.key === "wall" || this.key === "gate" ? 2.7 : this.key === "workbench" ? 1.6 : this.key === "trap" ? 0.7 : this.key === "harvester" ? 1.9 : 3.4;
     g2.visible = false;
     g2.renderOrder = 5;
     this.mesh.add(g2);
@@ -237,6 +260,20 @@ function buildMesh(key, level) {
     }
     return g2;
   }
+  if (key === "gate") {
+    for (const side of [-1, 1]) {
+      const post = new THREE.Mesh(GEO2.gatePost, MAT2.wall[level - 1]);
+      post.position.set(side * 0.73, 1.15, 0);
+      post.castShadow = true;
+      post.receiveShadow = true;
+      g2.add(post);
+    }
+    const lintel = new THREE.Mesh(GEO2.gateLintel, MAT2.gateLintel);
+    lintel.position.y = 2.45;
+    lintel.castShadow = true;
+    g2.add(lintel);
+    return g2;
+  }
   if (key === "workbench") {
     const top = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.16, 1.1), MAT2.workbenchTop);
     top.position.y = 0.85;
@@ -272,6 +309,28 @@ function buildMesh(key, level) {
     g2.add(mouth);
     return g2;
   }
+  if (key === "harvester") {
+    const post = new THREE.Mesh(GEO2.harvesterPost, MAT2.harvesterPost);
+    post.position.y = 0.75;
+    post.castShadow = true;
+    g2.add(post);
+    const wheel = new THREE.Mesh(GEO2.harvesterWheel, MAT2.harvesterWheel);
+    wheel.position.set(0, 1.35, 0.35);
+    wheel.castShadow = true;
+    g2.add(wheel);
+    for (let i = 0; i < 2; i++) {
+      const spoke = new THREE.Mesh(GEO2.harvesterSpoke, MAT2.harvesterWheel);
+      spoke.rotation.z = i * Math.PI / 2;
+      wheel.add(spoke);
+    }
+    const basket = new THREE.Mesh(GEO2.harvesterBasket, MAT2.harvesterBasket);
+    basket.position.set(0.4, 0.55, -0.3);
+    basket.castShadow = true;
+    basket.receiveShadow = true;
+    g2.add(basket);
+    g2.userData.wheel = wheel;
+    return g2;
+  }
   if (key === "trap") {
     const plate = new THREE.Mesh(GEO2.trapBase, MAT2.trapBase);
     plate.position.y = 0.06;
@@ -290,12 +349,13 @@ function buildMesh(key, level) {
   base.position.y = 0.35;
   base.castShadow = true;
   base.receiveShadow = true;
-  const pillar = new THREE.Mesh(GEO2.pillar, MAT2.base);
-  pillar.position.y = 1.5;
+  const isWatchtower = key === "watchtower";
+  const pillar = new THREE.Mesh(isWatchtower ? GEO2.watchPillar : GEO2.pillar, MAT2.base);
+  pillar.position.y = isWatchtower ? 2.3 : 1.5;
   pillar.castShadow = true;
   g2.add(base, pillar);
   const turret = new THREE.Group();
-  turret.position.y = 2.6;
+  turret.position.y = isWatchtower ? 4 : 2.6;
   if (key === "arrow") {
     const head = new THREE.Mesh(GEO2.headArrow, MAT2.arrow);
     head.rotation.x = Math.PI / 2;
@@ -329,6 +389,22 @@ function buildMesh(key, level) {
     const ringB = new THREE.Mesh(GEO2.supportRing, MAT2.snare);
     ringB.rotation.z = Math.PI / 2;
     turret.add(ringA, ringB);
+  } else if (key === "watchtower") {
+    const eye = new THREE.Mesh(GEO2.watchEye, MAT2.watchtower);
+    eye.castShadow = true;
+    turret.add(eye);
+    const ringG = new THREE.Mesh(GEO2.watchRing, MAT2.watchtower);
+    turret.add(ringG);
+  } else if (key === "repairpost") {
+    const crossV = new THREE.Mesh(GEO2.repairCrossV, MAT2.repairpost);
+    crossV.castShadow = true;
+    const crossH = new THREE.Mesh(GEO2.repairCrossH, MAT2.repairpost);
+    crossH.castShadow = true;
+    turret.add(crossV, crossH);
+    const ringG = new THREE.Mesh(GEO2.supportRing, MAT2.repairpost);
+    ringG.rotation.x = Math.PI / 2;
+    ringG.position.y = -0.3;
+    turret.add(ringG);
   } else {
     const head = new THREE.Mesh(GEO2.headCannon, MAT2.cannon);
     head.castShadow = true;
@@ -418,20 +494,22 @@ export var BuildManager = class {
       if (this.ghost) this.ghost.visible = false;
       const b = this.grid.atWorld(pointer.x, pointer.z);
       this.hover = b || null;
-      if (b && b.isSupport) this._showRangeRing(b.x, b.z, b.stats.buffRadius);
+      if (b && b.isSupport) this._showRangeRing(b.x, b.z, b.stats.buffRadius ?? b.stats.detectRadius);
+      else if (b && b.isHarvester) this._showRangeRing(b.x, b.z, b.stats.detectRadius);
+      else if (b && b.isRepairPost) this._showRangeRing(b.x, b.z, b.stats.healRadius);
       else if (b && b.isTower) this._showRangeRing(b.x, b.z, b.stats.range);
       else this.rangeRing.visible = false;
       return;
     }
     const g2 = this.grid.toGrid(pointer.x, pointer.z);
-    const res = this.grid.canPlace(g2.gx, g2.gz, (x2, z2) => this.world.blocksBuild(x2, z2));
+    const res = this.grid.canPlace(g2.gx, g2.gz, (x2, z2) => this.world.blocksBuild(x2, z2), this.mode);
     const w2 = this.grid.toWorld(g2.gx, g2.gz);
     if (this.ghost) {
       this.ghost.visible = true;
       this.ghost.position.set(w2.x, 0, w2.z);
     }
     const lv1 = CFG.builds[this.mode].levels[0];
-    const previewRadius = lv1.buffRadius ?? lv1.range;
+    const previewRadius = lv1.buffRadius ?? lv1.detectRadius ?? lv1.healRadius ?? lv1.range;
     if (previewRadius) this._showRangeRing(w2.x, w2.z, previewRadius);
     else this.rangeRing.visible = false;
     let ok = res.ok;
@@ -452,7 +530,7 @@ export var BuildManager = class {
   }
   // 실제 배치(권한 있는 쪽에서만 호출). 성공 시 Building 반환
   place(key, gx, gz, ownerId, id) {
-    const res = this.grid.canPlace(gx, gz, (x2, z2) => this.world.blocksBuild(x2, z2));
+    const res = this.grid.canPlace(gx, gz, (x2, z2) => this.world.blocksBuild(x2, z2), key);
     if (!res.ok) return null;
     const b = new Building(key, gx, gz, res.x, res.z, ownerId, id);
     if (id && id >= nextId) nextId = id + 1;
@@ -557,6 +635,14 @@ export var BuildManager = class {
     }
     return false;
   }
+  // 감시탑(watchtower) 시너지 — 반경 안이면 파묻힌 굴착병도 조준 가능하게 한다 (isSupport라 자기 자신은 제외 불필요)
+  hasNearbyDetector(b) {
+    for (const o of this.buildings.values()) {
+      if (o.key !== "watchtower") continue;
+      if (dist(b.x, b.z, o.x, o.z) <= o.stats.detectRadius) return true;
+    }
+    return false;
+  }
   // 독탑 시너지: 인접한 다른 독탑 하나당 독 피해가 누적 증가(상한 있음)
   poisonSynergyMult(b) {
     const s2 = CFG.synergy.poisonStack;
@@ -581,12 +667,17 @@ export var BuildManager = class {
   _acquire(b, enemies, range) {
     let best = null, bestScore = Infinity;
     const r2 = range * range;
+    let detector = null;
     for (const e of enemies) {
       if (e.dead) continue;
       if (e.variant === "ward") continue;
       // 야생 동물은 타워의 사냥감이 아니다 — 타워가 대신 잡아 주면 "직접 나가서 사냥한다"는
       // 설계가 통째로 무너진다(실제로 검증 중 타워만으로 8마리가 잡혔다)
       if (e.st.wild) continue;
+      if (e.st.burrows && e.diving) {
+        if (detector === null) detector = this.hasNearbyDetector(b);
+        if (!detector) continue;
+      }
       const d2 = (e.x - b.x) ** 2 + (e.z - b.z) ** 2;
       if (d2 > r2) continue;
       const score = e.x * e.x + e.z * e.z;
@@ -595,6 +686,7 @@ export var BuildManager = class {
         best = e;
       }
     }
+    if (best && best.st.burrows && best.diving) this.onDetectBurrow?.(best);
     return best;
   }
   // 투사체 발사 연출 → 명중 시 onImpact (데미지 적용은 호스트에서만)
@@ -623,6 +715,11 @@ export var BuildManager = class {
     for (const b of this.buildings.values()) {
       b.faceBar(camera);
       if (b.isSupport && b.turret) b.turret.rotation.y += dt2 * 0.6;
+      if (b.isRepairPost && b.turret) b.turret.rotation.y += dt2 * 0.6;
+      if (b.isHarvester) {
+        const wheel = b.mesh.userData.wheel;
+        if (wheel) wheel.rotation.x += dt2 * 1.4;
+      }
     }
     this._buffTimer = (this._buffTimer || 0) - dt2;
     if (this._buffTimer <= 0) {

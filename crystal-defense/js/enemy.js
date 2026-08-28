@@ -75,6 +75,8 @@ var Enemy = class {
     this.poisonUntil = 0;
     this.poisonTickCd = 0;
     this.target = null;
+    this.diving = !!st.burrows;
+    this._dustCd = 0;
     if (this.variant === "dash") {
       this.dashCd = CFG.variants.dash.interval * (0.4 + Math.random() * 0.6);
       this.dashUntil = 0;
@@ -211,6 +213,9 @@ export var EnemyManager = class {
     this.onKill = null;
     this.onPoisonTick = null;
     this.onSpawn = null;
+    this.onBurrowEmerge = null;
+    this.onNodeSteal = null;
+    this.onRallyPulse = null;
     const cap = CFG.wave.maxAlive;
     this.bodyInst = new THREE.InstancedMesh(
       GEO3.body,
@@ -339,6 +344,22 @@ export var EnemyManager = class {
         this._wildTick(e, dt2, now, players);
         continue;
       }
+      if (e.st.rallyAura) {
+        e._rallyCd = (e._rallyCd || 0) - dt2;
+        if (e._rallyCd <= 0) {
+          const ra2 = e.st.rallyAura;
+          e._rallyCd = ra2.interval;
+          let rallied = false;
+          for (const o of list) {
+            if (o === e || o.dead) continue;
+            if (dist(e.x, e.z, o.x, o.z) > ra2.radius) continue;
+            o.rallyUntil = now + ra2.duration;
+            o.rallyMult = ra2.mult;
+            rallied = true;
+          }
+          if (rallied) this.onRallyPulse?.(e);
+        }
+      }
       if (e.st.boss && this._bossTick(e, dt2, now)) {
         this._applyPosition(e, dt2, now);
         continue;
@@ -352,7 +373,8 @@ export var EnemyManager = class {
       }
       const dashMult = e.variant === "dash" && now < e.dashUntil ? CFG.variants.dash.speedMult : 1;
       const rootMult = now < e.rootUntil ? 0 : 1;
-      const speed = e.st.speed * e.slowFactor * dashMult * rootMult * (e.isCharging ? CFG.bossPattern.chargeSpeed / e.st.speed : 1);
+      const rallyMult = now < (e.rallyUntil || 0) ? e.rallyMult : 1;
+      const speed = e.st.speed * e.slowFactor * dashMult * rootMult * rallyMult * (e.isCharging ? CFG.bossPattern.chargeSpeed / e.st.speed : 1);
       if (e.st.flees) {
         const p22 = this._nearestPlayer(players, e.x, e.z, 16);
         const fx2 = p22 ? e.x - p22.x : e.x, fz2 = p22 ? e.z - p22.z : e.z;
@@ -366,6 +388,12 @@ export var EnemyManager = class {
         this._face(e, e.x + mx3, e.z + mz3, dt2);
         this._applyPosition(e, dt2, now);
         continue;
+      }
+      if (e.st.burrows && e.diving && Math.hypot(e.x, e.z) <= e.st.emergeRange) {
+        e.diving = false;
+        this.fx.ring(e.x, e.z, 9127187, 2.4);
+        this.fx.burst(e.x, 0.3, e.z, 9127187, 12, 4);
+        this.onBurrowEmerge?.(e);
       }
       e.attackCd -= dt2;
       const dc2 = Math.hypot(e.x, e.z);
@@ -390,7 +418,7 @@ export var EnemyManager = class {
         this._applyPosition(e, dt2, now);
         continue;
       }
-      if (e.st.flies) {
+      if (e.st.flies || e.st.burrows) {
         const dx2 = -e.x, dz2 = -e.z;
         const len2 = Math.hypot(dx2, dz2) || 1;
         let mx2 = dx2 / len2 * speed, mz2 = dz2 / len2 * speed;
@@ -400,6 +428,13 @@ export var EnemyManager = class {
         e.x += mx2 * dt2;
         e.z += mz2 * dt2;
         this._face(e, e.x + mx2, e.z + mz2, dt2);
+        if (e.st.burrows && e.diving) {
+          e._dustCd -= dt2;
+          if (e._dustCd <= 0) {
+            e._dustCd = 0.35;
+            this.fx.ring(e.x, e.z, 9127187, 0.9);
+          }
+        }
         this._applyPosition(e, dt2, now);
         continue;
       }
@@ -411,6 +446,34 @@ export var EnemyManager = class {
             if (e.attackCd <= 0) {
               e.attackCd = 1 / e.st.rate;
               this.onBuildingHit?.(e, target, e.st.buildingDmgMult || 1);
+            }
+            this._face(e, target.x, target.z, dt2);
+            this._applyPosition(e, dt2, now);
+            continue;
+          }
+          const dx2 = target.x - e.x, dz2 = target.z - e.z;
+          const len2 = Math.hypot(dx2, dz2) || 1;
+          let mx2 = dx2 / len2 * speed, mz2 = dz2 / len2 * speed;
+          const sep2 = this._separation(e);
+          mx2 += sep2.x * speed * 0.6;
+          mz2 += sep2.z * speed * 0.6;
+          e.x += mx2 * dt2;
+          e.z += mz2 * dt2;
+          this._face(e, e.x + mx2, e.z + mz2, dt2);
+          this._applyPosition(e, dt2, now);
+          continue;
+        }
+      }
+      if (e.st.stealsNodes && (e._stolen || 0) < e.st.stealMax) {
+        const target = this._nearestNode(e.x, e.z);
+        if (target) {
+          const d2 = dist(e.x, e.z, target.x, target.z);
+          if (d2 < 1.6 + e.st.radius) {
+            e._stealCd = (e._stealCd || 0) - dt2;
+            if (e._stealCd <= 0) {
+              e._stealCd = e.st.stealInterval;
+              e._stolen = (e._stolen || 0) + 1;
+              this.onNodeSteal?.(e, target);
             }
             this._face(e, target.x, target.z, dt2);
             this._applyPosition(e, dt2, now);
@@ -645,6 +708,18 @@ export var EnemyManager = class {
     }
     return best;
   }
+  _nearestNode(x2, z2) {
+    let best = null, bd2 = Infinity;
+    for (const n of this.world.nodes) {
+      if (n.depleted || n.mimic) continue;
+      const d2 = (n.x - x2) ** 2 + (n.z - z2) ** 2;
+      if (d2 < bd2) {
+        bd2 = d2;
+        best = n;
+      }
+    }
+    return best;
+  }
   _face(e, tx, tz, dt2) {
     const want = Math.atan2(tx - e.x, tz - e.z);
     const cur = e.mesh.rotation.y;
@@ -653,7 +728,8 @@ export var EnemyManager = class {
   }
   _applyPosition(e, dt2, now) {
     this._settle(e, dt2);
-    e.mesh.position.set(e.x + e._kox, e.st.flies ? CFG.flyHeight : 0, e.z + e._koz);
+    const groundY = e.st.burrows && e.diving ? -0.85 : 0;
+    e.mesh.position.set(e.x + e._kox, e.st.flies ? CFG.flyHeight : groundY, e.z + e._koz);
     e._bob += dt2 * (6 + e.st.speed);
     if (e.instanced) this._writeInstance(e, now);
     else e.body.position.y = 0.75 + Math.abs(Math.sin(e._bob)) * 0.12;
@@ -727,14 +803,15 @@ export var EnemyManager = class {
         // 보스 예고/돌진 상태 — 참가자도 경고를 보고 피할 수 있어야 한다
         e.castKind ? 1 : e.isCharging ? 2 : 0,
         e.variant || "",
-        e.elite ? 1 : 0
+        e.elite ? 1 : 0,
+        e.diving ? 1 : 0
       ]);
     }
     return out;
   }
   applySnapshot(list, wave) {
     const seen = /* @__PURE__ */ new Set();
-    for (const [id, type, x2, z2, hp, rot, boss, variant, elite] of list) {
+    for (const [id, type, x2, z2, hp, rot, boss, variant, elite, diving] of list) {
       seen.add(id);
       let e = this.byId(id);
       if (!e) {
@@ -746,6 +823,12 @@ export var EnemyManager = class {
       e.netTarget = { x: x2, z: z2, rot };
       e.hp = hp;
       e.refreshBar();
+      if (e.st.burrows && e.diving && !diving) {
+        e.diving = false;
+        this.fx.ring(e.x, e.z, 9127187, 2.4);
+        this.fx.burst(e.x, 0.3, e.z, 9127187, 12, 4);
+        this.onBurrowEmerge?.(e);
+      }
       if (boss !== e._netBoss) {
         const prevBoss = e._netBoss;
         e._netBoss = boss;
@@ -776,7 +859,8 @@ export var EnemyManager = class {
       e.x += (e.netTarget.x - e.x) * k2;
       e.z += (e.netTarget.z - e.z) * k2;
       this._settle(e, dt2);
-      e.mesh.position.set(e.x + e._kox, 0, e.z + e._koz);
+      const groundY = e.st.burrows && e.diving ? -0.85 : 0;
+      e.mesh.position.set(e.x + e._kox, e.st.flies ? CFG.flyHeight : groundY, e.z + e._koz);
       e.mesh.rotation.y = e.netTarget.rot;
       e._bob += dt2 * 8;
       if (e.instanced) this._writeInstance(e);

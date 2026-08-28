@@ -15,6 +15,11 @@ export var ACHIEVEMENTS = {
   treasureHunter: { name: "보물 사냥꾼", icon: "🦀", desc: "보물게를 5마리 잡았다" },
   nightmareConqueror: { name: "악몽 정복", icon: "😱", desc: "악몽 난이도로 10웨이브를 막아냈다" },
   fourKings: { name: "사천왕", icon: "🐉", desc: "한 판에서 네 보스(파괴자·서리 군주·침묵의 군주·갈취자)를 전부 처치했다" },
+  duoStrike: { name: "호흡 척척", icon: "🤝", desc: "협공 콤보를 10번 발동시켰다" },
+  mimicHunter: { name: "정체 발각", icon: "🎭", desc: "위장한 미믹을 3마리 처치했다" },
+  blockMaster: { name: "인내의 방패", icon: "🛡️", desc: "막기로 몬스터의 근접 공격을 10회 흘려냈다" },
+  relicCollector: { name: "유물 수집가", icon: "🏺", desc: "보스를 처치하고 유물을 3개 모았다" },
+  medic: { name: "정비병", icon: "🔧", desc: "정비소로 손상된 건물을 누적 500 이상 고쳤다" },
   hunter: { name: "사냥꾼", icon: "🍖", desc: "야생 동물을 10마리 사냥했다" }
 };
 var STORE_KEY = "cd.achievements";

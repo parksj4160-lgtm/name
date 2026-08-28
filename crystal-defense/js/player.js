@@ -14,6 +14,7 @@ var GEO4 = {
   hammer: new THREE.CylinderGeometry(0.09, 0.34, 1, 6),
   bomb: new THREE.SphereGeometry(0.22, 10, 8),
   whip: new THREE.TorusGeometry(0.16, 0.04, 6, 14),
+  shield: new THREE.CylinderGeometry(0.32, 0.32, 0.1, 16),
   ring: new THREE.RingGeometry(0.62, 0.76, 20)
 };
 var WEAPON_MAT = {
@@ -24,7 +25,8 @@ var WEAPON_MAT = {
   spear: new THREE.MeshStandardMaterial({ color: 13227747, roughness: 0.35, metalness: 0.75 }),
   hammer: new THREE.MeshStandardMaterial({ color: 7034692, roughness: 0.55, metalness: 0.4 }),
   bomb: new THREE.MeshStandardMaterial({ color: 2829103, roughness: 0.5, metalness: 0.2 }),
-  whip: new THREE.MeshStandardMaterial({ color: 4210752, roughness: 0.4, metalness: 0.8 })
+  whip: new THREE.MeshStandardMaterial({ color: 4210752, roughness: 0.4, metalness: 0.8 }),
+  shield: new THREE.MeshStandardMaterial({ color: 10466760, roughness: 0.35, metalness: 0.7 })
 };
 var WEAPON_LOOK = {
   default: { geo: GEO4.tool, mat: WEAPON_MAT.default, ry: 0, rz: 0 },
@@ -34,7 +36,8 @@ var WEAPON_LOOK = {
   spear: { geo: GEO4.spear, mat: WEAPON_MAT.spear, ry: 0, rz: 0.05 },
   hammer: { geo: GEO4.hammer, mat: WEAPON_MAT.hammer, ry: 0, rz: 0.85 },
   bomb: { geo: GEO4.bomb, mat: WEAPON_MAT.bomb, ry: 0, rz: 0 },
-  whip: { geo: GEO4.whip, mat: WEAPON_MAT.whip, ry: Math.PI / 2, rz: 0 }
+  whip: { geo: GEO4.whip, mat: WEAPON_MAT.whip, ry: Math.PI / 2, rz: 0 },
+  shield: { geo: GEO4.shield, mat: WEAPON_MAT.shield, ry: Math.PI / 2, rz: 0 }
 };
 var PALETTE = [6280447, 10354539, 16757599, 16739286, 14065919, 7077840];
 var Player = class {
@@ -63,6 +66,7 @@ var Player = class {
     this.combatUntil = 0;
     this.invulnerable = false;
     this.reviveAssisted = false;
+    this.blocking = false;
     this.mesh = this._makeMesh();
     this.mesh.position.set(this.x, 0, this.z);
   }
@@ -161,6 +165,15 @@ var Player = class {
   get heldWeaponLv() {
     return this.weaponLv[this.heldWeapon] || 0;
   }
+  // 막기(Q) 효과 — 기본값은 무기와 무관하지만, 방패를 손에 쥐고 있으면 훨씬 강해진다(대신 공격력이
+  // 거의 없다). 방패가 특화(철벽/기동방패)까지 마쳤으면 그 갈래의 값으로 한 번 더 바뀐다.
+  get blockStats() {
+    const base = CFG.player.block;
+    if (this.heldWeapon !== "shield") return base;
+    const specKey = this.weaponSpec.shield;
+    const spec = specKey && CFG.weaponSpec.shield?.[specKey];
+    return spec?.block || CFG.craft.shield.block;
+  }
   damage(amount) {
     if (!this.alive) return false;
     this.hp -= amount;
@@ -207,7 +220,10 @@ var Player = class {
   animate(dt2, moving) {
     this._updateWeapon();
     const t2 = performance.now() / 1e3;
-    if (this.swing > 0) {
+    if (this.blocking) {
+      this.arm.rotation.x = -1.3;
+      this.tool.rotation.x = -1.6;
+    } else if (this.swing > 0) {
       this.swing -= dt2 * 3.4;
       const k2 = Math.max(0, this.swing);
       this.arm.rotation.x = -Math.sin(k2 * Math.PI) * 2.2;
@@ -223,7 +239,7 @@ var Player = class {
     this.mesh.position.y = bob;
     this.mesh.rotation.y = this.rot;
     this.ring.material.opacity = this.alive ? this.isLocal ? 0.85 : 0.45 : this.reviveAssisted ? 0.45 + Math.abs(Math.sin(t2 * 8)) * 0.35 : 0.15;
-    this.mat.emissive?.setHex(this.combatUntil > t2 ? 6693410 : 0);
+    this.mat.emissive?.setHex(this.blocking ? 3377407 : this.combatUntil > t2 ? 6693410 : 0);
     this.mat.opacity = this.invulnerable ? 0.35 + Math.abs(Math.sin(t2 * 26)) * 0.35 : 1;
   }
 };
@@ -289,7 +305,8 @@ export var LocalPlayer = class extends Player {
         this.cancelHarvest();
         const sprint = input.down("shift");
         const weatherMult = world.weatherKind === "rain" ? WEATHER.rain.playerSpeedMult : 1;
-        const spd = (sprint ? CFG.player.sprint : CFG.player.speed) * weatherMult * speedMult;
+        const blockMult = this.blocking ? this.blockStats.speedMult : 1;
+        const spd = (sprint ? CFG.player.sprint : CFG.player.speed) * weatherMult * blockMult * speedMult;
         const len = Math.hypot(mx, mz);
         mx /= len;
         mz /= len;
@@ -330,7 +347,7 @@ export var LocalPlayer = class extends Player {
     for (let gz = g2.gz - 1; gz <= g2.gz + 1; gz++) {
       for (let gx = g2.gx - 1; gx <= g2.gx + 1; gx++) {
         const b = grid.at(gx, gz);
-        if (!b) continue;
+        if (!b || b.def.playerPass) continue;
         const halfCell = grid.cell / 2;
         const dx = this.x - b.x, dz = this.z - b.z;
         const ox = halfCell + r - Math.abs(dx);
@@ -412,6 +429,7 @@ export var RemotePlayer = class extends Player {
     this.alive = s2.alive;
     this.invulnerable = !!s2.invulnerable;
     this.reviveAssisted = !!s2.reviveAssisted;
+    this.blocking = !!s2.blocking;
     this.harvesting = s2.harvesting ? { t: 0, need: 1 } : null;
     if (s2.held) {
       this.tools[s2.held] = true;

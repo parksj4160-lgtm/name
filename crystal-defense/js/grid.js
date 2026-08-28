@@ -90,11 +90,14 @@ export var BuildGrid = class {
     this.set(gx, gz, null);
   }
   // 건설 가능 판정. 이유 문자열을 함께 돌려준다.
-  canPlace(gx, gz, blockers) {
+  // key 가 fieldPlacement 건물(채집기)이면 채집 노드가 사실 전부 buildRadius 밖에 있어서
+  // 방어선 안에서는 노드에 닿을 수조차 없다 — 그런 건물만 바깥쪽 반경 제한을 건너뛴다.
+  canPlace(gx, gz, blockers, key) {
     if (!this.inBounds(gx, gz)) return { ok: false, why: "맵 밖입니다" };
     const w2 = this.toWorld(gx, gz);
     const d2 = Math.hypot(w2.x, w2.z);
-    if (d2 > CFG.world.buildRadius) return { ok: false, why: "건설 가능 구역 밖입니다" };
+    const fieldPlacement = key && CFG.builds[key]?.fieldPlacement;
+    if (!fieldPlacement && d2 > CFG.world.buildRadius) return { ok: false, why: "건설 가능 구역 밖입니다" };
     if (d2 < CFG.world.coreRadius) return { ok: false, why: "크리스탈에 너무 가깝습니다" };
     if (this.at(gx, gz)) return { ok: false, why: "이미 건물이 있습니다" };
     if (blockers && blockers(w2.x, w2.z)) return { ok: false, why: "다른 오브젝트와 겹칩니다" };

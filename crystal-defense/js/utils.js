@@ -24,6 +24,18 @@ export function mulberry32(seed) {
     return ((t2 ^ t2 >>> 14) >>> 0) / 4294967296;
   };
 }
+export function todayKey() {
+  const d2 = /* @__PURE__ */ new Date();
+  return `${d2.getFullYear()}-${String(d2.getMonth() + 1).padStart(2, "0")}-${String(d2.getDate()).padStart(2, "0")}`;
+}
+export function dateSeed(key = todayKey()) {
+  let h2 = 2166136261;
+  for (let i = 0; i < key.length; i++) {
+    h2 ^= key.charCodeAt(i);
+    h2 = Math.imul(h2, 16777619);
+  }
+  return h2 >>> 0;
+}
 export function fmtTime(sec) {
   const s2 = Math.max(0, Math.ceil(sec));
   return `${String(Math.floor(s2 / 60)).padStart(2, "0")}:${String(s2 % 60).padStart(2, "0")}`;

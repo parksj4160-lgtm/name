@@ -1,3 +1,4 @@
+import { UI } from './ui.js';
 import { mulberry32 } from './utils.js';
 
 export var CFG = {
@@ -61,10 +62,19 @@ export var CFG = {
     // 회피 돌진 — 짧게 무적 상태로 튀어나간다. 보스 돌진이나 다구리를 피할 때, 결계 몹에게 순식간에
     // 붙을 때 쓴다. 쿨다운 중엔 다시 못 쓴다
     dash: { speed: 20, duration: 0.16, cooldown: 3 },
+    // 막기 — 누르고 있는 동안 근접 피격 대미지를 크게 줄이지만, 그만큼 거의 못 움직이고 공격·채집도
+    // 못 한다(공짜가 아니다). 돌진(dash)이 "짧은 순간 아예 안 맞는" 회피기라면, 이건 "느리지만 계속
+    // 버티는" 지속형 방어 — 무리에 둘러싸였을 때 도망칠 틈을 만들거나 아군이 올 때까지 버티는 용도.
+    // 원거리·범위·상태이상(독·침묵 장판·운석 등)은 막지 못하고 오직 몬스터의 근접 접촉 공격만 줄인다.
+    block: { mitigation: 0.65, speedMult: 0.4 },
     // 미니맵 핑 — 협동 플레이에서 위치를 알리는 신호. 자원도 안 쓰고 되돌릴 상태도 없어서
     // 쿨다운은 순전히 도배 방지용이다
     pingCooldown: 2.5
   },
+  // 협공 콤보 — 서로 다른 플레이어가 같은 적을 window 초 안에 연달아(근접·활·폭탄) 맞히면 두 번째
+  // 타격에 mult 배 피해가 붙는다. 같은 플레이어가 연타해서는 절대 안 걸린다(_hurtEnemy가 마지막
+  // 타격자 id와 비교) — 혼자 플레이하면 항상 같은 id라 100% 무영향인 순수 협동 전용 보너스다.
+  combo: { window: 1, mult: 1.3 },
   harvest: {
     range: 3.2,
     tree: { time: 1.5, yield: 6, charges: 4, respawn: 22 },
@@ -82,6 +92,13 @@ export var CFG = {
       { mult: 0.45, cost: { wood: 260, stone: 220 } }
     ]
   },
+  // 나무·바위 노드 중 일부는 위장한 몬스터(미믹)다 — 세계 생성 시 시드로 결정되어 호스트·참가자가
+  // 항상 같은 노드를 같은 결과로 계산한다(추가 동기화 없음). minWave 전에 건드리면 정체가 드러나지
+  // 않고 그냥 평범하게 캐지며(위장이 아깝게 소모될 뿐), minWave 이후에 캐야 진짜로 몬스터가 튀어나온다
+  // — 초반부터 무방비 상태로 당하는 걸 막으면서도 판이 진행될수록 "그 나무, 캐도 되는 걸까"라는
+  // 의심을 계속 남긴다. 정수석(gem)은 제외 — 가장 귀한 자원까지 위험해지면 후반 정수 파밍이 지나치게
+  // 조심스러워진다.
+  mimic: { chance: 0.07, minWave: 2 },
   // 건설물 정의. key 는 네트워크 메시지에도 그대로 쓰인다.
   builds: {
     wall: {
@@ -96,6 +113,26 @@ export var CFG = {
         { hp: 260 },
         { hp: 520, cost: { wood: 20, stone: 20 } },
         { hp: 980, cost: { wood: 40, stone: 55, iron: 4 } }
+      ]
+    },
+    // 벽으로 완전히 두른 방어선은 몬스터를 막는 대신 플레이어 자신도 못 나간다(건물 충돌은
+    // blocks 여부를 안 가리고 모든 건물에 걸린다 — player.js _collide). 성문은 몬스터 길찾기에는
+    // 벽과 똑같이 막힌 취급(blocks:true)이면서, playerPass 로 플레이어 충돌만 예외 처리해 자유롭게
+    // 드나들 수 있다 — 방어선에 일부러 구멍을 내거나 매번 벽을 부쉈다 다시 짓는 수고를 없앤다.
+    // 체력은 벽보다 낮게(관문은 원래 방어의 약점이라는 트레이드오프) 잡았다.
+    gate: {
+      name: "성문",
+      icon: "🚪",
+      hotkey: "j",
+      cost: { wood: 18, stone: 10 },
+      hp: 200,
+      blocks: true,
+      playerPass: true,
+      desc: "벽처럼 몬스터의 길을 막지만, 플레이어는 자유롭게 드나들 수 있다. 벽보다 체력은 낮다.",
+      levels: [
+        { hp: 200 },
+        { hp: 380, cost: { wood: 30, stone: 30 } },
+        { hp: 620, cost: { wood: 60, stone: 70, iron: 5 } }
       ]
     },
     arrow: {
@@ -232,7 +269,7 @@ export var CFG = {
     lightning: {
       name: "번개탑",
       icon: "🌩️",
-      hotkey: "c",
+      hotkey: "o",
       cost: { wood: 45, stone: 35 },
       hp: 170,
       blocks: true,
@@ -241,6 +278,66 @@ export var CFG = {
         { hp: 170, dmg: 9, range: 11, rate: 0.85, chain: { count: 3, range: 4.5, falloff: 0.6 } },
         { hp: 260, dmg: 14, range: 12.5, rate: 0.95, chain: { count: 4, range: 5, falloff: 0.65 }, cost: { wood: 55, stone: 65 } },
         { hp: 400, dmg: 21, range: 14, rate: 1.05, chain: { count: 5, range: 5.5, falloff: 0.7 }, cost: { wood: 100, stone: 130, iron: 6 } }
+      ]
+    },
+    // 굴착병(burrower)은 파묻혀 있는 동안(diving) 모든 타워의 _acquire 에서 제외되도록 설계됐다 —
+    // "타워로는 못 잡고 직접 쫓아가야 한다"가 그 몬스터의 정체성이다. 감시탑은 그 규칙에 한 가지
+    // 예외를 뚫는다: 스스로 공격은 안 하지만, 반경 안 타워는 파묻힌 굴착병도 감지해서 조준할 수 있게
+    // 한다(보루가 공격력을 buff 하듯, 이건 "탐지"를 buff 한다) — 굴착병 전용 카운터를 벽·타워가 아니라
+    // 새 건물 하나로 만들어, "쫓아가서 끊는다"와 "미리 지어서 방어선으로 막는다" 둘 다 선택지가 되게 했다.
+    watchtower: {
+      name: "감시탑",
+      icon: "🗼",
+      hotkey: "k",
+      cost: { wood: 35, stone: 20 },
+      hp: 120,
+      blocks: true,
+      desc: "스스로 공격하지 않지만, 반경 안 타워가 땅에 파묻힌 🕳️ 굴착병도 감지해 조준할 수 있게 한다.",
+      levels: [
+        { hp: 120, detectRadius: 10 },
+        { hp: 180, detectRadius: 12.5, cost: { wood: 30, stone: 35 } },
+        { hp: 250, detectRadius: 16, cost: { wood: 60, stone: 75, iron: 4 } }
+      ]
+    },
+    // 지금까지 "파밍"은 전부 플레이어가 직접 클릭·홀드해야만 진행됐다. 채집기는 그 순환에
+    // 처음으로 자동화를 끼워 넣는다 — 짓고 나면 방치해도 알아서 채워지지만, 손으로 캐는 것보다
+    // 항상 느리게(레벨 3 최고 속도여도 나무 기본 채집(1.5초)보다 느리다) 잡아 "지어두면 편하지만
+    // 직접 캐는 걸 완전히 대체하진 않는" 균형을 잡았다. 정수석(gem)은 일부러 제외했다 — 정수는
+    // 스킬·크리스탈 강화·축복을 전부 잠그는 자원이라 방치로 저절로 쌓이면 그 긴장이 사라진다.
+    // fieldPlacement — 채집 노드는 전부 buildRadius(크리스탈 중심 22) 훨씬 밖에 있어서, 다른
+    // 건물처럼 방어선 안에만 지을 수 있게 두면 노드 근처에 지을 방법 자체가 없다(실측: 가장 가까운
+    // 나무도 거리 27+). 그래서 채집기만은 canPlace 의 바깥쪽 반경 제한을 건너뛰어 맵 어디든(코어
+    // 반경 제외) 지을 수 있게 했다 — 대신 blocks:false 로 몬스터 길찾기를 방해하지 않게 하고
+    // (야외에 두는 건물이 몬스터 경로를 막으면 예상 못한 자리에서 병목이 생길 수 있다), 건물을
+    // 노리는 약탈자(seeksBuildings)에게는 다른 건물과 똑같이 부서질 수 있다 — 방치한 채집기가
+    // 지나가는 몬스터에게 파괴될 위험이 자연스러운 견제가 된다.
+    harvester: {
+      name: "채집기",
+      icon: "🧺",
+      hotkey: "l",
+      cost: { wood: 25, stone: 15 },
+      hp: 90,
+      blocks: false,
+      fieldPlacement: true,
+      desc: "반경 안 나무·바위를 스스로 캔다(정수석은 캐지 않는다) — 손으로 캐는 것보다 항상 느리다. 방어선 밖 어디든 지을 수 있지만, 몬스터에게 부서질 수 있다.",
+      levels: [
+        { hp: 90, detectRadius: 4, interval: 4.5 },
+        { hp: 140, detectRadius: 5.5, interval: 3.5, cost: { wood: 40, stone: 30 } },
+        { hp: 200, detectRadius: 7, interval: 2.6, cost: { wood: 75, stone: 60, iron: 4 } }
+      ]
+    },
+    repairpost: {
+      name: "정비소",
+      icon: "🔧",
+      hotkey: "z",
+      cost: { wood: 45, stone: 65 },
+      hp: 130,
+      blocks: true,
+      desc: "스스로 공격하지 않지만, 반경 안 손상된 건물을 자원 없이 천천히 저절로 고쳐준다. 수리하러 뛰어다니지 않아도 방어선이 스스로 버틴다.",
+      levels: [
+        { hp: 130, healRadius: 6, healRate: 4 },
+        { hp: 190, healRadius: 7, healRate: 7, cost: { wood: 60, stone: 100 } },
+        { hp: 260, healRadius: 8, healRate: 11, cost: { wood: 100, stone: 170, iron: 6 } }
       ]
     }
   },
@@ -263,7 +360,8 @@ export var CFG = {
       spear: { dmg: 8 },
       hammer: { dmg: 12 },
       bomb: { dmg: 20 },
-      whip: { dmg: 6 }
+      whip: { dmg: 6 },
+      shield: { dmg: 3 }
     }
   },
   // 제작대에서 만드는 것들. 각자 하나씩만 가질 수 있다.
@@ -323,6 +421,18 @@ export var CFG = {
       cost: { wood: 15, stone: 10 },
       desc: "들면 공격이 근접 대신 조준한 곳에 폭탄을 던지는 것으로 바뀐다. 던질 때마다 목재·광물을 태운다.",
       throw: { cost: { wood: 4, stone: 3 }, dmg: 70, radius: 3.2, cd: 1.1, speed: 13, range: 9 }
+    },
+    // 다른 6개는 전부 "얼마나 세게 때리느냐"를 겨루는데, 이건 유일하게 공격력을 거의 포기하고
+    // 대신 막기(Q)를 훨씬 강하게 만든다 — attackStats 는 effect 를 안 둬서 맨손과 동일한 기본
+    // 공격력만 남는다. block 필드는 player.js 의 blockStats 게터가 heldWeapon==="shield" 일 때만
+    // 골라 쓰는 값으로, 무기 강화·특화와 같은 자리(craft/weaponUpgrade/weaponSpec)에 있지만
+    // 공격 판정(attackStats)에는 전혀 관여하지 않는 별도 경로다.
+    shield: {
+      name: "방패",
+      icon: "🛡️",
+      cost: { wood: 14, iron: 8 },
+      desc: "공격력은 거의 없지만, 손에 쥔 채 막기(Q)를 쓰면 피해 경감(65%→80%)과 이동 속도(40%→60%)가 크게 좋아진다.",
+      block: { mitigation: 0.8, speedMult: 0.6 }
     }
   },
   // 몬스터 종류 (일반형 / 빠른형 / 탱커형 / 원거리형 / 건물추적형 / 보스)
@@ -334,6 +444,13 @@ export var CFG = {
     shooter: { name: "주술사", icon: "🧙", hp: 45, speed: 2.4, dmg: 9, rate: 0.5, radius: 0.5, color: 3526479, bounty: { wood: 3, stone: 2 }, scale: 0.95, ranged: true, atkRange: 11 },
     // 경로상의 벽을 무시하고 가장 가까운 타워로 직행해 부순다 — 타워를 뒤에 숨기는 전략을 견제한다
     raider: { name: "약탈자", icon: "🪓", hp: 80, speed: 2.6, dmg: 10, rate: 0.8, radius: 0.55, color: 11887901, bounty: { wood: 3, stone: 2 }, scale: 1.05, seeksBuildings: true, buildingDmgMult: 1.8 },
+    // 다른 몬스터는 전부 크리스탈·건물·플레이어(체력)를 노리는데, 이건 유일하게 채집 노드(나무·바위·
+    // 정수석)를 직접 노린다 — 지금까지 압박이 전부 "체력"이었다면 이건 "경제"를 겨눈다. 도착하면
+    // 플레이어가 캐는 것과 똑같이 `world.consumeNode`로 충전을 깎아 훔치고, 훔친 만큼(자원 종류·양)을
+    // 몸에 지니고 다닌다 — 죽이면 그 노획물을 그대로 돌려받는다(놔두면 그 노드는 한동안 못 쓴다).
+    // 정해진 만큼(stealMax) 다 훔치면 보통 몬스터처럼 크리스탈로 향한다. 전투력은 일부러 약하게
+    // 잡아(dmg 낮음) "죽여야 하나 말아야 하나"가 아니라 "지금 쫓아갈 시간이 있나"를 묻게 만든다.
+    raccoon: { name: "도둑너구리", icon: "🦝", hp: 34, speed: 3.8, dmg: 4, rate: 0.6, radius: 0.42, color: 10259023, bounty: { wood: 2, stone: 1 }, scale: 0.85, stealsNodes: true, stealInterval: 1.1, stealMax: 2 },
     // 벽·함정을 전부 무시하고 크리스탈로 직선 비행한다 — 길찾기 자체를 안 쓰므로 벽 중심 방어에 구멍을 낸다.
     // 대신 체력이 아주 낮아 타워 몇 대만 스치면 죽는다: "타워가 있어야 하는 이유"를 만드는 게 목적
     flyer: { name: "박쥐", icon: "🦇", hp: 26, speed: 4.6, dmg: 9, rate: 1.1, radius: 0.42, color: 8048895, bounty: { wood: 2, stone: 2 }, scale: 0.8, flies: true },
@@ -371,7 +488,27 @@ export var CFG = {
     deer: { name: "사슴", icon: "🦌", hp: 30, speed: 4.9, dmg: 0, rate: 0, radius: 0.5, color: 11106111, bounty: { wood: 0, stone: 0 }, scale: 1.05, flees: true, wild: true, event: true, fleeRange: 11, meat: "deer" },
     // 유일하게 도망치지 않는다 — 때리면 오히려 달려들어 반격한다. 공짜 사냥감이 아니게 만드는 장치.
     boar: { name: "멧돼지", icon: "🐗", hp: 70, speed: 3.6, dmg: 16, rate: 0.8, radius: 0.6, color: 6048829, bounty: { wood: 0, stone: 0 }, scale: 0.95, wild: true, event: true, retaliates: true, aggroTime: 6, meat: "boar" },
-    treasure: { name: "보물게", icon: "🦀", hp: 16, speed: 5.4, dmg: 0, rate: 0, radius: 0.4, color: 16766720, bounty: { wood: 16, stone: 12 }, scale: 0.85, flees: true, event: true, shardChance: 0.5 }
+    treasure: { name: "보물게", icon: "🦀", hp: 16, speed: 5.4, dmg: 0, rate: 0, radius: 0.4, color: 16766720, bounty: { wood: 16, stone: 12 }, scale: 0.85, flees: true, event: true, shardChance: 0.5 },
+    // 박쥐(flies)가 "벽을 무시"한다면 이쪽은 "벽과 타워를 동시에 무시"한다 — 땅속에 파묻힌 채
+    // 크리스탈로 직선 이동하고, 파묻혀 있는 동안(diving)은 타워가 조준 자체를 못 한다(buildings.js
+    // _acquire). 대신 (1) 완전히 안 보이는 게 아니라 지표면에 흙먼지 자국을 남기며 이동해 위치를
+    // 눈으로 좇을 수 있고, (2) 함정(trap)은 땅 밑을 그대로 관통해 여전히 맞힌다(flyer와 반대 — 함정은
+    // flies만 피해간다), (3) 크리스탈 emergeRange 안까지 오면 지상으로 올라와(diving=false) 그 순간부터
+    // 다른 몬스터처럼 타워에도 맞는다. 총평: "타워 방어선을 무력화하지만 무적은 아닌" 위협 — 다가오는
+    // 흙먼지를 보고 직접 뛰어가 끊거나, 뒤늦게라도 떠오르는 순간을 타워 화력으로 정리해야 한다.
+    burrower: { name: "굴착병", icon: "🕳️", hp: 70, speed: 3, dmg: 22, rate: 0.75, radius: 0.5, color: 9127187, bounty: { wood: 5, stone: 4 }, scale: 1.05, burrows: true, emergeRange: 9 },
+    // 지금까지 몬스터는 전부 개별 행동체였는데, 이건 유일하게 "남을 강하게 만든다." 주기적으로
+    // 진군의 함성(rallyAura)을 울려 반경 안 몬스터 전원의 이동 속도를 잠깐 크게 올린다 — 돌진(dash)
+    // 변종이 자기 자신만 주기적으로 빨라지는 것과 달리, 이건 무리 전체를 동시에 빠르게 만든다.
+    // 체력이 낮은 편이라 각개격파는 쉽지만, 놔두면 계속 울려서 뒤따르는 무리가 훨씬 빨리 밀려온다 —
+    // "누구부터 잡을까"에 처음으로 확실한 정답(지휘관)이 생기는 몬스터.
+    commander: { name: "지휘관", icon: "🥁", hp: 60, speed: 2.2, dmg: 6, rate: 0.5, radius: 0.55, color: 16751001, bounty: { wood: 4, stone: 3 }, scale: 1.1, rallyAura: { radius: 7, mult: 1.7, duration: 2.5, interval: 4 } },
+    // 웨이브 구성에 안 끼는 독립 이벤트(event:true) — CFG.mimic 이 정한 나무·바위 노드를 캐는 순간 그
+    // 자리에서 튀어나온다. 방금 그 자리에 있던 플레이어를 곧바로 덮치도록 사거리·공격력을 근접 무기
+    // 없이도 위협적인 수준으로 잡았다(그런트보다 세지만 브루트만큼은 아님) — "무작정 다 캐고 본다"는
+    // 습관에 제동을 거는 게 목적. bounty 를 0으로 둔 건 애초에 "자원인 줄 알았던" 실망이 핵심이라,
+    // 잡아도 위로 보상을 안 준다(순수 페널티 회피가 전부).
+    mimic: { name: "미믹", icon: "🎭", hp: 75, speed: 2.4, dmg: 13, rate: 0.85, radius: 0.55, color: 8998662, bounty: { wood: 0, stone: 0 }, scale: 1, event: true }
   },
   // 몬스터 변종 접두사 — 종류를 늘리는 대신 기존 몬스터에 가끔 붙는다. 웨이브가 오를수록 등장 확률이 오른다.
   // 색 틴트 + 머리 위 아이콘으로 항상 표시되어(색약 여부와 무관하게) 눈에 띈다.
@@ -390,7 +527,11 @@ export var CFG = {
     // 근접 공격(칼·창·망치 등)으로 때리면 준 피해의 일부를 그대로 되돌려 받는다. 타워·함정·
     // 폭탄·정수 스킬처럼 거리를 둔 공격에는 안 걸린다 — 무기 강화나 필사의 반격으로 근접 대미지가
     // 오른 만큼 반사 피해도 커지므로, "닥치고 근접"만으로는 항상 안전하지 않게 만드는 게 목적
-    thorn: { name: "가시", icon: "🌵", tint: 9127187, reflectPct: 0.4 }
+    thorn: { name: "가시", icon: "🌵", tint: 9127187, reflectPct: 0.4 },
+    // 크리스탈·건물·플레이어 중 무엇을 때리든, 그 피해의 일부를 자기 체력으로 되돌린다.
+    // 방패(막아야 한다)·재생(안 때리면 회복)과 달리 "때리게 놔두면 회복"이라 무시하고 다른 놈부터
+    // 잡는 선택이 오히려 손해가 되게 만든다 — 발견하면 최우선으로 끊어야 하는 표적
+    vampire: { name: "흡혈", icon: "🩸", tint: 10485760, healPct: 0.45 }
   },
   // 웨이브당 몬스터 1마리가 변종을 달 확률 (보스 제외, 분열체 제외)
   variantChance: { base: 0.05, perWave: 0.012, max: 0.32 },
@@ -476,6 +617,12 @@ export var CFG = {
     bomb: {
       cluster: { name: "확산탄", icon: "💥", desc: "범위가 크게 넓어지지만 한 방은 약해진다 — 뭉친 무리를 통째로 쓸어담는다", mods: { radius: 1.6, dmg: 0.65 } },
       heavy: { name: "고폭탄", icon: "☢️", desc: "범위를 내주는 대신 한 방이 훨씬 무겁다(던지는 간격도 길어진다) — 단단한 한 놈을 확실히 끊는다", mods: { dmg: 1.8, radius: 0.6, cd: 1.3 } }
+    },
+    // 방패 특화는 다른 무기처럼 attackStats(mods/add)를 거치지 않는다 — player.js 의 blockStats
+    // 게터가 여기 block 필드를 직접 읽어 통째로 골라 쓴다. 공격 판정과 완전히 분리된 경로다.
+    shield: {
+      bulwark: { name: "철벽", icon: "🧱", desc: "피해 경감이 더 강해지지만(80%→92%) 그만큼 더 느려진다(60%→45%) — 자리를 지키는 탱커용", block: { mitigation: 0.92, speedMult: 0.45 } },
+      guardian: { name: "기동방패", icon: "🏃", desc: "경감은 줄어들지만(80%→72%) 막는 동안에도 거의 정상 속도로 움직인다(60%→85%) — 버티며 이동하는 용도", block: { mitigation: 0.72, speedMult: 0.85 } }
     }
   },
   // 보급품 투하 — 전투 중(웨이브 2부터) 가끔 지도 위에 상자가 떨어진다. 한 번에 최대 1개만 떠 있고,
@@ -536,7 +683,7 @@ export var CFG = {
   // 엔드리스 축복 — 10웨이브 승리 이후(엔드리스)에만 등장한다. 표준 캠페인 밸런스에는 영향이 없다.
   // n웨이브마다 무작위 2개 중 하나를 골라 영구 적용(응급 처치만 즉시 1회성). 전부 호스트가 계산하는
   // 값(근접 공격력·타워 공격력·스킬 비용·크리스탈 체력)에만 걸려 있어서 별도 동기화 없이 참가자에게도 그대로 반영된다.
-  endlessBoon: { every: 3 },
+  endlessBoon: { every: 3, trickleInterval: 12 },
   boons: {
     might: { name: "완력", icon: "💪", desc: "근접 공격력 +20%", kind: "mult", key: "atk", value: 1.2 },
     artillery: { name: "포격 강화", icon: "🗼", desc: "모든 타워 공격력 +15%", kind: "mult", key: "towerDmg", value: 1.15 },
@@ -552,7 +699,19 @@ export var CFG = {
     forging: { name: "제련술", icon: "⚒️", desc: "무기 강화 비용 -3 (최소 1)", kind: "delta", key: "weaponUpgradeCostDelta", value: -3 },
     // forging 과 같은 구조를 무기 강화가 아니라 무기 특화(weaponSpec) 비용 쪽으로 옮긴 것 —
     // 무기 특화는 철 12개 고정이라 강화(레벨당 5~13)보다 단가가 커서 -4로 잡았다.
-    mastery: { name: "숙련", icon: "🎓", desc: "무기 특화 비용 -4 (최소 1)", kind: "delta", key: "weaponSpecCostDelta", value: -4 }
+    mastery: { name: "숙련", icon: "🎓", desc: "무기 특화 비용 -4 (최소 1)", kind: "delta", key: "weaponSpecCostDelta", value: -4 },
+    // 지금까지 축복은 전부 "이미 쓰는 자원을 아끼는" 방향(제련술·숙련·성장 가속)이거나 "전투력을
+    // 올리는" 방향(완력·포격 강화)이었지, "저절로 들어오는" 방향은 없었다. 정수 샘은 처음으로
+    // 패시브 수입을 만든다 — 채집을 잠깐 소홀히 해도 스킬·강화에 쓸 정수가 계속 고인다.
+    spring: { name: "정수 샘", icon: "💧", desc: "12초마다 정수 1개가 저절로 고인다(중첩 가능)", kind: "trickle", key: "shard", value: 1 },
+    // 보스 전용 유물 — 여기부터는 엔드리스가 아니라 "보스를 처치했을 때"(표준 캠페인의 5·10웨이브
+    // 포함) 뜬다. 지금까지 축복은 전부 엔드리스에만 있어서 표준 10웨이브 캠페인에는 이런 선택의
+    // 순간이 전혀 없었다 — trigger 필드 하나로 같은 카드 UI·동기화 배관을 그대로 재사용해 새 트리거
+    // 지점만 추가했다.
+    respite: { name: "여유의 유물", icon: "⏳", desc: "이후 모든 웨이브의 준비 시간이 8초 늘어난다", trigger: "boss", kind: "prepDelta", value: 8 },
+    mend: { name: "회복의 유물", icon: "💚", desc: "즉시 크리스탈 최대 체력의 20%를 회복한다", trigger: "boss", kind: "instantPct", value: 0.2 },
+    venom: { name: "맹독의 유물", icon: "☠️", desc: "근접 공격이 25% 확률로 적에게 독을 묻힌다(3초간 지속 피해)", trigger: "boss", kind: "venom", dps: 10, duration: 3, value: 0.25 },
+    vigor: { name: "투지의 유물", icon: "💪", desc: "크리스탈 위기(체력 30% 미만) 시 피해 보너스가 더 커진다", trigger: "boss", kind: "desperationBonus", value: 0.25 }
   },
   // 보스 전용 패턴. 예고 시간을 반드시 두어서 플레이어가 반응할 수 있게 한다.
   bossPattern: {
@@ -612,9 +771,15 @@ export var CFG = {
     barrier: { name: "긴급 방벽", icon: "🛡️", cost: 3, time: 5, desc: "잠시 크리스탈이 어떤 피해도 받지 않는다" },
     // 나머지 넷과 성격이 다른 유일한 "설치형" 스킬 — 내 발밑이 아니라 **조준한 지점**에 잠깐 열려서
     // 주변 적을 중심으로 끌어당긴다. 그 자체로는 피해가 0이라 단독으로는 아무것도 못 죽이지만,
-    // 흩어져 오는 무리를 한 덩어리로 뭉쳐 놓기 때문에 대포탑\xB7융단폭격\xB7폭탄\xB7운석처럼 범위 피해를
+    // 흩어져 오는 무리를 한 덩어리로 뭉쳐 놓기 때문에 대포탑·융단폭격·폭탄·운석처럼 범위 피해를
     // 주는 수단과 짝지으면 판이 갈린다. 보스는 자기 패턴이 있으므로 면역(끌려다니면 패턴이 망가진다).
-    rift: { name: "중력 균열", icon: "🌌", cost: 3, radius: 7, pull: 5.5, time: 3.5, aimRange: 14, desc: "조준한 곳에 균열을 열어 주변 적을 끌어모은다 (피해 없음 · 보스 면역)" }
+    rift: { name: "중력 균열", icon: "🌌", cost: 3, radius: 7, pull: 5.5, time: 3.5, aimRange: 14, desc: "조준한 곳에 균열을 열어 주변 적을 끌어모은다 (피해 없음 · 보스 면역)" },
+    // 나머지 다섯과 달리 즉발 효과가 아니라 지속시간 내내 스스로 판단해서 움직이고 싸우는 유일한
+    // 스킬 — 회복·폭발·시간왜곡·방벽은 쓰는 순간 끝나고, 중력 균열도 제자리에 고정되지만 이건
+    // 나를 따라다니며 알아서 근처 적을 공격한다. 타워의 _acquire 와 똑같이 결계 변종·파묻힌 굴착병은
+    // 못 때린다(타워 계열 공격으로 취급) — 그런 상대는 여전히 직접 처리해야 한다. 균열처럼 팀 전체
+    // 1마리로 제한해 다중 소환으로 화력을 불리지 못하게 막는다.
+    summon: { name: "정령 소환", icon: "🧚", cost: 3, duration: 10, speed: 6, range: 11, atkRange: 2.2, dmg: 14, rate: 1.6, desc: "10초간 나를 따라다니며 근처 적을 알아서 공격하는 정령을 부른다 (팀 전체 1마리, 결계·파묻힌 적은 못 때림)" }
   },
   net: {
     snapshotHz: 12,
@@ -631,10 +796,13 @@ function _standardTotal(w2) {
   n += 2 + Math.floor(w2 * 1.1);
   if (w2 >= 3) n += Math.floor((w2 - 1) / 2) + 1;
   if (w2 >= 4) n += 1 + Math.floor((w2 - 2) / 2);
+  if (w2 >= 4) n += 1 + Math.floor((w2 - 2) / 4);
   if (w2 >= 5) n += 1 + Math.floor((w2 - 3) / 3);
   if (w2 >= 6) n += 1 + Math.floor((w2 - 4) / 2);
   if (w2 >= 7) n += 1 + Math.floor((w2 - 5) / 3);
   if (w2 >= 8) n += 1 + Math.floor((w2 - 6) / 3);
+  if (w2 >= 9) n += 1 + Math.floor((w2 - 7) / 3);
+  if (w2 >= 10) n += 1 + Math.floor((w2 - 8) / 5);
   return n;
 }
 export var SPECIAL_WAVES = {
@@ -650,7 +818,12 @@ export var SPECIAL_WAVES = {
   // "안 죽이면 끝나지 않는다"는 축이다. 치유사를 먼저 솎아내지 않으면 나머지 그런트가 계속
   // 회복되어 웨이브가 실질적으로 안 끝난다 — 타워가 알아서 잡아 주길 기다리지 말고 직접
   // 우선순위를 정해 뛰어들어야 한다.
-  healers: { name: "치유단", icon: "💉", desc: "치유사가 잔뜩 섞여 나와 서로를 회복시킨다 — 먼저 솎아내지 않으면 무리 전체가 안 죽는다" }
+  healers: { name: "치유단", icon: "💉", desc: "치유사가 잔뜩 섞여 나와 서로를 회복시킨다 — 먼저 솎아내지 않으면 무리 전체가 안 죽는다" },
+  // 🥁 지휘관(commander)의 진군의 함성(rallyAura) 하나만으로는 평소 웨이브에 한둘 섞여 나오는 정도라
+  // 존재감이 옅다. 이 웨이브는 지휘관 여러 명을 동시에 풀어 그 함성이 "무리 전체가 계속 가속되는"
+  // 압박으로 체감되게 만든다 — rush가 물량, siege가 건물 파괴였다면 이건 "먼저 잡아야 할 대상이
+  // 뚜렷한" 축이다. 지휘관을 방치하면 뒤따르는 러너 무리가 끊임없이 1.7배로 밀려온다.
+  rally: { name: "돌격대", icon: "🥁", desc: "지휘관 여러 명이 무리를 이끈다 — 먼저 끊지 않으면 뒤따르는 무리가 계속 빨라진다" }
 };
 var SPECIAL_KEYS = Object.keys(SPECIAL_WAVES);
 export function specialWaveKind(w2) {
@@ -677,6 +850,13 @@ function _specialComposition(w2, kind) {
       { type: "healer", count: Math.max(2, Math.round(total * 0.22)) }
     ];
   }
+  if (kind === "rally") {
+    const commanders = Math.max(3, Math.min(8, 3 + Math.floor((w2 - 21) / 21)));
+    return [
+      { type: "commander", count: commanders },
+      { type: "runner", count: Math.max(6, Math.round(total * 0.75)) }
+    ];
+  }
   return [{ type: "grunt", count: Math.max(3, Math.round(total * 0.32)) }];
 }
 export function waveComposition(w2) {
@@ -687,15 +867,18 @@ export function waveComposition(w2) {
     if (w2 >= 2) l2.push({ type: "runner", count: 2 + Math.floor(w2 * 1.1) });
     if (w2 >= 3) l2.push({ type: "brute", count: Math.floor((w2 - 1) / 2) + 1 });
     if (w2 >= 4) l2.push({ type: "shooter", count: 1 + Math.floor((w2 - 2) / 2) });
+    if (w2 >= 4) l2.push({ type: "raccoon", count: 1 + Math.floor((w2 - 2) / 4) });
     if (w2 >= 5) l2.push({ type: "raider", count: 1 + Math.floor((w2 - 3) / 3) });
     if (w2 >= 6) l2.push({ type: "flyer", count: 1 + Math.floor((w2 - 4) / 2) });
     if (w2 >= 7) l2.push({ type: "healer", count: 1 + Math.floor((w2 - 5) / 3) });
     if (w2 >= 8) l2.push({ type: "bomber", count: 1 + Math.floor((w2 - 6) / 3) });
+    if (w2 >= 9) l2.push({ type: "burrower", count: 1 + Math.floor((w2 - 7) / 3) });
+    if (w2 >= 10) l2.push({ type: "commander", count: 1 + Math.floor((w2 - 8) / 5) });
     return l2;
   })();
   if (w2 % 5 === 0) {
     const bossType = BOSS_CYCLE[(w2 / 5 - 1) % BOSS_CYCLE.length];
-    list.push({ type: bossType, count: Math.floor(w2 / 5) });
+    list.push({ type: bossType, count: 1 });
   }
   return list;
 }
