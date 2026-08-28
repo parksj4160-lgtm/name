@@ -21,6 +21,7 @@ export var WaveDirector = class {
     this.endless = false;
     this._specialKind = null;
     this._siegePortal = null;
+    this.prepBonus = 0;
   }
   get displayWave() {
     return Math.min(CFG.wave.goal, this.wave + 1);
@@ -101,7 +102,7 @@ export var WaveDirector = class {
       return;
     }
     this.phase = PHASE.PREP;
-    this.prepLeft = CFG.wave.prepTime;
+    this.prepLeft = CFG.wave.prepTime + this.prepBonus;
     this.onWaveClear?.(this.wave, reward, false);
   }
   // 승리 화면의 "계속하기": 목표 웨이브에서 멈추지 않고 그대로 이어간다
@@ -109,7 +110,7 @@ export var WaveDirector = class {
     if (this.phase !== PHASE.WON) return false;
     this.endless = true;
     this.phase = PHASE.PREP;
-    this.prepLeft = CFG.wave.prepTime;
+    this.prepLeft = CFG.wave.prepTime + this.prepBonus;
     return true;
   }
   lose() {

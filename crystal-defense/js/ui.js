@@ -2,7 +2,7 @@ import { ACHIEVEMENTS, loadUnlocked, unlock } from './achievements.js';
 import { CFG, DIFFICULTIES, SPECIAL_WAVES, needsPickaxe, specialWaveKind, waveComposition } from './config.js';
 import { Game } from './game.js';
 import { keyLabel } from './keymap.js';
-import { canAfford, clamp, costText, fmtTime, roomCode } from './utils.js';
+import { canAfford, clamp, costText, dateSeed, fmtTime, roomCode, todayKey } from './utils.js';
 import { PHASE } from './wave.js';
 
 var $2 = (id) => document.getElementById(id);
@@ -73,6 +73,8 @@ export var UI = class {
       historyCount: $2("history-count"),
       boonOverlay: $2("boon-overlay"),
       boonChoices: $2("boon-choices"),
+      boonTitle: $2("boon-title"),
+      boonSub: $2("boon-sub"),
       specOverlay: $2("spec-overlay"),
       specChoices: $2("spec-choices"),
       specTitle: $2("spec-title"),
@@ -229,9 +231,10 @@ export var UI = class {
         blast: () => g2.requestSkillBlast(),
         chill: () => g2.requestSkillChill(),
         barrier: () => g2.requestSkillBarrier(),
-        rift: () => g2.requestSkillRift()
+        rift: () => g2.requestSkillRift(),
+        summon: () => g2.requestSkillSummon()
       };
-      const HOTKEYS = { heal: "shard", blast: "skillBlast", chill: "skillChill", barrier: "skillBarrier", rift: "skillRift" };
+      const HOTKEYS = { heal: "shard", blast: "skillBlast", chill: "skillChill", barrier: "skillBarrier", rift: "skillRift", summon: "skillSummon" };
       return Object.entries(CFG.skills).map(([key, s]) => {
         const shardCost = key === "heal" ? s.cost : g2._skillCost(s);
         const cost = { shard: shardCost };
@@ -381,6 +384,7 @@ export var UI = class {
     if (st.poisonDps) parts.push(`독 <b>${st.poisonDps}</b>/초`);
     if (st.root) parts.push(`묶기 <b>${st.root}</b>초`);
     if (st.buffMult) parts.push(`주변 타워 공격력 <b>+${Math.round(st.buffMult * 100)}%</b> (범위 ${st.buffRadius})`);
+    if (st.healRate) parts.push(`반경 안 건물 초당 <b>${st.healRate}</b> 회복 (범위 ${st.healRadius})`);
     if (st.triggerRadius) parts.push(`감지 반경 <b>${st.triggerRadius}</b>`);
     if (st.singleUse) parts.push(`1회용`);
     const ok = canAfford(this.game.myPool, def.cost);
@@ -427,6 +431,8 @@ export var UI = class {
     diff("묶기", cur.root, next.root, "초");
     diff("버프", cur.buffMult, next.buffMult);
     diff("버프 범위", cur.buffRadius, next.buffRadius);
+    diff("회복", cur.healRate, next.healRate);
+    diff("회복 범위", cur.healRadius, next.healRadius);
     const ok = canAfford(g2.myPool, next.cost);
     return `${name} → <b>Lv.${b.level + 1}</b> · ${parts.join(" · ")} · 비용 <b class="${ok ? "" : "lack"}">${costText(next.cost)}</b>`;
   }
@@ -488,6 +494,14 @@ export var UI = class {
       Game.clearLocalSave();
       this.el.lobby.classList.add("hidden");
       g2.begin({ seed: Math.random() * 1e9 | 0, shared: true, difficulty: this.selectedDifficulty });
+    };
+    this._refreshDailyBest();
+    $2("btn-daily").onclick = () => {
+      takeName();
+      g2.net.leave();
+      Game.clearLocalSave();
+      this.el.lobby.classList.add("hidden");
+      g2.begin({ seed: dateSeed(), shared: true, difficulty: "normal", daily: true });
     };
     $2("btn-create").onclick = () => {
       takeName();
@@ -845,8 +859,16 @@ export var UI = class {
   hideResult() {
     this.el.result.classList.add("hidden");
   }
-  // 엔드리스 축복 2개 중 하나를 고르는 선택창
-  showBoonChoice(keys) {
+  // 엔드리스 축복(또는 보스 유물) 2개 중 하나를 고르는 선택창 — 둘 다 같은 카드 UI 를 쓰고
+  // trigger 로 제목·설명만 바꾼다
+  showBoonChoice(keys, trigger = "endless") {
+    if (trigger === "boss") {
+      this.el.boonTitle.textContent = "💀 유물을 골라라";
+      this.el.boonSub.textContent = "보스를 처치했다! 둘 중 하나를 고른다. 영구 적용된다.";
+    } else {
+      this.el.boonTitle.textContent = "♾️ 축복을 골라라";
+      this.el.boonSub.textContent = "엔드리스 웨이브를 넘길 때마다 둘 중 하나를 고른다. 영구 적용된다.";
+    }
     this.el.boonChoices.innerHTML = keys.map((k2) => {
       const b = CFG.boons[k2];
       return `<button type="button" class="boon-card" data-boon="${k2}">
@@ -931,9 +953,16 @@ export var UI = class {
     } else {
       log.classList.add("hidden");
     }
-    const rec = this._recordStats(win, stats, win ? CFG.wave.goal : wave);
-    this._recordHistory(win, stats, win ? CFG.wave.goal : wave);
-    $2("result-record").innerHTML = `
+    const finalWave = win ? CFG.wave.goal : wave;
+    const rec = this._recordStats(win, stats, finalWave);
+    this._recordHistory(win, stats, finalWave);
+    let dailyLine = "";
+    if (this.game.daily) {
+      const d2 = this._recordDaily(win, stats, finalWave);
+      dailyLine = `<li class="${d2.isNewBest ? "new-best" : ""}">🗓️ 오늘의 도전 — 웨이브 <b>${d2.best.wave}</b>${d2.isNewBest ? " — 오늘의 신기록!" : " (오늘 최고는 그대로)"}</li>`;
+      this._refreshDailyBest();
+    }
+    $2("result-record").innerHTML = `${dailyLine}
 <li class="${rec.isNewBest ? "new-best" : ""}">🏆 역대 최고 웨이브 <b>${rec.bestWave}</b>${rec.isNewBest ? " — 신기록!" : ""}</li>
 <li>⚔️ 누적 처치 <b>${rec.totalKills}</b></li>
 <li>🎮 플레이 횟수 <b>${rec.plays}</b> (승리 ${rec.wins}회)</li>`;
@@ -1017,6 +1046,37 @@ export var UI = class {
     hist = hist.slice(0, 10);
     localStorage.setItem("cd.history", JSON.stringify(hist));
     return hist;
+  }
+  // 오늘의 도전 최고 기록 — 날짜별로 그날의 가장 좋은 결과 하나만 남긴다(같은 날 여러 번 도전 가능,
+  // 갱신됐을 때만 덮어쓴다). cd.record 의 "역대 최고"와 별개로, "오늘 이 시드에서" 얼마나 잘했는지를 잰다.
+  _recordDaily(win, stats, finalWave) {
+    const key = todayKey();
+    let all;
+    try {
+      all = JSON.parse(localStorage.getItem("cd.daily") || "{}");
+    } catch {
+      all = {};
+    }
+    const prev = all[key];
+    const isNewBest = !prev || finalWave > prev.wave || finalWave === prev.wave && !prev.win && win;
+    if (isNewBest) all[key] = { wave: finalWave, win, time: stats.time, kills: stats.kills };
+    try {
+      localStorage.setItem("cd.daily", JSON.stringify(all));
+    } catch {
+    }
+    return { best: all[key], isNewBest };
+  }
+  _refreshDailyBest() {
+    const el2 = $2("daily-best");
+    if (!el2) return;
+    let all;
+    try {
+      all = JSON.parse(localStorage.getItem("cd.daily") || "{}");
+    } catch {
+      all = {};
+    }
+    const rec = all[todayKey()];
+    el2.textContent = rec ? `오늘 최고: 웨이브 ${rec.wave}${rec.win ? " · 클리어" : ""} — 넘어서 보자` : "오늘 아직 도전 기록이 없다";
   }
   // 로비의 최근 전적 목록을 채운다
   refreshHistory() {
@@ -1114,9 +1174,6 @@ export var UI = class {
     }
     const waveBottom = this.el.wavePanel.getBoundingClientRect().bottom;
     this.el.toasts.style.top = `${Math.round(waveBottom + 8)}px`;
-    // 튜토리얼은 자원 패널 바로 아래에 붙인다. 자원 패널은 도구를 만들수록(도구 줄) 세로로 길어져서
-    // 높이가 고정이 아니다 — CSS 로 top 을 박아 두면 도구가 늘어난 순간 패널을 덮어 가린다.
-    // 좁은 화면(<=780px)은 CSS 미디어 쿼리가 튜토리얼을 아예 다른 자리에 놓으므로 건드리지 않는다
     if (!this.el.tutorial.classList.contains("hidden")) {
       if (window.innerWidth > 780) {
         const resBottom = this.el.resPanel.getBoundingClientRect().bottom;
@@ -1166,7 +1223,7 @@ export var UI = class {
     const hunting = g2.wave.phase === PHASE.COMBAT && g2.wave.remaining <= 3;
     for (const e of g2.enemyMgr.list) {
       if (e.dead) continue;
-      const isNotable = hunting || this.colorblind || e.st.boss || e.type === "shooter" || e.type === "raider" || e.type === "healer" || e.type === "bomber" || e.type === "treasure" || e.elite;
+      const isNotable = hunting || this.colorblind || e.st.boss || e.type === "shooter" || e.type === "raider" || e.type === "healer" || e.type === "bomber" || e.type === "treasure" || e.type === "burrower" || e.type === "raccoon" || e.type === "commander" || e.elite;
       const slowed = now < e.slowUntil;
       const poisoned = now < e.poisonUntil;
       if (!isNotable && !slowed && !poisoned && !e.variant) continue;
@@ -1389,16 +1446,24 @@ export var UI = class {
         ctx.stroke();
       }
     }
-    ctx.fillStyle = "#ff6a7d";
+    const bossPulse = 3 + Math.sin(performance.now() / 180) * 1.2;
     for (const e of g2.enemyMgr.list) {
       if (e.dead) continue;
-      const ex = tx(e.x), ez = tz(e.z), r = 2.2;
+      const ex = tx(e.x), ez = tz(e.z), r = e.st.boss ? 3.2 : 2.2;
+      ctx.fillStyle = e.st.boss ? "#ff3050" : "#ff6a7d";
       ctx.beginPath();
       ctx.moveTo(ex, ez - r);
       ctx.lineTo(ex + r * 0.87, ez + r * 0.5);
       ctx.lineTo(ex - r * 0.87, ez + r * 0.5);
       ctx.closePath();
       ctx.fill();
+      if (e.st.boss) {
+        ctx.strokeStyle = "rgba(255,204,85,0.9)";
+        ctx.lineWidth = 1.3;
+        ctx.beginPath();
+        ctx.arc(ex, ez, bossPulse + 3, 0, Math.PI * 2);
+        ctx.stroke();
+      }
     }
     ctx.strokeStyle = "#ffcc55";
     for (const ping of g2.fx.pings) {
