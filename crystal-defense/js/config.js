@@ -84,6 +84,10 @@ export var CFG = {
     // 정수석: 아주 드물게 있는 채집물. 캐면 수정 정수(크리스탈 회복용)를 바로 얻는다.
     // 곡괭이가 필요하고, 캐는 데 오래 걸리며, 한 번 캐면 오래 리스폰되지 않는다.
     gem: { time: 3, yield: 1, charges: 1, respawn: 90, needsPickaxe: true },
+    // 구리 광맥 — 바위보다 드물다. 구리는 화살·활시위·보루처럼 "정밀한" 쪽에 들어간다.
+    copper: { time: 2.4, yield: 3, charges: 3, respawn: 40, needsPickaxe: true },
+    // 석탄층 — 태우는 재료. 철을 제련할 때와 화약(대포탑)에 들어간다.
+    coal: { time: 2.2, yield: 4, charges: 3, respawn: 34, needsPickaxe: true },
     // 채집 속도 업그레이드 (레벨당 시간 배율)
     upgrade: [
       { mult: 1, cost: null },
@@ -137,72 +141,74 @@ export var CFG = {
     },
     arrow: {
       name: "화살탑",
+      // 발사할 때마다 화살 1발. 제작대에서 만들어 대야 한다.
+      ammo: "arrow",
       icon: "🏹",
       hotkey: "2",
-      cost: { wood: 35, stone: 15 },
+      cost: { wood: 30, copper: 2 },
       hp: 180,
       blocks: true,
       desc: "가장 앞선 적을 빠르게 저격한다. 서리탑 근처에 두면 둔화된 적에게 추가 피해.",
       levels: [
-        { hp: 180, dmg: 11, range: 13, rate: 1.15 },
-        { hp: 280, dmg: 18, range: 14.5, rate: 1.35, cost: { wood: 40, stone: 30 } },
-        { hp: 420, dmg: 29, range: 16, rate: 1.6, cost: { wood: 80, stone: 70, iron: 6 } }
+        { tier: "나무", hp: 180, dmg: 11, range: 13, rate: 1.15 },
+        { tier: "석조", hp: 280, dmg: 18, range: 14.5, rate: 1.35, cost: { stone: 40, copper: 5 } },
+        { tier: "강철", hp: 420, dmg: 29, range: 16, rate: 1.6, cost: { iron: 6, copper: 10 } }
       ]
     },
     frost: {
       name: "서리탑",
       icon: "❄️",
       hotkey: "3",
-      cost: { wood: 25, stone: 45 },
+      cost: { wood: 20, stone: 25, shard: 1 },
       hp: 200,
       blocks: true,
       desc: "적중한 적을 느리게 만든다. 빠른 몬스터 대응용. 화살탑과 붙여 지으면 궁합이 좋다.",
       levels: [
-        { hp: 200, dmg: 5, range: 10, rate: 0.9, slow: 0.45, slowTime: 1.6 },
-        { hp: 320, dmg: 9, range: 11.5, rate: 1, slow: 0.55, slowTime: 2, cost: { wood: 30, stone: 55 } },
-        { hp: 480, dmg: 14, range: 13, rate: 1.1, slow: 0.65, slowTime: 2.4, cost: { wood: 60, stone: 110, iron: 5 } }
+        { tier: "나무", hp: 200, dmg: 5, range: 10, rate: 0.9, slow: 0.45, slowTime: 1.6 },
+        { tier: "석조", hp: 320, dmg: 9, range: 11.5, rate: 1, slow: 0.55, slowTime: 2, cost: { stone: 60, shard: 2 } },
+        { tier: "강철", hp: 480, dmg: 14, range: 13, rate: 1.1, slow: 0.65, slowTime: 2.4, cost: { iron: 5, shard: 4 } }
       ]
     },
     cannon: {
       name: "대포탑",
       icon: "💣",
       hotkey: "4",
-      cost: { wood: 55, stone: 70 },
+      cost: { wood: 45, stone: 40, coal: 4 },
       hp: 240,
       blocks: true,
       desc: "느리지만 범위 피해를 준다. 뭉친 적에게 강하다.",
       levels: [
-        { hp: 240, dmg: 26, range: 15, rate: 0.55, splash: 3.2 },
-        { hp: 380, dmg: 42, range: 16.5, rate: 0.62, splash: 3.6, cost: { wood: 60, stone: 80 } },
-        { hp: 560, dmg: 66, range: 18, rate: 0.7, splash: 4.2, cost: { wood: 120, stone: 160, iron: 8 } }
+        { tier: "나무", hp: 240, dmg: 26, range: 15, rate: 0.55, splash: 3.2 },
+        { tier: "석조", hp: 380, dmg: 42, range: 16.5, rate: 0.62, splash: 3.6, cost: { stone: 90, coal: 8 } },
+        { tier: "강철", hp: 560, dmg: 66, range: 18, rate: 0.7, splash: 4.2, cost: { iron: 8, coal: 14 } }
       ]
     },
     poison: {
       name: "독탑",
       icon: "☠️",
       hotkey: "5",
-      cost: { wood: 30, stone: 50 },
+      cost: { wood: 25, stone: 30, copper: 3 },
       hp: 190,
       blocks: true,
       desc: "적중한 적에게 지속 피해를 남긴다. 독탑끼리 가까이 모으면 서로 독 피해가 강해진다.",
       levels: [
-        { hp: 190, dmg: 4, range: 11, rate: 0.8, poisonDps: 6, poisonTime: 3 },
-        { hp: 300, dmg: 6, range: 12.5, rate: 0.9, poisonDps: 10, poisonTime: 3.5, cost: { wood: 40, stone: 70 } },
-        { hp: 460, dmg: 9, range: 14, rate: 1, poisonDps: 16, poisonTime: 4, cost: { wood: 80, stone: 140, iron: 6 } }
+        { tier: "나무", hp: 190, dmg: 4, range: 11, rate: 0.8, poisonDps: 6, poisonTime: 3 },
+        { tier: "석조", hp: 300, dmg: 6, range: 12.5, rate: 0.9, poisonDps: 10, poisonTime: 3.5, cost: { stone: 70, copper: 6 } },
+        { tier: "강철", hp: 460, dmg: 9, range: 14, rate: 1, poisonDps: 16, poisonTime: 4, cost: { iron: 6, copper: 12, coal: 4 } }
       ]
     },
     support: {
       name: "보루",
       icon: "🔱",
       hotkey: "6",
-      cost: { wood: 40, stone: 60 },
+      cost: { wood: 40, copper: 4 },
       hp: 150,
       blocks: true,
       desc: "스스로 공격하지 않지만, 주변 타워의 공격력을 높인다. 타워 밀집 지역에 세우면 좋다.",
       levels: [
         { hp: 150, buffRadius: 6, buffMult: 0.2 },
-        { hp: 220, buffRadius: 7, buffMult: 0.3, cost: { wood: 50, stone: 90 } },
-        { hp: 300, buffRadius: 8, buffMult: 0.42, cost: { wood: 90, stone: 160, iron: 5 } }
+        { tier: "석조", hp: 220, buffRadius: 7, buffMult: 0.3, cost: { stone: 70, copper: 8 } },
+        { tier: "강철", hp: 300, buffRadius: 8, buffMult: 0.42, cost: { iron: 5, copper: 14 } }
       ]
     },
     workbench: {
@@ -249,6 +255,9 @@ export var CFG = {
     // 🦇 박쥐처럼 벽·함정을 무시하는 적도 사거리 안에만 들어오면 그대로 묶인다 —
     // 다른 타워들의 화력이 명중할 시간을 벌어 주는 용도.
     snare: {
+      // 건설 메뉴에서는 내렸다 — 이 타워의 역할은 아래 towerSpec 의 특화로 옮겼다.
+      // 정의를 지우지 않는 이유: 이전에 저장된 게임·스냅샷에 남아 있어도 그대로 동작해야 한다.
+      hidden: true,
       name: "덫탑",
       icon: "🕸️",
       hotkey: "0",
@@ -267,6 +276,9 @@ export var CFG = {
     // 뭉쳐서 오는 잡몹 무리엔 대포탑만큼 강하면서, 흩어진 적에게는 화살탑처럼 한 놈에 집중된다 —
     // "지금 뭉쳐 오나 흩어져 오나"에 따라 대포탑과 다른 선택지가 되는 게 목적.
     lightning: {
+      // 건설 메뉴에서는 내렸다 — 이 타워의 역할은 아래 towerSpec 의 특화로 옮겼다.
+      // 정의를 지우지 않는 이유: 이전에 저장된 게임·스냅샷에 남아 있어도 그대로 동작해야 한다.
+      hidden: true,
       name: "번개탑",
       icon: "🌩️",
       hotkey: "o",
@@ -286,6 +298,9 @@ export var CFG = {
     // 한다(보루가 공격력을 buff 하듯, 이건 "탐지"를 buff 한다) — 굴착병 전용 카운터를 벽·타워가 아니라
     // 새 건물 하나로 만들어, "쫓아가서 끊는다"와 "미리 지어서 방어선으로 막는다" 둘 다 선택지가 되게 했다.
     watchtower: {
+      // 건설 메뉴에서는 내렸다 — 이 타워의 역할은 아래 towerSpec 의 특화로 옮겼다.
+      // 정의를 지우지 않는 이유: 이전에 저장된 게임·스냅샷에 남아 있어도 그대로 동작해야 한다.
+      hidden: true,
       name: "감시탑",
       icon: "🗼",
       hotkey: "k",
@@ -344,7 +359,7 @@ export var CFG = {
   // 시설에 다가가 클릭하면 열리는 작업창. range 는 상호작용 가능 거리.
   station: { range: 3.6 },
   // 화로 제련: 광물 -> 철
-  smelt: { cost: { stone: 6 }, yield: 1 },
+  smelt: { cost: { stone: 6, coal: 2 }, yield: 1 },
   // 무기 강화 — 화로에서 철을 태워 이미 만든 무기(곡괭이 제외)의 위력을 영구히 올린다.
   // 크리스탈 강화(정수)와 대칭되는 후반 자원 배출구: 정수는 크리스탈에, 철은 무기에 쓰게 된다.
   // 레벨당 비용이 오르고 최대 레벨이 있어 크리스탈 강화처럼 무한 스노우볼은 아니다.
@@ -561,10 +576,14 @@ export var CFG = {
     },
     frost: {
       deepfreeze: { name: "혹한", icon: "🥶", ring: 5891071, desc: "둔화가 더 깊고 훨씬 오래 간다 — 한 놈을 확실히 묶어 둔다", mods: { slow: 1.25, slowTime: 1.6 } },
+      // 덫탑을 대신하는 갈래 — 둔화 대신 아예 묶어 세운다(덫탑의 root 를 그대로 가져왔다)
+      bind: { name: "속박", icon: "⛓️", ring: 13215862, desc: "둔화 대신 적을 완전히 묶어 세운다 — 비행 몬스터도 사거리 안이면 그대로 멈춘다", mods: { dmg: 0.8 }, add: { root: 2, slow: 0, slowTime: 0 } },
       shatter: { name: "서리파편", icon: "💠", ring: 11800063, desc: "명중 지점 주변까지 함께 얼린다 — 무리 전체를 한꺼번에 늦춘다", mods: { dmg: 1.2, slowTime: 0.75 }, add: { splash: 2.8 } }
     },
     cannon: {
       barrage: { name: "융단폭격", icon: "🎇", ring: 16752640, desc: "폭발 범위가 크게 넓어진다(한 방은 약해진다) — 뭉친 무리를 통째로 쓸어담는다", mods: { dmg: 0.7, splash: 1.5, rate: 1.15 } },
+      // 번개탑을 대신하는 갈래 — 폭발 대신 적에서 적으로 튀어 옮겨붙는다
+      arc: { name: "연쇄", icon: "🌩️", ring: 16769126, desc: "폭발을 포기하고 명중한 적에서 가까운 적으로 튀어 옮겨붙는다 — 줄지어 오는 무리에 강하다", mods: { dmg: 0.55, rate: 1.3 }, add: { splash: 0, chain: { count: 5, range: 5.5, falloff: 0.7 } } },
       breaker: { name: "철갑탄", icon: "🛡️", ring: 12105912, desc: "범위를 좁히는 대신 한 방이 훨씬 무거워진다 — 브루트·보스를 부순다", mods: { dmg: 1.75, splash: 0.55 } }
     },
     poison: {
@@ -650,6 +669,12 @@ export var CFG = {
     // 종류별 등장 가중치 — 흔한 토끼, 가끔 사슴, 드물게 멧돼지
     weights: { rabbit: 5, deer: 3, boar: 2 }
   },
+  // 화살 — 🏹 화살탑이 발사할 때마다 한 발씩 쓴다. 지금까지 타워는 한 번 지으면 공짜로 영원히
+  // 쐈지만, 화살탑만은 보급이 끊기면 멈춘다. 목재와 구리를 계속 대야 하는 대신, 다른 타워보다
+  // 짓는 값이 싸다 — "싸게 깔고 계속 먹이느냐, 비싸게 짓고 잊느냐" 라는 선택을 만드는 게 목적.
+  // 제작대에서 한 번에 여러 발씩 만들고, 팀 자원 풀에 쌓여 모든 화살탑이 같이 꺼내 쓴다.
+  fletch: { cost: { wood: 6, copper: 1 }, yield: 12 },
+  // 제련 — 광물만으로는 안 되고 태울 것(석탄)이 있어야 철이 나온다. 석탄을 캐야 할 이유.
   // 화로에서 굽는다. 생고기 1 + 목재를 태워 그 자리에서 먹고, 효과는 다음 웨이브 한 판 동안 간다.
   // 상인의 물약(tempBoon)과 같은 "한 판짜리" 수명이지만, 자원이 아니라 사냥한 전리품으로만
   // 살 수 있다는 점이 다르다 — 돈으로 못 사는 버프다.

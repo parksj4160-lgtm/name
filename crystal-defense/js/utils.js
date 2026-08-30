@@ -40,8 +40,10 @@ export function fmtTime(sec) {
   const s2 = Math.max(0, Math.ceil(sec));
   return `${String(Math.floor(s2 / 60)).padStart(2, "0")}:${String(s2 % 60).padStart(2, "0")}`;
 }
-var RES_ICON = { wood: "🪵", stone: "🪨", iron: "⚙️", shard: "💠" };
-var COST_KEYS = ["wood", "stone", "iron", "shard"];
+// 비용에 쓰이는 자원 전부. canAfford/payCost/costText 가 전부 이 목록만 보고 돌아가므로,
+// 새 재료는 여기에 한 줄 더하는 것으로 게임 전체(건설·제작·제련·상인·환급)에 한 번에 반영된다.
+var RES_ICON = { wood: "🪵", stone: "🪨", copper: "🟠", coal: "⚫", iron: "⚙️", arrow: "🏹", shard: "💠" };
+var COST_KEYS = ["wood", "stone", "copper", "coal", "iron", "arrow", "shard"];
 export function canAfford(res, cost) {
   if (!cost) return false;
   return COST_KEYS.every((k2) => (res[k2] || 0) >= (cost[k2] || 0));

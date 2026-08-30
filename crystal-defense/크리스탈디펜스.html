@@ -537,7 +537,10 @@ button.corner.mute.off { opacity: 0.5; }
   <div id="res-panel" class="panel">
     <div class="res"><span class="ic">🪵</span><b id="res-wood">0</b><span class="lbl">목재</span></div>
     <div class="res"><span class="ic">🪨</span><b id="res-stone">0</b><span class="lbl">광물</span></div>
+    <div class="res"><span class="ic">🟠</span><b id="res-copper">0</b><span class="lbl">구리</span></div>
+    <div class="res"><span class="ic">⚫</span><b id="res-coal">0</b><span class="lbl">석탄</span></div>
     <div class="res"><span class="ic">⚙️</span><b id="res-iron">0</b><span class="lbl">철</span></div>
+    <div class="res"><span class="ic">🏹</span><b id="res-arrow">0</b><span class="lbl">화살 (화살탑 탄약)</span></div>
     <div class="res"><span class="ic">💠</span><b id="res-shard">0</b><span class="lbl">정수 (스킬)</span></div>
     <div id="meat-row" class="tag hidden"></div>
     <button id="btn-hup" class="mini">채집속도 <b id="hup-lv">Lv.1</b> <span id="hup-cost" class="cost"></span></button>
@@ -632,11 +635,11 @@ button.corner.mute.off { opacity: 0.5; }
       <tr><td>공격 · 채집</td><td><b>대상을 직접 클릭(탭)</b> — 몬스터를 누르면 때리고, 나무·바위·정수석을 누르면 캔다. 빈 곳을 누르면 그냥 휘두른다. <kbd class="rebind" data-action="attack">Space</kbd> 로도 휘두르고 <kbd class="rebind" data-action="harvest">F</kbd> 로 가장 가까운 자원을 캔다. 🪨 바위와 💠 정수석은 <b>곡괭이를 손에 쥐어야</b> 캘 수 있다 (나무는 맨손으로 가능 — 좌상단 도구 아이콘을 눌러 바로 교체)</td></tr>
       <tr><td>🎭 미믹</td><td>나무·바위 노드 중 극히 일부는 위장한 몬스터다(2웨이브부터, 겉보기로는 절대 구분 안 됨) — 캐는 순간 자원 대신 그 자리에서 몬스터가 튀어나와 덮친다. 정수석은 대상이 아니다</td></tr>
       <tr><td>인벤토리</td><td><kbd class="rebind" data-action="inventory">I</kbd> — 건설 · 제작 · 장비를 여기서 전부 고른다</td></tr>
+      <tr><td>⛏️ 재료</td><td>🪵 목재(나무) · 🪨 광물(바위) · 🟠 <b>구리</b>(구리 광맥) · ⚫ <b>석탄</b>(석탄층) · 💠 정수(정수석)를 캔다. 구리·석탄도 바위처럼 <b>곡괭이를 쥐어야</b> 캘 수 있다. ⚙️ <b>철</b>은 캐는 게 아니라 <b>화로</b>에서 광물을 <b>석탄으로 태워</b> 만든다 — 석탄이 없으면 철도 없다</td></tr>
+      <tr><td>🏗️ 타워 재질 단계</td><td>타워는 업그레이드할 때마다 <b>나무 → 석조 → 강철</b>로 재질이 올라가고, 단계마다 요구 재료가 달라진다(1단계는 목재 위주, 2단계는 광물, 3단계는 철). 게다가 <b>타워마다 쓰는 재료가 다르다</b> — 🏹 화살탑은 구리(활시위·촉), ❄️ 서리탑은 정수, 💣 대포탑은 석탄(화약), ☠️ 독탑은 구리, 🔱 보루는 구리. 어떤 광맥을 먼저 캐느냐가 어떤 방어선을 세울 수 있느냐로 이어진다</td></tr>
+      <tr><td>🏹 화살(탄약)</td><td>다른 타워는 한 번 지으면 공짜로 계속 쏘지만, <b>화살탑만은 쏠 때마다 화살을 한 발씩 쓴다</b>. 제작대에서 목재·구리로 한 번에 여러 발씩 만들어 두면 팀 전체의 화살탑이 같이 꺼내 쓴다. 떨어지면 화살탑은 조준만 하고 <b>쏘지 못한다</b>(경고가 뜬다) — 대신 짓는 값이 다른 타워보다 훨씬 싸다</td></tr>
       <tr><td>건설</td><td>인벤토리 <b>건설</b> 탭에서 고르면 배치 모드가 된다 → 좌클릭으로 배치. 벽·타워는 <b>제작대를 먼저 지어야</b> 열린다</td></tr>
       <tr><td>🚪 성문</td><td>벽처럼 몬스터의 길을 막지만(체력은 벽보다 낮다), <b>플레이어는 그대로 통과</b>할 수 있다. 방어선을 완전히 둘러싸도 채집하러 나갈 때마다 벽을 부쉈다 다시 짓는 수고 없이 성문 하나로 드나들면 된다</td></tr>
-      <tr><td>🕸️ 덫탑</td><td>피해는 미미하지만 맞은 적을 잠깐 완전히 묶어 이동을 멈춘다(둔화가 아니라 정지). 🦇 박쥐처럼 벽·함정을 무시하는 적도 사거리 안에만 들어오면 그대로 묶인다 — 다른 타워가 명중시킬 시간을 벌어 준다. <b>묶인 적을 다른 타워가 맞추면 추가 피해 35%</b> — 인접 배치 없이 묶인 상태 자체가 조건이라 어떤 타워 조합이든 이득을 본다</td></tr>
-      <tr><td>🌩️ 번개탑</td><td>명중한 적에서 가까운 다른 적으로 튀어 옮겨붙는다(튈수록 피해 감소) — 뭉쳐서 오는 잡몹 무리엔 대포탑만큼 강하고, 흩어진 적에게는 화살탑처럼 한 놈에 집중된다</td></tr>
-      <tr><td>🗼 감시탑</td><td>스스로 공격하지 않지만, 반경 안 타워가 땅에 파묻힌 🕳️ 굴착병도 감지해서 조준할 수 있게 한다 — 원래는 직접 쫓아가야만 잡을 수 있는 적을, 미리 지어 두면 타워 방어선만으로도 막을 수 있게 된다</td></tr>
       <tr><td>🧺 채집기</td><td>다른 건물과 달리 <b>방어선 밖 어디든</b> 지을 수 있다 — 채집 노드 옆에 놓으면 반경 안 나무·바위를 스스로 캔다(정수석은 캐지 않는다). 손으로 캐는 것보다 항상 느리지만 방치해도 알아서 채워진다. 대신 길을 막지 않고, 지나가는 몬스터(특히 건물을 노리는 🪓 약탈자)에게 부서질 수 있다</td></tr>
       <tr><td>🔧 정비소</td><td>스스로 공격하지 않지만, 반경 안 손상된 건물을 <b>자원 없이</b> 초당 일정량씩 저절로 고쳐준다 — 전투 중 벽·타워를 일일이 찾아다니며 수리할 필요가 줄어든다. 여러 개를 겹쳐 지으면 회복량이 그대로 합산된다</td></tr>
       <tr><td>🪤 함정</td><td>벽·타워와 달리 <b>길을 막지 않는다</b> — 적이 지나가는 길목 한복판에 심어 두면, 적이 밟는 순간 큰 피해+둔화를 주고 사라지는 1회용이다. 벽 뒤가 아니라 통로 위에 놓는 게 핵심</td></tr>
@@ -10847,8 +10850,8 @@ button.corner.mute.off { opacity: 0.5; }
     const s2 = Math.max(0, Math.ceil(sec));
     return `${String(Math.floor(s2 / 60)).padStart(2, "0")}:${String(s2 % 60).padStart(2, "0")}`;
   }
-  var RES_ICON = { wood: "\u{1FAB5}", stone: "\u{1FAA8}", iron: "\u2699\uFE0F", shard: "\u{1F4A0}" };
-  var COST_KEYS = ["wood", "stone", "iron", "shard"];
+  var RES_ICON = { wood: "\u{1FAB5}", stone: "\u{1FAA8}", copper: "\u{1F7E0}", coal: "\u26AB", iron: "\u2699\uFE0F", arrow: "\u{1F3F9}", shard: "\u{1F4A0}" };
+  var COST_KEYS = ["wood", "stone", "copper", "coal", "iron", "arrow", "shard"];
   function canAfford(res, cost) {
     if (!cost) return false;
     return COST_KEYS.every((k2) => (res[k2] || 0) >= (cost[k2] || 0));
@@ -11070,6 +11073,9 @@ button.corner.mute.off { opacity: 0.5; }
         tutorial: $2("tutorial"),
         resPanel: $2("res-panel"),
         meatRow: $2("meat-row"),
+        copper: $2("res-copper"),
+        coal: $2("res-coal"),
+        arrow: $2("res-arrow"),
         tutorialText: $2("tutorial-text"),
         achList: $2("ach-list"),
         achCount: $2("ach-count"),
@@ -11118,7 +11124,7 @@ button.corner.mute.off { opacity: 0.5; }
       const tab = this._invTab;
       if (tab === "build") {
         const hasBench = g2.hasStation("workbench");
-        const rows2 = Object.entries(CFG.builds).map(([key, def]) => {
+        const rows2 = Object.entries(CFG.builds).filter(([, def]) => !def.hidden).map(([key, def]) => {
           const needsBench = !def.station && !hasBench;
           return {
             key,
@@ -11184,6 +11190,16 @@ button.corner.mute.off { opacity: 0.5; }
             action: () => g2.requestCook(mk)
           });
         }
+        rows2.push({
+          key: "fletch",
+          icon: "\u{1F3F9}",
+          name: `\uD654\uC0B4 ${CFG.fletch.yield}\uBC1C \uC81C\uC791`,
+          desc: "\u{1F3F9} \uD654\uC0B4\uD0D1\uC774 \uD55C \uBC1C \uC3E0 \uB54C\uB9C8\uB2E4 \uD558\uB098\uC529 \uC4F4\uB2E4. \uB5A8\uC5B4\uC9C0\uBA74 \uD654\uC0B4\uD0D1\uC774 \uBA48\uCD98\uB2E4.",
+          cost: CFG.fletch.cost,
+          state: !g2.hasStation("workbench") ? "locked" : canAfford(g2.myPool, CFG.fletch.cost) ? "" : "poor",
+          note: !g2.hasStation("workbench") ? "\uC81C\uC791\uB300 \uD544\uC694" : `\uBCF4\uC720 ${Math.floor(g2.myPool.arrow || 0)}\uBC1C`,
+          action: () => g2.requestFletch()
+        });
         rows2.push({
           key: "smelt",
           icon: "\u2699\uFE0F",
@@ -11413,7 +11429,8 @@ button.corner.mute.off { opacity: 0.5; }
     // 업그레이드/수리/철거 모드에서 가리킨 건물의 수치를 한 줄로 만든다
     _hoverDetail(mode, b) {
       const g2 = this.game;
-      const name = `${b.def.icon} ${b.def.name} <b>Lv.${b.level}</b>`;
+      const tier = b.def.levels[b.level - 1]?.tier;
+      const name = `${b.def.icon} ${b.def.name} <b>Lv.${b.level}${tier ? ` ${tier}` : ""}</b>`;
       if (mode === "sell") {
         const back = g2.buildMgr.refund(b);
         return `${name} \uCCA0\uAC70 \u2014 \uD658\uAE09 <b>${costText(back) || "-"}</b>`;
@@ -12157,6 +12174,9 @@ button.corner.mute.off { opacity: 0.5; }
       this.el.hupCost.textContent = nextUp ? costText(nextUp.cost) : "\uCD5C\uB300";
       this.el.hupBtn.disabled = !nextUp || !canAfford(pool, nextUp.cost);
       this.el.iron.textContent = Math.floor(pool.iron || 0);
+      this.el.copper.textContent = Math.floor(pool.copper || 0);
+      this.el.coal.textContent = Math.floor(pool.coal || 0);
+      this.el.arrow.textContent = Math.floor(pool.arrow || 0);
       const meat = pool.meat || {};
       const meatParts = Object.keys(CFG.cook).filter((k2) => meat[k2] > 0).map((k2) => `${CFG.enemies[k2].icon}${meat[k2]}`);
       this.el.meatRow.classList.toggle("hidden", meatParts.length === 0);
@@ -12602,6 +12622,10 @@ button.corner.mute.off { opacity: 0.5; }
       // 정수석: 아주 드물게 있는 채집물. 캐면 수정 정수(크리스탈 회복용)를 바로 얻는다.
       // 곡괭이가 필요하고, 캐는 데 오래 걸리며, 한 번 캐면 오래 리스폰되지 않는다.
       gem: { time: 3, yield: 1, charges: 1, respawn: 90, needsPickaxe: true },
+      // 구리 광맥 — 바위보다 드물다. 구리는 화살·활시위·보루처럼 "정밀한" 쪽에 들어간다.
+      copper: { time: 2.4, yield: 3, charges: 3, respawn: 40, needsPickaxe: true },
+      // 석탄층 — 태우는 재료. 철을 제련할 때와 화약(대포탑)에 들어간다.
+      coal: { time: 2.2, yield: 4, charges: 3, respawn: 34, needsPickaxe: true },
       // 채집 속도 업그레이드 (레벨당 시간 배율)
       upgrade: [
         { mult: 1, cost: null },
@@ -12655,72 +12679,74 @@ button.corner.mute.off { opacity: 0.5; }
       },
       arrow: {
         name: "\uD654\uC0B4\uD0D1",
+        // 발사할 때마다 화살 1발. 제작대에서 만들어 대야 한다.
+        ammo: "arrow",
         icon: "\u{1F3F9}",
         hotkey: "2",
-        cost: { wood: 35, stone: 15 },
+        cost: { wood: 30, copper: 2 },
         hp: 180,
         blocks: true,
         desc: "\uAC00\uC7A5 \uC55E\uC120 \uC801\uC744 \uBE60\uB974\uAC8C \uC800\uACA9\uD55C\uB2E4. \uC11C\uB9AC\uD0D1 \uADFC\uCC98\uC5D0 \uB450\uBA74 \uB454\uD654\uB41C \uC801\uC5D0\uAC8C \uCD94\uAC00 \uD53C\uD574.",
         levels: [
-          { hp: 180, dmg: 11, range: 13, rate: 1.15 },
-          { hp: 280, dmg: 18, range: 14.5, rate: 1.35, cost: { wood: 40, stone: 30 } },
-          { hp: 420, dmg: 29, range: 16, rate: 1.6, cost: { wood: 80, stone: 70, iron: 6 } }
+          { tier: "\uB098\uBB34", hp: 180, dmg: 11, range: 13, rate: 1.15 },
+          { tier: "\uC11D\uC870", hp: 280, dmg: 18, range: 14.5, rate: 1.35, cost: { stone: 40, copper: 5 } },
+          { tier: "\uAC15\uCCA0", hp: 420, dmg: 29, range: 16, rate: 1.6, cost: { iron: 6, copper: 10 } }
         ]
       },
       frost: {
         name: "\uC11C\uB9AC\uD0D1",
         icon: "\u2744\uFE0F",
         hotkey: "3",
-        cost: { wood: 25, stone: 45 },
+        cost: { wood: 20, stone: 25, shard: 1 },
         hp: 200,
         blocks: true,
         desc: "\uC801\uC911\uD55C \uC801\uC744 \uB290\uB9AC\uAC8C \uB9CC\uB4E0\uB2E4. \uBE60\uB978 \uBAAC\uC2A4\uD130 \uB300\uC751\uC6A9. \uD654\uC0B4\uD0D1\uACFC \uBD99\uC5EC \uC9C0\uC73C\uBA74 \uAD81\uD569\uC774 \uC88B\uB2E4.",
         levels: [
-          { hp: 200, dmg: 5, range: 10, rate: 0.9, slow: 0.45, slowTime: 1.6 },
-          { hp: 320, dmg: 9, range: 11.5, rate: 1, slow: 0.55, slowTime: 2, cost: { wood: 30, stone: 55 } },
-          { hp: 480, dmg: 14, range: 13, rate: 1.1, slow: 0.65, slowTime: 2.4, cost: { wood: 60, stone: 110, iron: 5 } }
+          { tier: "\uB098\uBB34", hp: 200, dmg: 5, range: 10, rate: 0.9, slow: 0.45, slowTime: 1.6 },
+          { tier: "\uC11D\uC870", hp: 320, dmg: 9, range: 11.5, rate: 1, slow: 0.55, slowTime: 2, cost: { stone: 60, shard: 2 } },
+          { tier: "\uAC15\uCCA0", hp: 480, dmg: 14, range: 13, rate: 1.1, slow: 0.65, slowTime: 2.4, cost: { iron: 5, shard: 4 } }
         ]
       },
       cannon: {
         name: "\uB300\uD3EC\uD0D1",
         icon: "\u{1F4A3}",
         hotkey: "4",
-        cost: { wood: 55, stone: 70 },
+        cost: { wood: 45, stone: 40, coal: 4 },
         hp: 240,
         blocks: true,
         desc: "\uB290\uB9AC\uC9C0\uB9CC \uBC94\uC704 \uD53C\uD574\uB97C \uC900\uB2E4. \uBB49\uCE5C \uC801\uC5D0\uAC8C \uAC15\uD558\uB2E4.",
         levels: [
-          { hp: 240, dmg: 26, range: 15, rate: 0.55, splash: 3.2 },
-          { hp: 380, dmg: 42, range: 16.5, rate: 0.62, splash: 3.6, cost: { wood: 60, stone: 80 } },
-          { hp: 560, dmg: 66, range: 18, rate: 0.7, splash: 4.2, cost: { wood: 120, stone: 160, iron: 8 } }
+          { tier: "\uB098\uBB34", hp: 240, dmg: 26, range: 15, rate: 0.55, splash: 3.2 },
+          { tier: "\uC11D\uC870", hp: 380, dmg: 42, range: 16.5, rate: 0.62, splash: 3.6, cost: { stone: 90, coal: 8 } },
+          { tier: "\uAC15\uCCA0", hp: 560, dmg: 66, range: 18, rate: 0.7, splash: 4.2, cost: { iron: 8, coal: 14 } }
         ]
       },
       poison: {
         name: "\uB3C5\uD0D1",
         icon: "\u2620\uFE0F",
         hotkey: "5",
-        cost: { wood: 30, stone: 50 },
+        cost: { wood: 25, stone: 30, copper: 3 },
         hp: 190,
         blocks: true,
         desc: "\uC801\uC911\uD55C \uC801\uC5D0\uAC8C \uC9C0\uC18D \uD53C\uD574\uB97C \uB0A8\uAE34\uB2E4. \uB3C5\uD0D1\uB07C\uB9AC \uAC00\uAE4C\uC774 \uBAA8\uC73C\uBA74 \uC11C\uB85C \uB3C5 \uD53C\uD574\uAC00 \uAC15\uD574\uC9C4\uB2E4.",
         levels: [
-          { hp: 190, dmg: 4, range: 11, rate: 0.8, poisonDps: 6, poisonTime: 3 },
-          { hp: 300, dmg: 6, range: 12.5, rate: 0.9, poisonDps: 10, poisonTime: 3.5, cost: { wood: 40, stone: 70 } },
-          { hp: 460, dmg: 9, range: 14, rate: 1, poisonDps: 16, poisonTime: 4, cost: { wood: 80, stone: 140, iron: 6 } }
+          { tier: "\uB098\uBB34", hp: 190, dmg: 4, range: 11, rate: 0.8, poisonDps: 6, poisonTime: 3 },
+          { tier: "\uC11D\uC870", hp: 300, dmg: 6, range: 12.5, rate: 0.9, poisonDps: 10, poisonTime: 3.5, cost: { stone: 70, copper: 6 } },
+          { tier: "\uAC15\uCCA0", hp: 460, dmg: 9, range: 14, rate: 1, poisonDps: 16, poisonTime: 4, cost: { iron: 6, copper: 12, coal: 4 } }
         ]
       },
       support: {
         name: "\uBCF4\uB8E8",
         icon: "\u{1F531}",
         hotkey: "6",
-        cost: { wood: 40, stone: 60 },
+        cost: { wood: 40, copper: 4 },
         hp: 150,
         blocks: true,
         desc: "\uC2A4\uC2A4\uB85C \uACF5\uACA9\uD558\uC9C0 \uC54A\uC9C0\uB9CC, \uC8FC\uBCC0 \uD0C0\uC6CC\uC758 \uACF5\uACA9\uB825\uC744 \uB192\uC778\uB2E4. \uD0C0\uC6CC \uBC00\uC9D1 \uC9C0\uC5ED\uC5D0 \uC138\uC6B0\uBA74 \uC88B\uB2E4.",
         levels: [
           { hp: 150, buffRadius: 6, buffMult: 0.2 },
-          { hp: 220, buffRadius: 7, buffMult: 0.3, cost: { wood: 50, stone: 90 } },
-          { hp: 300, buffRadius: 8, buffMult: 0.42, cost: { wood: 90, stone: 160, iron: 5 } }
+          { tier: "\uC11D\uC870", hp: 220, buffRadius: 7, buffMult: 0.3, cost: { stone: 70, copper: 8 } },
+          { tier: "\uAC15\uCCA0", hp: 300, buffRadius: 8, buffMult: 0.42, cost: { iron: 5, copper: 14 } }
         ]
       },
       workbench: {
@@ -12767,6 +12793,9 @@ button.corner.mute.off { opacity: 0.5; }
       // 🦇 박쥐처럼 벽·함정을 무시하는 적도 사거리 안에만 들어오면 그대로 묶인다 —
       // 다른 타워들의 화력이 명중할 시간을 벌어 주는 용도.
       snare: {
+        // 건설 메뉴에서는 내렸다 — 이 타워의 역할은 아래 towerSpec 의 특화로 옮겼다.
+        // 정의를 지우지 않는 이유: 이전에 저장된 게임·스냅샷에 남아 있어도 그대로 동작해야 한다.
+        hidden: true,
         name: "\uB36B\uD0D1",
         icon: "\u{1F578}\uFE0F",
         hotkey: "0",
@@ -12785,6 +12814,9 @@ button.corner.mute.off { opacity: 0.5; }
       // 뭉쳐서 오는 잡몹 무리엔 대포탑만큼 강하면서, 흩어진 적에게는 화살탑처럼 한 놈에 집중된다 —
       // "지금 뭉쳐 오나 흩어져 오나"에 따라 대포탑과 다른 선택지가 되는 게 목적.
       lightning: {
+        // 건설 메뉴에서는 내렸다 — 이 타워의 역할은 아래 towerSpec 의 특화로 옮겼다.
+        // 정의를 지우지 않는 이유: 이전에 저장된 게임·스냅샷에 남아 있어도 그대로 동작해야 한다.
+        hidden: true,
         name: "\uBC88\uAC1C\uD0D1",
         icon: "\u{1F329}\uFE0F",
         hotkey: "o",
@@ -12804,6 +12836,9 @@ button.corner.mute.off { opacity: 0.5; }
       // 한다(보루가 공격력을 buff 하듯, 이건 "탐지"를 buff 한다) — 굴착병 전용 카운터를 벽·타워가 아니라
       // 새 건물 하나로 만들어, "쫓아가서 끊는다"와 "미리 지어서 방어선으로 막는다" 둘 다 선택지가 되게 했다.
       watchtower: {
+        // 건설 메뉴에서는 내렸다 — 이 타워의 역할은 아래 towerSpec 의 특화로 옮겼다.
+        // 정의를 지우지 않는 이유: 이전에 저장된 게임·스냅샷에 남아 있어도 그대로 동작해야 한다.
+        hidden: true,
         name: "\uAC10\uC2DC\uD0D1",
         icon: "\u{1F5FC}",
         hotkey: "k",
@@ -12862,7 +12897,7 @@ button.corner.mute.off { opacity: 0.5; }
     // 시설에 다가가 클릭하면 열리는 작업창. range 는 상호작용 가능 거리.
     station: { range: 3.6 },
     // 화로 제련: 광물 -> 철
-    smelt: { cost: { stone: 6 }, yield: 1 },
+    smelt: { cost: { stone: 6, coal: 2 }, yield: 1 },
     // 무기 강화 — 화로에서 철을 태워 이미 만든 무기(곡괭이 제외)의 위력을 영구히 올린다.
     // 크리스탈 강화(정수)와 대칭되는 후반 자원 배출구: 정수는 크리스탈에, 철은 무기에 쓰게 된다.
     // 레벨당 비용이 오르고 최대 레벨이 있어 크리스탈 강화처럼 무한 스노우볼은 아니다.
@@ -13079,10 +13114,14 @@ button.corner.mute.off { opacity: 0.5; }
       },
       frost: {
         deepfreeze: { name: "\uD639\uD55C", icon: "\u{1F976}", ring: 5891071, desc: "\uB454\uD654\uAC00 \uB354 \uAE4A\uACE0 \uD6E8\uC52C \uC624\uB798 \uAC04\uB2E4 \u2014 \uD55C \uB188\uC744 \uD655\uC2E4\uD788 \uBB36\uC5B4 \uB454\uB2E4", mods: { slow: 1.25, slowTime: 1.6 } },
+        // 덫탑을 대신하는 갈래 — 둔화 대신 아예 묶어 세운다(덫탑의 root 를 그대로 가져왔다)
+        bind: { name: "\uC18D\uBC15", icon: "\u26D3\uFE0F", ring: 13215862, desc: "\uB454\uD654 \uB300\uC2E0 \uC801\uC744 \uC644\uC804\uD788 \uBB36\uC5B4 \uC138\uC6B4\uB2E4 \u2014 \uBE44\uD589 \uBAAC\uC2A4\uD130\uB3C4 \uC0AC\uAC70\uB9AC \uC548\uC774\uBA74 \uADF8\uB300\uB85C \uBA48\uCD98\uB2E4", mods: { dmg: 0.8 }, add: { root: 2, slow: 0, slowTime: 0 } },
         shatter: { name: "\uC11C\uB9AC\uD30C\uD3B8", icon: "\u{1F4A0}", ring: 11800063, desc: "\uBA85\uC911 \uC9C0\uC810 \uC8FC\uBCC0\uAE4C\uC9C0 \uD568\uAED8 \uC5BC\uB9B0\uB2E4 \u2014 \uBB34\uB9AC \uC804\uCCB4\uB97C \uD55C\uAEBC\uBC88\uC5D0 \uB2A6\uCD98\uB2E4", mods: { dmg: 1.2, slowTime: 0.75 }, add: { splash: 2.8 } }
       },
       cannon: {
         barrage: { name: "\uC735\uB2E8\uD3ED\uACA9", icon: "\u{1F387}", ring: 16752640, desc: "\uD3ED\uBC1C \uBC94\uC704\uAC00 \uD06C\uAC8C \uB113\uC5B4\uC9C4\uB2E4(\uD55C \uBC29\uC740 \uC57D\uD574\uC9C4\uB2E4) \u2014 \uBB49\uCE5C \uBB34\uB9AC\uB97C \uD1B5\uC9F8\uB85C \uC4F8\uC5B4\uB2F4\uB294\uB2E4", mods: { dmg: 0.7, splash: 1.5, rate: 1.15 } },
+        // 번개탑을 대신하는 갈래 — 폭발 대신 적에서 적으로 튀어 옮겨붙는다
+        arc: { name: "\uC5F0\uC1C4", icon: "\u{1F329}\uFE0F", ring: 16769126, desc: "\uD3ED\uBC1C\uC744 \uD3EC\uAE30\uD558\uACE0 \uBA85\uC911\uD55C \uC801\uC5D0\uC11C \uAC00\uAE4C\uC6B4 \uC801\uC73C\uB85C \uD280\uC5B4 \uC62E\uACA8\uBD99\uB294\uB2E4 \u2014 \uC904\uC9C0\uC5B4 \uC624\uB294 \uBB34\uB9AC\uC5D0 \uAC15\uD558\uB2E4", mods: { dmg: 0.55, rate: 1.3 }, add: { splash: 0, chain: { count: 5, range: 5.5, falloff: 0.7 } } },
         breaker: { name: "\uCCA0\uAC11\uD0C4", icon: "\u{1F6E1}\uFE0F", ring: 12105912, desc: "\uBC94\uC704\uB97C \uC881\uD788\uB294 \uB300\uC2E0 \uD55C \uBC29\uC774 \uD6E8\uC52C \uBB34\uAC70\uC6CC\uC9C4\uB2E4 \u2014 \uBE0C\uB8E8\uD2B8\xB7\uBCF4\uC2A4\uB97C \uBD80\uC21C\uB2E4", mods: { dmg: 1.75, splash: 0.55 } }
       },
       poison: {
@@ -13168,6 +13207,12 @@ button.corner.mute.off { opacity: 0.5; }
       // 종류별 등장 가중치 — 흔한 토끼, 가끔 사슴, 드물게 멧돼지
       weights: { rabbit: 5, deer: 3, boar: 2 }
     },
+    // 화살 — 🏹 화살탑이 발사할 때마다 한 발씩 쓴다. 지금까지 타워는 한 번 지으면 공짜로 영원히
+    // 쐈지만, 화살탑만은 보급이 끊기면 멈춘다. 목재와 구리를 계속 대야 하는 대신, 다른 타워보다
+    // 짓는 값이 싸다 — "싸게 깔고 계속 먹이느냐, 비싸게 짓고 잊느냐" 라는 선택을 만드는 게 목적.
+    // 제작대에서 한 번에 여러 발씩 만들고, 팀 자원 풀에 쌓여 모든 화살탑이 같이 꺼내 쓴다.
+    fletch: { cost: { wood: 6, copper: 1 }, yield: 12 },
+    // 제련 — 광물만으로는 안 되고 태울 것(석탄)이 있어야 철이 나온다. 석탄을 캐야 할 이유.
     // 화로에서 굽는다. 생고기 1 + 목재를 태워 그 자리에서 먹고, 효과는 다음 웨이브 한 판 동안 간다.
     // 상인의 물약(tempBoon)과 같은 "한 판짜리" 수명이지만, 자원이 아니라 사냥한 전리품으로만
     // 살 수 있다는 점이 다르다 — 돈으로 못 사는 버프다.
@@ -14089,6 +14134,13 @@ button.corner.mute.off { opacity: 0.5; }
           b.turret.rotation.y = ang;
         }
         if (target && b.cooldown <= 0) {
+          if (b.def.ammo) {
+            if (!this.takeAmmo?.(b.def.ammo)) {
+              b.ammoOut = true;
+              continue;
+            }
+            b.ammoOut = false;
+          }
           b.cooldown = 1 / st.rate;
           this.shoot(b, target);
         }
@@ -14104,10 +14156,16 @@ button.corner.mute.off { opacity: 0.5; }
       return false;
     }
     // 감시탑(watchtower) 시너지 — 반경 안이면 파묻힌 굴착병도 조준 가능하게 한다 (isSupport라 자기 자신은 제외 불필요)
+    // 감시탑을 건설 메뉴에서 내리면서 탐지 역할은 보루(support)가 Lv2 부터 겸한다 —
+    // 이미 지어 둔 감시탑도 그대로 계속 동작한다.
     hasNearbyDetector(b) {
       for (const o of this.buildings.values()) {
-        if (o.key !== "watchtower") continue;
-        if (dist(b.x, b.z, o.x, o.z) <= o.stats.detectRadius) return true;
+        if (o.dead) continue;
+        if (o.key === "watchtower") {
+          if (dist(b.x, b.z, o.x, o.z) <= o.stats.detectRadius) return true;
+        } else if (o.key === "support" && o.level >= 2) {
+          if (dist(b.x, b.z, o.x, o.z) <= o.stats.buffRadius) return true;
+        }
       }
       return false;
     }
@@ -16509,6 +16567,8 @@ button.corner.mute.off { opacity: 0.5; }
     leaf: new sd({ color: 4098887, roughness: 0.9 }),
     leafDry: new sd({ color: 7306549, roughness: 0.9 }),
     rock: new sd({ color: 9146266, roughness: 0.85, metalness: 0.06 }),
+    copperOre: new sd({ color: 13136695, roughness: 0.5, metalness: 0.55 }),
+    coalOre: new sd({ color: 2895163, roughness: 0.95, metalness: 0.02 }),
     ore: new sd({ color: 7305874, roughness: 0.6, metalness: 0.35 }),
     pedestal: new sd({ color: 3818848, roughness: 0.7 }),
     crystal: new sd({
@@ -16640,6 +16700,8 @@ button.corner.mute.off { opacity: 0.5; }
       place("tree", Math.round(46 * mult));
       place("rock", Math.round(30 * mult));
       place("gem", Math.max(3, Math.round(5 * mult)));
+      place("copper", Math.max(4, Math.round(9 * mult)));
+      place("coal", Math.max(4, Math.round(8 * mult)));
     }
     _makeNode(id, type, x2, z2, rng) {
       const cfg = CFG.harvest[type];
@@ -16683,7 +16745,8 @@ button.corner.mute.off { opacity: 0.5; }
         const rockG = new Wl();
         const n = 2 + Math.floor(rng() * 2);
         for (let i = 0; i < n; i++) {
-          const m2 = new Xs(GEO.rock, rng() > 0.6 ? MAT.ore : MAT.rock);
+          const oreMat = type === "copper" ? MAT.copperOre : type === "coal" ? MAT.coalOre : MAT.ore;
+          const m2 = new Xs(GEO.rock, rng() > (type === "rock" ? 0.6 : 0.25) ? oreMat : MAT.rock);
           m2.position.set((rng() - 0.5) * 1.6, 0.4 + rng() * 0.4, (rng() - 0.5) * 1.6);
           m2.scale.setScalar(0.5 + rng() * 0.6);
           m2.rotation.set(rng() * 3, rng() * 3, rng() * 3);
@@ -17031,7 +17094,7 @@ button.corner.mute.off { opacity: 0.5; }
       this.local = new LocalPlayer(this.net.selfId, this.net.name, this._colorIndex(this.net.selfId));
       this.sm.scene.add(this.local.mesh);
       this.players.set(this.local.id, this.local);
-      this.pools.team = { wood: this.difficultyPreset.startWood, stone: this.difficultyPreset.startStone, iron: 0, shard: 0, meat: { rabbit: 0, deer: 0, boar: 0 } };
+      this.pools.team = { wood: this.difficultyPreset.startWood, stone: this.difficultyPreset.startStone, iron: 0, copper: 0, coal: 0, shard: 0, arrow: 0, meat: { rabbit: 0, deer: 0, boar: 0 } };
       this.pools.byId = {};
       this._poolOf(this.local.id);
       this._wireCallbacks();
@@ -17130,7 +17193,7 @@ button.corner.mute.off { opacity: 0.5; }
     }
     _poolOf(id) {
       if (this.shared) return this.pools.team;
-      if (!this.pools.byId[id]) this.pools.byId[id] = { wood: this.difficultyPreset.startWood, stone: this.difficultyPreset.startStone, iron: 0, shard: 0, meat: { rabbit: 0, deer: 0, boar: 0 } };
+      if (!this.pools.byId[id]) this.pools.byId[id] = { wood: this.difficultyPreset.startWood, stone: this.difficultyPreset.startStone, iron: 0, copper: 0, coal: 0, shard: 0, arrow: 0, meat: { rabbit: 0, deer: 0, boar: 0 } };
       return this.pools.byId[id];
     }
     get myPool() {
@@ -17142,6 +17205,7 @@ button.corner.mute.off { opacity: 0.5; }
     }
     // ---------------------------------------------------------------- 콜백 연결
     _wireCallbacks() {
+      this.buildMgr.takeAmmo = (kind) => this._takeAmmo(kind);
       this.buildMgr.onImpact = (b, st, pos) => {
         if (!this.isHost) return;
         const targets = st.splash ? this.enemyMgr.list.filter((e) => !e.dead && dist(e.x, e.z, pos.x, pos.z) <= st.splash) : this.enemyMgr.list.filter((e) => !e.dead && dist(e.x, e.z, pos.x, pos.z) <= 1.2);
@@ -18239,6 +18303,8 @@ button.corner.mute.off { opacity: 0.5; }
       const amount = cfg.yield;
       if (node.type === "tree") pool.wood += amount;
       else if (node.type === "gem") pool.shard = (pool.shard || 0) + amount;
+      else if (node.type === "copper") pool.copper = (pool.copper || 0) + amount;
+      else if (node.type === "coal") pool.coal = (pool.coal || 0) + amount;
       else pool.stone += amount;
       this.world.consumeNode(node);
       this.stats.harvested += amount;
@@ -18603,6 +18669,43 @@ button.corner.mute.off { opacity: 0.5; }
     requestSmelt() {
       if (this.isHost) this.hostSmelt(this.local.id);
       else this.net.send("smelt", {});
+    }
+    // 화살탑이 한 발 쏠 때마다 호출된다(호스트 전용 경로). 팀 자원 풀에서 화살을 한 발 꺼내고,
+    // 없으면 false 를 돌려 그 타워는 이번 발사를 건너뛴다.
+    _takeAmmo(kind) {
+      const pool = this.shared ? this.pools.team : this._poolOf(this.local.id);
+      if ((pool[kind] || 0) < 1) {
+        if (!this._ammoWarned) {
+          this._ammoWarned = true;
+          this.ui?.toast("\u{1F3F9} \uD654\uC0B4\uC774 \uB5A8\uC5B4\uC84C\uB2E4! \uD654\uC0B4\uD0D1\uC774 \uBA48\uCD98\uB2E4 \u2014 \uC81C\uC791\uB300\uC5D0\uC11C \uD654\uC0B4\uC744 \uB9CC\uB4E4\uC5B4\uB77C (\uBAA9\uC7AC\xB7\uAD6C\uB9AC)", "bad");
+        }
+        return false;
+      }
+      pool[kind] -= 1;
+      this._ammoWarned = false;
+      return true;
+    }
+    requestFletch() {
+      if (this.isHost) this.hostFletch(this.local.id);
+      else this.net.send("fletch", {});
+    }
+    hostFletch(playerId) {
+      if (!this.players.get(playerId)) return;
+      if (!this.hasStation("workbench")) {
+        this._notify(playerId, "\uC81C\uC791\uB300\uAC00 \uC788\uC5B4\uC57C \uD654\uC0B4\uC744 \uB9CC\uB4E4 \uC218 \uC788\uC2B5\uB2C8\uB2E4", "bad");
+        return;
+      }
+      const c2 = CFG.fletch;
+      const pool = this._poolOf(playerId);
+      if (!canAfford(pool, c2.cost)) {
+        this._notify(playerId, "\uC7AC\uB8CC\uAC00 \uBD80\uC871\uD569\uB2C8\uB2E4 (\uBAA9\uC7AC\xB7\uAD6C\uB9AC)", "bad");
+        return;
+      }
+      payCost(pool, c2.cost);
+      this._trackSpend(c2.cost, "craft");
+      pool.arrow = (pool.arrow || 0) + c2.yield;
+      this._notify(playerId, `\u{1F3F9} \uD654\uC0B4 ${c2.yield}\uBC1C\uC744 \uB9CC\uB4E4\uC5C8\uB2E4`, "good");
+      if (playerId === this.local.id) this.sfx.upgrade();
     }
     hostSmelt(playerId) {
       if (!this.players.get(playerId)) return;
@@ -19199,6 +19302,9 @@ button.corner.mute.off { opacity: 0.5; }
       });
       net.on("skillChill", (d2, from) => {
         if (this.isHost) this.hostSkillChill(from);
+      });
+      net.on("fletch", (d2, from) => {
+        if (this.isHost) this.hostFletch(from);
       });
       net.on("cook", (d2, from) => {
         if (this.isHost) this.hostCook(from, d2.key);

@@ -51,7 +51,7 @@ export var Game = class {
     this.local = new LocalPlayer(this.net.selfId, this.net.name, this._colorIndex(this.net.selfId));
     this.sm.scene.add(this.local.mesh);
     this.players.set(this.local.id, this.local);
-    this.pools.team = { wood: this.difficultyPreset.startWood, stone: this.difficultyPreset.startStone, iron: 0, shard: 0, meat: { rabbit: 0, deer: 0, boar: 0 } };
+    this.pools.team = { wood: this.difficultyPreset.startWood, stone: this.difficultyPreset.startStone, iron: 0, copper: 0, coal: 0, shard: 0, arrow: 0, meat: { rabbit: 0, deer: 0, boar: 0 } };
     this.pools.byId = {};
     this._poolOf(this.local.id);
     this._wireCallbacks();
@@ -150,7 +150,7 @@ export var Game = class {
   }
   _poolOf(id) {
     if (this.shared) return this.pools.team;
-    if (!this.pools.byId[id]) this.pools.byId[id] = { wood: this.difficultyPreset.startWood, stone: this.difficultyPreset.startStone, iron: 0, shard: 0, meat: { rabbit: 0, deer: 0, boar: 0 } };
+    if (!this.pools.byId[id]) this.pools.byId[id] = { wood: this.difficultyPreset.startWood, stone: this.difficultyPreset.startStone, iron: 0, copper: 0, coal: 0, shard: 0, arrow: 0, meat: { rabbit: 0, deer: 0, boar: 0 } };
     return this.pools.byId[id];
   }
   get myPool() {
@@ -162,6 +162,7 @@ export var Game = class {
   }
   // ---------------------------------------------------------------- 콜백 연결
   _wireCallbacks() {
+    this.buildMgr.takeAmmo = (kind) => this._takeAmmo(kind);
     this.buildMgr.onImpact = (b, st, pos) => {
       if (!this.isHost) return;
       const targets = st.splash ? this.enemyMgr.list.filter((e) => !e.dead && dist(e.x, e.z, pos.x, pos.z) <= st.splash) : this.enemyMgr.list.filter((e) => !e.dead && dist(e.x, e.z, pos.x, pos.z) <= 1.2);
@@ -1261,6 +1262,8 @@ export var Game = class {
     const amount = cfg.yield;
     if (node.type === "tree") pool.wood += amount;
     else if (node.type === "gem") pool.shard = (pool.shard || 0) + amount;
+    else if (node.type === "copper") pool.copper = (pool.copper || 0) + amount;
+    else if (node.type === "coal") pool.coal = (pool.coal || 0) + amount;
     else pool.stone += amount;
     this.world.consumeNode(node);
     this.stats.harvested += amount;
@@ -1625,6 +1628,44 @@ export var Game = class {
   requestSmelt() {
     if (this.isHost) this.hostSmelt(this.local.id);
     else this.net.send("smelt", {});
+  }
+  // 화살탑이 한 발 쏠 때마다 호출된다(호스트 전용 경로). 팀 자원 풀에서 화살을 한 발 꺼내고,
+  // 없으면 false 를 돌려 그 타워는 이번 발사를 건너뛴다.
+  _takeAmmo(kind) {
+    const pool = this.shared ? this.pools.team : this._poolOf(this.local.id);
+    if ((pool[kind] || 0) < 1) {
+      // 보급이 끊긴 걸 모르면 "타워가 왜 안 쏘지?" 가 된다 — 한 번만 크게 알린다
+      if (!this._ammoWarned) {
+        this._ammoWarned = true;
+        this.ui?.toast("🏹 화살이 떨어졌다! 화살탑이 멈춘다 — 제작대에서 화살을 만들어라 (목재·구리)", "bad");
+      }
+      return false;
+    }
+    pool[kind] -= 1;
+    this._ammoWarned = false;
+    return true;
+  }
+  requestFletch() {
+    if (this.isHost) this.hostFletch(this.local.id);
+    else this.net.send("fletch", {});
+  }
+  hostFletch(playerId) {
+    if (!this.players.get(playerId)) return;
+    if (!this.hasStation("workbench")) {
+      this._notify(playerId, "제작대가 있어야 화살을 만들 수 있습니다", "bad");
+      return;
+    }
+    const c2 = CFG.fletch;
+    const pool = this._poolOf(playerId);
+    if (!canAfford(pool, c2.cost)) {
+      this._notify(playerId, "재료가 부족합니다 (목재·구리)", "bad");
+      return;
+    }
+    payCost(pool, c2.cost);
+    this._trackSpend(c2.cost, "craft");
+    pool.arrow = (pool.arrow || 0) + c2.yield;
+    this._notify(playerId, `🏹 화살 ${c2.yield}발을 만들었다`, "good");
+    if (playerId === this.local.id) this.sfx.upgrade();
   }
   hostSmelt(playerId) {
     if (!this.players.get(playerId)) return;
@@ -2221,6 +2262,9 @@ export var Game = class {
     });
     net.on("skillChill", (d2, from) => {
       if (this.isHost) this.hostSkillChill(from);
+    });
+    net.on("fletch", (d2, from) => {
+      if (this.isHost) this.hostFletch(from);
     });
     net.on("cook", (d2, from) => {
       if (this.isHost) this.hostCook(from, d2.key);

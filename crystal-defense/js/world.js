@@ -26,6 +26,8 @@ var MAT = {
   leaf: new THREE.MeshStandardMaterial({ color: 4098887, roughness: 0.9 }),
   leafDry: new THREE.MeshStandardMaterial({ color: 7306549, roughness: 0.9 }),
   rock: new THREE.MeshStandardMaterial({ color: 9146266, roughness: 0.85, metalness: 0.06 }),
+  copperOre: new THREE.MeshStandardMaterial({ color: 13136695, roughness: 0.5, metalness: 0.55 }),
+  coalOre: new THREE.MeshStandardMaterial({ color: 2895163, roughness: 0.95, metalness: 0.02 }),
   ore: new THREE.MeshStandardMaterial({ color: 7305874, roughness: 0.6, metalness: 0.35 }),
   pedestal: new THREE.MeshStandardMaterial({ color: 3818848, roughness: 0.7 }),
   crystal: new THREE.MeshStandardMaterial({
@@ -157,6 +159,8 @@ export var World = class {
     place("tree", Math.round(46 * mult));
     place("rock", Math.round(30 * mult));
     place("gem", Math.max(3, Math.round(5 * mult)));
+    place("copper", Math.max(4, Math.round(9 * mult)));
+    place("coal", Math.max(4, Math.round(8 * mult)));
   }
   _makeNode(id, type, x2, z2, rng) {
     const cfg = CFG.harvest[type];
@@ -200,7 +204,10 @@ export var World = class {
       const rockG = new THREE.Group();
       const n = 2 + Math.floor(rng() * 2);
       for (let i = 0; i < n; i++) {
-        const m2 = new THREE.Mesh(GEO.rock, rng() > 0.6 ? MAT.ore : MAT.rock);
+        // 구리 광맥·석탄층은 같은 바위 실루엣이되 광석 재질이 확실히 드러나게 섞는다 —
+        // 멀리서도 "저건 구리다/석탄이다" 가 색으로 구분돼야 캐러 갈 목표를 정할 수 있다
+        const oreMat = type === "copper" ? MAT.copperOre : type === "coal" ? MAT.coalOre : MAT.ore;
+        const m2 = new THREE.Mesh(GEO.rock, rng() > (type === "rock" ? 0.6 : 0.25) ? oreMat : MAT.rock);
         m2.position.set((rng() - 0.5) * 1.6, 0.4 + rng() * 0.4, (rng() - 0.5) * 1.6);
         m2.scale.setScalar(0.5 + rng() * 0.6);
         m2.rotation.set(rng() * 3, rng() * 3, rng() * 3);

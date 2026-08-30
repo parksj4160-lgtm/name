@@ -621,6 +621,15 @@ export var BuildManager = class {
         b.turret.rotation.y = ang;
       }
       if (target && b.cooldown <= 0) {
+        // 화살탑만 탄약을 쓴다 — 화살이 떨어지면 조준은 하되 쏘지 못한다(보급이 끊긴 상태).
+        // 소모 판정은 호스트가 가진 팀 자원 풀에서 하며, ammoOut 은 표시용 플래그다.
+        if (b.def.ammo) {
+          if (!this.takeAmmo?.(b.def.ammo)) {
+            b.ammoOut = true;
+            continue;
+          }
+          b.ammoOut = false;
+        }
         b.cooldown = 1 / st.rate;
         this.shoot(b, target);
       }
@@ -636,10 +645,16 @@ export var BuildManager = class {
     return false;
   }
   // 감시탑(watchtower) 시너지 — 반경 안이면 파묻힌 굴착병도 조준 가능하게 한다 (isSupport라 자기 자신은 제외 불필요)
+  // 감시탑을 건설 메뉴에서 내리면서 탐지 역할은 보루(support)가 Lv2 부터 겸한다 —
+  // 이미 지어 둔 감시탑도 그대로 계속 동작한다.
   hasNearbyDetector(b) {
     for (const o of this.buildings.values()) {
-      if (o.key !== "watchtower") continue;
-      if (dist(b.x, b.z, o.x, o.z) <= o.stats.detectRadius) return true;
+      if (o.dead) continue;
+      if (o.key === "watchtower") {
+        if (dist(b.x, b.z, o.x, o.z) <= o.stats.detectRadius) return true;
+      } else if (o.key === "support" && o.level >= 2) {
+        if (dist(b.x, b.z, o.x, o.z) <= o.stats.buffRadius) return true;
+      }
     }
     return false;
   }

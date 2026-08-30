@@ -67,6 +67,9 @@ export var UI = class {
       tutorial: $2("tutorial"),
       resPanel: $2("res-panel"),
       meatRow: $2("meat-row"),
+      copper: $2("res-copper"),
+      coal: $2("res-coal"),
+      arrow: $2("res-arrow"),
       tutorialText: $2("tutorial-text"),
       achList: $2("ach-list"),
       achCount: $2("ach-count"),
@@ -115,7 +118,7 @@ export var UI = class {
     const tab = this._invTab;
     if (tab === "build") {
       const hasBench = g2.hasStation("workbench");
-      const rows2 = Object.entries(CFG.builds).map(([key, def]) => {
+      const rows2 = Object.entries(CFG.builds).filter(([, def]) => !def.hidden).map(([key, def]) => {
         const needsBench = !def.station && !hasBench;
         return {
           key,
@@ -182,6 +185,16 @@ export var UI = class {
           action: () => g2.requestCook(mk)
         });
       }
+      rows2.push({
+        key: "fletch",
+        icon: "🏹",
+        name: `화살 ${CFG.fletch.yield}발 제작`,
+        desc: "🏹 화살탑이 한 발 쏠 때마다 하나씩 쓴다. 떨어지면 화살탑이 멈춘다.",
+        cost: CFG.fletch.cost,
+        state: !g2.hasStation("workbench") ? "locked" : canAfford(g2.myPool, CFG.fletch.cost) ? "" : "poor",
+        note: !g2.hasStation("workbench") ? "제작대 필요" : `보유 ${Math.floor(g2.myPool.arrow || 0)}발`,
+        action: () => g2.requestFletch()
+      });
       rows2.push({
         key: "smelt",
         icon: "⚙️",
@@ -411,7 +424,8 @@ export var UI = class {
   // 업그레이드/수리/철거 모드에서 가리킨 건물의 수치를 한 줄로 만든다
   _hoverDetail(mode, b) {
     const g2 = this.game;
-    const name = `${b.def.icon} ${b.def.name} <b>Lv.${b.level}</b>`;
+    const tier = b.def.levels[b.level - 1]?.tier;
+    const name = `${b.def.icon} ${b.def.name} <b>Lv.${b.level}${tier ? ` ${tier}` : ""}</b>`;
     if (mode === "sell") {
       const back = g2.buildMgr.refund(b);
       return `${name} 철거 — 환급 <b>${costText(back) || "-"}</b>`;
@@ -1155,6 +1169,9 @@ export var UI = class {
     this.el.hupCost.textContent = nextUp ? costText(nextUp.cost) : "최대";
     this.el.hupBtn.disabled = !nextUp || !canAfford(pool, nextUp.cost);
     this.el.iron.textContent = Math.floor(pool.iron || 0);
+    this.el.copper.textContent = Math.floor(pool.copper || 0);
+    this.el.coal.textContent = Math.floor(pool.coal || 0);
+    this.el.arrow.textContent = Math.floor(pool.arrow || 0);
     // 생고기는 종류별로 세서 자원 패널에 한 줄로 보여준다(0마리면 줄 자체를 숨긴다)
     const meat = pool.meat || {};
     const meatParts = Object.keys(CFG.cook).filter((k2) => meat[k2] > 0).map((k2) => `${CFG.enemies[k2].icon}${meat[k2]}`);
