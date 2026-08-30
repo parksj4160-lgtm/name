@@ -27,7 +27,9 @@ var GEO2 = {
   harvesterSpoke: new THREE.BoxGeometry(0.06, 1, 0.06),
   harvesterBasket: new THREE.CylinderGeometry(0.32, 0.24, 0.4, 8),
   repairCrossV: new THREE.BoxGeometry(0.24, 0.74, 0.24),
-  repairCrossH: new THREE.BoxGeometry(0.74, 0.24, 0.24)
+  repairCrossH: new THREE.BoxGeometry(0.74, 0.24, 0.24),
+  sniperBarrel: new THREE.CylinderGeometry(0.13, 0.17, 2.3, 8),
+  sniperScope: new THREE.CylinderGeometry(0.12, 0.12, 0.6, 10)
 };
 var MAT2 = {
   wall: [
@@ -55,6 +57,8 @@ var MAT2 = {
   harvesterWheel: new THREE.MeshStandardMaterial({ color: 10309763, roughness: 0.7, metalness: 0.15 }),
   harvesterBasket: new THREE.MeshStandardMaterial({ color: 12159565, roughness: 0.8 }),
   repairpost: new THREE.MeshStandardMaterial({ color: 6274976, emissive: 2790492, emissiveIntensity: 0.85, roughness: 0.35 }),
+  sniper: new THREE.MeshStandardMaterial({ color: 3817291, roughness: 0.35, metalness: 0.75 }),
+  sniperScope: new THREE.MeshStandardMaterial({ color: 16726843, emissive: 16720418, emissiveIntensity: 0.9, roughness: 0.3 }),
   ghostOk: new THREE.MeshStandardMaterial({ color: 5570463, transparent: true, opacity: 0.45, emissive: 2002770, emissiveIntensity: 0.6 }),
   ghostBad: new THREE.MeshStandardMaterial({ color: 16734826, transparent: true, opacity: 0.4, emissive: 9379372, emissiveIntensity: 0.6 }),
   barBg: new THREE.MeshBasicMaterial({ color: 1119519, transparent: true, opacity: 0.8, depthTest: false }),
@@ -62,8 +66,13 @@ var MAT2 = {
   rangeRing: new THREE.MeshBasicMaterial({ color: 14061311, transparent: true, opacity: 0.35, side: THREE.DoubleSide }),
   buffRing: new THREE.MeshBasicMaterial({ color: 14061311, transparent: true, opacity: 0.5, side: THREE.DoubleSide })
 };
+function barLayer(bg, fg) {
+  bg.renderOrder = 5;
+  fg.material.transparent = true;
+  fg.renderOrder = 6;
+}
 var RANGE_RING_GEO = new THREE.RingGeometry(0.96, 1, 40);
-var PROJECTILE_COLOR = { arrow: 16769162, frost: 8382719, cannon: 16751178, poison: 3526479, snare: 13215862, lightning: 16769126 };
+var PROJECTILE_COLOR = { arrow: 16769162, frost: 8382719, cannon: 16751178, poison: 3526479, snare: 13215862, lightning: 16769126, sniper: 16726843 };
 var nextId = 1;
 function resetBuildingIds() {
   nextId = 1;
@@ -84,10 +93,21 @@ var Building = class {
     this.maxHp = def.levels[0].hp;
     this.hp = this.maxHp;
     this.cooldown = 0;
+    this.ammo = this.magazine;
     this.mesh = buildMesh(key, 1);
     this.mesh.position.set(x2, 0, z2);
     this.mesh.userData.building = this;
     this._makeBar();
+  }
+  // 이 타워가 쓰는 탄약 종류 (안 쓰는 건물이면 null)
+  get ammoType() {
+    return CFG.ammo.towers[this.key] || null;
+  }
+  get magazine() {
+    return this.ammoType ? this.def.levels[this.level - 1].mag || 0 : 0;
+  }
+  get ammoEmpty() {
+    return !!this.ammoType && this.ammo <= 0;
   }
   // 특화를 고른 타워는 레벨 스탯에 배율·추가 속성을 얹은 값을 쓴다. 매 프레임 조준·사격에서
   // 읽히므로 레벨·특화가 바뀔 때만 다시 만들고 그 뒤로는 캐시를 돌려준다.
@@ -147,6 +167,7 @@ var Building = class {
     const bg = new THREE.Mesh(GEO2.bar, MAT2.barBg);
     const fg = new THREE.Mesh(GEO2.bar, MAT2.barFg.clone());
     fg.position.z = 0.01;
+    barLayer(bg, fg);
     g2.add(bg, fg);
     g2.position.y = this.key === "wall" || this.key === "gate" ? 2.7 : this.key === "workbench" ? 1.6 : this.key === "trap" ? 0.7 : this.key === "harvester" ? 1.9 : 3.4;
     g2.visible = false;
@@ -154,6 +175,31 @@ var Building = class {
     this.mesh.add(g2);
     this.bar = g2;
     this.barFg = fg;
+    if (this.ammoType) {
+      const a2 = new THREE.Group();
+      const abg = new THREE.Mesh(GEO2.bar, MAT2.barBg);
+      const afg = new THREE.Mesh(GEO2.bar, MAT2.barFg.clone());
+      afg.position.z = 0.01;
+      barLayer(abg, afg);
+      a2.add(abg, afg);
+      a2.scale.y = 0.55;
+      a2.position.copy(g2.position);
+      a2.position.y -= 0.26;
+      a2.renderOrder = 5;
+      this.mesh.add(a2);
+      this.ammoBar = a2;
+      this.ammoBarFg = afg;
+      this.refreshAmmoBar();
+    }
+  }
+  refreshAmmoBar() {
+    if (!this.ammoBar) return;
+    const max = this.magazine || 1;
+    const r = Math.max(0, Math.min(1, this.ammo / max));
+    this.ammoBar.visible = true;
+    this.ammoBarFg.scale.x = Math.max(1e-3, r);
+    this.ammoBarFg.position.x = -(1 - r) * 0.75;
+    this.ammoBarFg.material.color.setHex(r <= 0 ? 16734826 : r < 0.25 ? 16763989 : CFG.ammo.types[this.ammoType].color);
   }
   // 보루 버프를 받는 동안 발치에 보라색 고리를 띄운다. 세기에 따라 밝기가 달라진다.
   showBuff(mult) {
@@ -210,6 +256,7 @@ var Building = class {
     const ratio = this.hp / this.maxHp;
     this.maxHp = st.hp;
     this.hp = Math.min(this.maxHp, Math.max(1, Math.round(this.maxHp * ratio)));
+    this.ammo = this.magazine;
     const old = this.mesh;
     const pos = old.position.clone();
     const parent = old.parent;
@@ -242,6 +289,7 @@ var Building = class {
   }
   faceBar(camera) {
     if (this.bar.visible) this.bar.quaternion.copy(camera.quaternion);
+    if (this.ammoBar) this.ammoBar.quaternion.copy(camera.quaternion);
   }
 };
 function buildMesh(key, level) {
@@ -405,6 +453,16 @@ function buildMesh(key, level) {
     ringG.rotation.x = Math.PI / 2;
     ringG.position.y = -0.3;
     turret.add(ringG);
+  } else if (key === "sniper") {
+    const barrel = new THREE.Mesh(GEO2.sniperBarrel, MAT2.sniper);
+    barrel.rotation.x = Math.PI / 2;
+    barrel.position.z = 1.15;
+    barrel.castShadow = true;
+    const scope = new THREE.Mesh(GEO2.sniperScope, MAT2.sniperScope);
+    scope.rotation.z = Math.PI / 2;
+    scope.position.set(0, 0.3, 0.15);
+    scope.castShadow = true;
+    turret.add(barrel, scope);
   } else {
     const head = new THREE.Mesh(GEO2.headCannon, MAT2.cannon);
     head.castShadow = true;
@@ -621,18 +679,13 @@ export var BuildManager = class {
         b.turret.rotation.y = ang;
       }
       if (target && b.cooldown <= 0) {
-        // 화살탑만 탄약을 쓴다 — 화살이 떨어지면 조준은 하되 쏘지 못한다(보급이 끊긴 상태).
-        // 소모 판정은 호스트가 가진 팀 자원 풀에서 하며, ammoOut 은 표시용 플래그다.
-        if (b.def.ammo) {
-          if (!this.takeAmmo?.(b.def.ammo)) {
-            b.ammoOut = true;
-            continue;
-          }
-          b.ammoOut = false;
+        const empty = b.ammoEmpty;
+        if (!empty && b.ammoType) {
+          b.ammo -= 1;
+          if (b.ammo <= 0) this.onAmmoEmpty?.(b);
         }
-        b.cooldown = 1 / st.rate;
-        this.shoot(b, target);
-      }
+        b.cooldown = 1 / (st.rate * (empty ? CFG.ammo.emptyRateMult : 1));
+        this.shoot(b, target, empty);      }
     }
   }
   // 화살탑 시너지: 사거리 안(정확히는 인접 반경)에 서리탑이 있으면 true
@@ -640,6 +693,15 @@ export var BuildManager = class {
     const r = CFG.synergy.frostArrow.radius;
     for (const o of this.buildings.values()) {
       if (o === b || o.key !== "frost") continue;
+      if (dist(b.x, b.z, o.x, o.z) <= r) return true;
+    }
+    return false;
+  }
+  // 저격탑 시너지: hasNearbyFrost와 정확히 같은 구조 — 사거리 안(인접 반경)에 독탑이 있으면 true
+  hasNearbyPoison(b) {
+    const r = CFG.synergy.sniperVenom.radius;
+    for (const o of this.buildings.values()) {
+      if (o === b || o.key !== "poison") continue;
       if (dist(b.x, b.z, o.x, o.z) <= r) return true;
     }
     return false;
@@ -678,16 +740,16 @@ export var BuildManager = class {
     }
     return 1 + Math.min(1, bonus);
   }
-  // 사거리 안에서 크리스탈에 가장 가까운(=가장 위협적인) 적
+  // 사거리 안에서 크리스탈에 가장 가까운(=가장 위협적인) 적을 고른다. targetMode가 "highestHp"인
+  // 타워(저격탑)만 예외로, 대신 사거리 안에서 남은 체력이 가장 많은 적을 고른다.
   _acquire(b, enemies, range) {
-    let best = null, bestScore = Infinity;
+    const byHp = b.def.targetMode === "highestHp";
+    let best = null, bestScore = byHp ? -Infinity : Infinity;
     const r2 = range * range;
     let detector = null;
     for (const e of enemies) {
       if (e.dead) continue;
       if (e.variant === "ward") continue;
-      // 야생 동물은 타워의 사냥감이 아니다 — 타워가 대신 잡아 주면 "직접 나가서 사냥한다"는
-      // 설계가 통째로 무너진다(실제로 검증 중 타워만으로 8마리가 잡혔다)
       if (e.st.wild) continue;
       if (e.st.burrows && e.diving) {
         if (detector === null) detector = this.hasNearbyDetector(b);
@@ -695,6 +757,13 @@ export var BuildManager = class {
       }
       const d2 = (e.x - b.x) ** 2 + (e.z - b.z) ** 2;
       if (d2 > r2) continue;
+      if (byHp) {
+        if (e.hp > bestScore) {
+          bestScore = e.hp;
+          best = e;
+        }
+        continue;
+      }
       const score = e.x * e.x + e.z * e.z;
       if (score < bestScore) {
         bestScore = score;
@@ -705,7 +774,7 @@ export var BuildManager = class {
     return best;
   }
   // 투사체 발사 연출 → 명중 시 onImpact (데미지 적용은 호스트에서만)
-  shoot(b, target) {
+  shoot(b, target, empty = false) {
     const st = b.stats;
     const mult = this.supportBuffMult(b);
     let effStats = mult !== 1 ? { ...st, dmg: Math.round(st.dmg * mult) } : st;
@@ -713,10 +782,18 @@ export var BuildManager = class {
       const pm = this.poisonSynergyMult(b);
       if (pm !== 1) effStats = { ...effStats, poisonDps: Math.round(effStats.poisonDps * pm) };
     }
+    if (empty) {
+      const m = CFG.ammo.emptyDmgMult;
+      effStats = { ...effStats };
+      effStats.dmg = Math.max(1, Math.round(effStats.dmg * m));
+      if (effStats.poisonDps) effStats.poisonDps = Math.max(1, Math.round(effStats.poisonDps * m));
+      if (effStats.slowTime) effStats.slowTime = effStats.slowTime * m;
+      if (effStats.root) effStats.root = effStats.root * m;
+    }
     const from = new THREE.Vector3(b.x, 2.9, b.z);
     const to2 = new THREE.Vector3(target.x, 0.8, target.z);
     const color = PROJECTILE_COLOR[b.key];
-    const speed = b.key === "cannon" ? 26 : 42;
+    const speed = b.key === "cannon" ? 26 : b.key === "sniper" ? 65 : 42;
     this.projectiles.fire(from, to2, speed, color, (pos) => {
       this.fx.burst(pos.x, pos.y, pos.z, color, b.key === "cannon" ? 12 : 5, b.key === "cannon" ? 6 : 3);
       if (b.key === "cannon") this.fx.ring(pos.x, pos.z, color, st.splash);
@@ -740,6 +817,7 @@ export var BuildManager = class {
     if (this._buffTimer <= 0) {
       this._buffTimer = 0.25;
       for (const b of this.buildings.values()) {
+        if (b.ammoBar) b.refreshAmmoBar();
         if (b.isTower) b.showBuff(this.supportBuffMult(b));
         if (b.key === "arrow") {
           const active = this.hasNearbyFrost(b);
@@ -754,6 +832,13 @@ export var BuildManager = class {
           if (pm > 1 && !b._synergyNotified) {
             b._synergyNotified = true;
             this.onSynergy?.("poisonStack");
+          }
+        } else if (b.key === "sniper") {
+          const active = this.hasNearbyPoison(b);
+          b.showSynergy(active, 9419324);
+          if (active && !b._synergyNotified) {
+            b._synergyNotified = true;
+            this.onSynergy?.("sniperVenom");
           }
         }
       }
@@ -771,13 +856,13 @@ export var BuildManager = class {
   snapshot() {
     const out = [];
     for (const b of this.buildings.values()) {
-      out.push([b.id, b.key, b.gx, b.gz, b.level, Math.round(b.hp), b.ownerId || "", b.spec || ""]);
+      out.push([b.id, b.key, b.gx, b.gz, b.level, Math.round(b.hp), b.ownerId || "", b.spec || "", b.ammo]);
     }
     return out;
   }
   applySnapshot(list) {
     const seen = /* @__PURE__ */ new Set();
-    for (const [id, key, gx, gz, level, hp, owner, spec] of list) {
+    for (const [id, key, gx, gz, level, hp, owner, spec, ammo] of list) {
       seen.add(id);
       let b = this.buildings.get(id);
       if (!b) b = this.place(key, gx, gz, owner, id);
@@ -793,6 +878,10 @@ export var BuildManager = class {
       }
       b.hp = hp;
       b.refreshBar();
+      if (ammo !== void 0 && b.ammoType) {
+        b.ammo = ammo;
+        b.refreshAmmoBar();
+      }
     }
     for (const id of [...this.buildings.keys()]) {
       if (!seen.has(id)) this.remove(id);

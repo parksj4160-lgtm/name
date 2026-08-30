@@ -2,6 +2,7 @@ import { ACHIEVEMENTS, loadUnlocked, unlock } from './achievements.js';
 import { CFG, DIFFICULTIES, SPECIAL_WAVES, needsPickaxe, specialWaveKind, waveComposition } from './config.js';
 import { Game } from './game.js';
 import { keyLabel } from './keymap.js';
+import { META_UPGRADES, buyMetaUpgrade, earnMetaCurrency, loadMeta } from './meta.js';
 import { canAfford, clamp, costText, dateSeed, fmtTime, roomCode, todayKey } from './utils.js';
 import { PHASE } from './wave.js';
 
@@ -69,12 +70,15 @@ export var UI = class {
       meatRow: $2("meat-row"),
       copper: $2("res-copper"),
       coal: $2("res-coal"),
-      arrow: $2("res-arrow"),
+      ammoRow: $2("ammo-row"),
+      petRow: $2("pet-row"),
       tutorialText: $2("tutorial-text"),
       achList: $2("ach-list"),
       achCount: $2("ach-count"),
       historyList: $2("history-list"),
       historyCount: $2("history-count"),
+      metaList: $2("meta-list"),
+      metaCurrency: $2("meta-currency"),
       boonOverlay: $2("boon-overlay"),
       boonChoices: $2("boon-choices"),
       boonTitle: $2("boon-title"),
@@ -92,6 +96,47 @@ export var UI = class {
     this._toastTimers = [];
     this.refreshAchievements();
     this.refreshHistory();
+    this.refreshMetaShop();
+  }
+  // 로비의 🏕️ 원정 준비 — 결정 조각 잔액과 업그레이드 목록을 그린다
+  refreshMetaShop() {
+    const list = this.el.metaList;
+    if (!list) return;
+    const m = loadMeta();
+    this.el.metaCurrency.textContent = `🔷 ${m.currency}`;
+    list.innerHTML = Object.entries(META_UPGRADES).map(([key, def]) => {
+      const lv = m.levels[key] || 0;
+      const maxed = lv >= def.max;
+      const cost = maxed ? null : def.cost[lv];
+      const afford = !maxed && m.currency >= cost;
+      return `
+<li class="${maxed ? "on" : ""}">
+<span class="mi-icon">${def.icon}</span>
+<span class="mi-body">
+<span class="mi-name">${def.name} <span class="mi-lv">Lv.${lv}/${def.max}</span></span>
+<span class="mi-desc">${def.desc}</span>
+</span>
+<button type="button" class="mi-buy" data-meta="${key}" ${maxed ? "disabled" : ""}>${maxed ? "최대" : `🔷${cost}`}</button>
+</li>`;
+    }).join("");
+    for (const btn of list.querySelectorAll(".mi-buy")) {
+      if (btn.disabled) continue;
+      const key = btn.dataset.meta;
+      const def = META_UPGRADES[key];
+      const lv = m.levels[key] || 0;
+      const cost = def.cost[lv];
+      if (m.currency < cost) btn.classList.add("poor");
+      btn.onclick = () => {
+        const r = buyMetaUpgrade(key);
+        if (!r.ok) {
+          this.toast(r.reason, "bad");
+          return;
+        }
+        this.game.sfx.upgrade();
+        this.toast(`${r.icon} ${r.name} Lv.${r.level} 습득! 다음 판부터 적용된다`, "good");
+        this.refreshMetaShop();
+      };
+    }
   }
   // ------------------------------------------------------------- 인벤토리
   // 건설 · 제작 · 장비를 한 창에서 고른다. 예전 하단 단축키 바를 대체한다.
@@ -168,7 +213,6 @@ export var UI = class {
         note: g2.local.tools[key] ? "보유 중" : !g2.hasStation("workbench") ? "제작대 필요" : null,
         action: () => g2.requestCraft(key)
       }));
-      // 사냥한 생고기를 굽는 칸 — 화로가 있어야 하고, 고기가 있을 때만 목록에 뜬다
       const meat = g2.myPool.meat || {};
       for (const [mk, r] of Object.entries(CFG.cook)) {
         const have = meat[mk] || 0;
@@ -185,16 +229,21 @@ export var UI = class {
           action: () => g2.requestCook(mk)
         });
       }
-      rows2.push({
-        key: "fletch",
-        icon: "🏹",
-        name: `화살 ${CFG.fletch.yield}발 제작`,
-        desc: "🏹 화살탑이 한 발 쏠 때마다 하나씩 쓴다. 떨어지면 화살탑이 멈춘다.",
-        cost: CFG.fletch.cost,
-        state: !g2.hasStation("workbench") ? "locked" : canAfford(g2.myPool, CFG.fletch.cost) ? "" : "poor",
-        note: !g2.hasStation("workbench") ? "제작대 필요" : `보유 ${Math.floor(g2.myPool.arrow || 0)}발`,
-        action: () => g2.requestFletch()
-      });
+      for (const [ak, a2] of Object.entries(CFG.ammo.types)) {
+        const stationName = a2.station === "workbench" ? "제작대" : "화로";
+        const ready = g2.hasStation(a2.station);
+        const have = (g2.myPool.ammo || {})[ak] || 0;
+        rows2.push({
+          key: `ammo-${ak}`,
+          icon: a2.icon,
+          name: `${a2.name} ${a2.yield}발 제작 (재고 ${have})`,
+          desc: a2.desc,
+          cost: a2.cost,
+          state: !ready ? "locked" : canAfford(g2.myPool, a2.cost) ? "" : "poor",
+          note: !ready ? `${stationName} 필요` : null,
+          action: () => g2.requestCraftAmmo(ak)
+        });
+      }
       rows2.push({
         key: "smelt",
         icon: "⚙️",
@@ -994,7 +1043,11 @@ export var UI = class {
       dailyLine = `<li class="${d2.isNewBest ? "new-best" : ""}">🗓️ 오늘의 도전 — 웨이브 <b>${d2.best.wave}</b>${d2.isNewBest ? " — 오늘의 신기록!" : " (오늘 최고는 그대로)"}</li>`;
       this._refreshDailyBest();
     }
-    $2("result-record").innerHTML = `${dailyLine}
+    const metaBossCount = (stats.bossKillsSeen || []).length;
+    const metaEarned = finalWave + metaBossCount * 3 + (win ? 5 : 0);
+    const metaTotal = earnMetaCurrency(metaEarned);
+    const metaLine = `<li>🔷 결정 조각 <b>+${metaEarned}</b> (총 ${metaTotal}) — 🏕️ 원정 준비에서 쓸 수 있다</li>`;
+    $2("result-record").innerHTML = `${dailyLine}${metaLine}
 <li class="${rec.isNewBest ? "new-best" : ""}">🏆 역대 최고 웨이브 <b>${rec.bestWave}</b>${rec.isNewBest ? " — 신기록!" : ""}</li>
 <li>⚔️ 누적 처치 <b>${rec.totalKills}</b></li>
 <li>🎮 플레이 횟수 <b>${rec.plays}</b> (승리 ${rec.wins}회)</li>`;
@@ -1012,6 +1065,7 @@ export var UI = class {
     }
     this.refreshAchievements();
     this.refreshHistory();
+    this.refreshMetaShop();
   }
   // 로비의 업적 목록을 채운다 — 전체 달성 현황을 항상 볼 수 있게
   refreshAchievements() {
@@ -1171,12 +1225,30 @@ export var UI = class {
     this.el.iron.textContent = Math.floor(pool.iron || 0);
     this.el.copper.textContent = Math.floor(pool.copper || 0);
     this.el.coal.textContent = Math.floor(pool.coal || 0);
-    this.el.arrow.textContent = Math.floor(pool.arrow || 0);
     // 생고기는 종류별로 세서 자원 패널에 한 줄로 보여준다(0마리면 줄 자체를 숨긴다)
-    const meat = pool.meat || {};
+    const stock = pool.ammo || {};
+    const usedTypes = /* @__PURE__ */ new Set();
+    for (const b of g2.buildMgr.buildings.values()) if (b.ammoType) usedTypes.add(b.ammoType);
+    this.el.ammoRow.classList.toggle("hidden", usedTypes.size === 0);
+    if (usedTypes.size) {
+      const parts = Object.keys(CFG.ammo.types).filter((t2) => usedTypes.has(t2)).map((t2) => {
+        const n = stock[t2] || 0;
+        const ic = CFG.ammo.types[t2].icon;
+        return n > 0 ? `${ic}${n}` : `<span class="out">${ic}0</span>`;
+      });
+      this.el.ammoRow.innerHTML = `📦 탄약 ${parts.join(" ")}`;
+    }    const meat = pool.meat || {};
     const meatParts = Object.keys(CFG.cook).filter((k2) => meat[k2] > 0).map((k2) => `${CFG.enemies[k2].icon}${meat[k2]}`);
     this.el.meatRow.classList.toggle("hidden", meatParts.length === 0);
     if (meatParts.length) this.el.meatRow.textContent = `🥩 생고기 ${meatParts.join(" ")}`;
+    const pet = g2.world.pet;
+    this.el.petRow.classList.toggle("hidden", !pet);
+    if (pet) {
+      const tc2 = CFG.tame[pet.type];
+      const lv = pet.lv || 0;
+      const star = lv >= CFG.tame.maxLevel ? " ★" : ` Lv.${lv}`;
+      this.el.petRow.textContent = `${tc2.icon} ${tc2.name}${star}`;
+    }
     this._refreshTools();
     const c2 = g2.world.crystal;
     const ratio = clamp(c2.hp / c2.maxHp, 0, 1);
@@ -1488,7 +1560,35 @@ export var UI = class {
     }
     const bossPulse = 3 + Math.sin(performance.now() / 180) * 1.2;
     for (const e of g2.enemyMgr.list) {
-      if (e.dead) continue;
+      if (e.dead || !e.st.wild) continue;
+      const ex = tx(e.x), ez = tz(e.z);
+      ctx.fillStyle = e.st.hunts ? "#ff9a3d" : "#c9a45a";
+      ctx.beginPath();
+      ctx.arc(ex, ez, 1.8, 0, Math.PI * 2);
+      ctx.fill();
+      if (e.st.hunts) {
+        ctx.strokeStyle = "rgba(255,154,61,0.85)";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(ex, ez, 3.2, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+    }
+    if (g2.world.pet) {
+      const pet = g2.world.pet;
+      const px = tx(pet.x), pz = tz(pet.z);
+      ctx.fillStyle = "#7ce6a0";
+      ctx.beginPath();
+      ctx.arc(px, pz, 2.2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = "rgba(124,230,160,0.85)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(px, pz, 3.6, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    for (const e of g2.enemyMgr.list) {
+      if (e.dead || e.st.wild) continue;
       const ex = tx(e.x), ez = tz(e.z), r = e.st.boss ? 3.2 : 2.2;
       ctx.fillStyle = e.st.boss ? "#ff3050" : "#ff6a7d";
       ctx.beginPath();

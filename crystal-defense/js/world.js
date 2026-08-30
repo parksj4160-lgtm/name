@@ -19,7 +19,12 @@ var GEO = {
   riftRing: new THREE.RingGeometry(0.86, 1, 48),
   riftCore: new THREE.CircleGeometry(1, 32),
   spiritCore: new THREE.IcosahedronGeometry(0.42, 1),
-  spiritRing: new THREE.RingGeometry(0.5, 0.64, 24)
+  spiritRing: new THREE.RingGeometry(0.5, 0.64, 24),
+  petBody: new THREE.SphereGeometry(0.34, 10, 8),
+  petSnout: new THREE.ConeGeometry(0.13, 0.32, 6),
+  petEar: new THREE.ConeGeometry(0.09, 0.2, 5),
+  petTail: new THREE.ConeGeometry(0.08, 0.4, 5),
+  petRing: new THREE.RingGeometry(0.42, 0.54, 24)
 };
 var MAT = {
   trunk: new THREE.MeshStandardMaterial({ color: 5979428, roughness: 0.95 }),
@@ -56,7 +61,9 @@ var MAT = {
   riftRing: new THREE.MeshBasicMaterial({ color: 11239935, transparent: true, opacity: 0.75, side: THREE.DoubleSide, depthWrite: false }),
   riftCore: new THREE.MeshBasicMaterial({ color: 4530126, transparent: true, opacity: 0.4, side: THREE.DoubleSide, depthWrite: false }),
   spiritCore: new THREE.MeshStandardMaterial({ color: 9430015, emissive: 6736127, emissiveIntensity: 1.6, roughness: 0.2, transparent: true, opacity: 0.92 }),
-  spiritRing: new THREE.MeshBasicMaterial({ color: 9430015, transparent: true, opacity: 0.5, side: THREE.DoubleSide, depthWrite: false })
+  spiritRing: new THREE.MeshBasicMaterial({ color: 9430015, transparent: true, opacity: 0.5, side: THREE.DoubleSide, depthWrite: false }),
+  petBody: new THREE.MeshStandardMaterial({ color: 6247214, roughness: 0.75 }),
+  petRing: new THREE.MeshBasicMaterial({ color: 6247214, transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false })
 };
 export var World = class {
   constructor(sceneMgr, seed = 1) {
@@ -348,6 +355,34 @@ export var World = class {
     sr2.visible = false;
     this.scene.add(sr2);
     this.spiritRing = sr2;
+    const petBodyMat = MAT.petBody.clone();
+    const petGroup = new THREE.Group();
+    const petBody = new THREE.Mesh(GEO.petBody, petBodyMat);
+    petBody.castShadow = true;
+    petGroup.add(petBody);
+    const petSnout = new THREE.Mesh(GEO.petSnout, petBodyMat);
+    petSnout.rotation.x = Math.PI / 2;
+    petSnout.position.set(0, -0.02, 0.34);
+    petGroup.add(petSnout);
+    for (const side of [-1, 1]) {
+      const ear = new THREE.Mesh(GEO.petEar, petBodyMat);
+      ear.position.set(0.17 * side, 0.32, 0.05);
+      ear.rotation.z = 0.25 * side;
+      petGroup.add(ear);
+    }
+    const petTail = new THREE.Mesh(GEO.petTail, petBodyMat);
+    petTail.rotation.x = -Math.PI / 2.6;
+    petTail.position.set(0, 0.08, -0.42);
+    petGroup.add(petTail);
+    petGroup.visible = false;
+    this.scene.add(petGroup);
+    this.petGroup = petGroup;
+    this.petBodyMat = petBodyMat;
+    const pr2 = new THREE.Mesh(GEO.petRing, MAT.petRing.clone());
+    pr2.rotation.x = -Math.PI / 2;
+    pr2.visible = false;
+    this.scene.add(pr2);
+    this.petRing = pr2;
   }
   setRift(x2, z2, timeLeft, radius) {
     this.rift = { x: x2, z: z2, timeLeft, radius };
@@ -396,6 +431,38 @@ export var World = class {
     this.spiritRing.visible = true;
     this.spiritRing.position.set(x2, 0.06, z2);
     this.spiritRing.material.opacity = 0.35 + Math.abs(Math.sin(now * 4)) * 0.25;
+  }
+  // 정령과 달리 시간제한이 없어 timeLeft 인자가 없다 — type(여우/늑대)에 따라 색·크기만 다시 칠한다.
+  // lv(먹이주기 레벨)가 오르면 몸집이 조금씩 커져서, 강해졌다는 게 스탯 창을 안 열어봐도 눈으로 보인다.
+  setPet(x2, z2, type, rot, lv) {
+    lv = lv || 0;
+    if (this.pet?.type !== type || this.pet?.lv !== lv) {
+      const tc2 = CFG.tame[type];
+      this.petBodyMat.color.setHex(tc2.color);
+      const base = type === "wolf" ? 1.15 : 0.85;
+      this.petGroup.scale.setScalar(base * (1 + lv * 0.12));
+      this.petRing.material.color.setHex(tc2.color);
+    }
+    this.pet = { x: x2, z: z2, type, rot, lv };
+  }
+  clearPet() {
+    this.pet = null;
+    if (this.petGroup) this.petGroup.visible = false;
+    if (this.petRing) this.petRing.visible = false;
+  }
+  updatePetVisual(now) {
+    if (!this.pet) {
+      if (this.petGroup) this.petGroup.visible = false;
+      if (this.petRing) this.petRing.visible = false;
+      return;
+    }
+    const { x: x2, z: z2, rot } = this.pet;
+    this.petGroup.visible = true;
+    this.petGroup.position.set(x2, 0.36 + Math.abs(Math.sin(now * 5)) * 0.08, z2);
+    if (rot !== void 0) this.petGroup.rotation.y = rot;
+    this.petRing.visible = true;
+    this.petRing.position.set(x2, 0.05, z2);
+    this.petRing.material.opacity = 0.35 + Math.abs(Math.sin(now * 3)) * 0.25;
   }
   setMeteor(x2, z2, timeLeft, radius) {
     this.meteor = { x: x2, z: z2, timeLeft, radius };
@@ -516,5 +583,6 @@ export var World = class {
     this.updateMeteorVisual(now);
     this.updateRiftVisual(now);
     this.updateSpiritVisual(now);
+    this.updatePetVisual(now);
   }
 };

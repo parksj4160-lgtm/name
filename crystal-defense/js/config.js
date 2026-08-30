@@ -141,8 +141,6 @@ export var CFG = {
     },
     arrow: {
       name: "화살탑",
-      // 발사할 때마다 화살 1발. 제작대에서 만들어 대야 한다.
-      ammo: "arrow",
       icon: "🏹",
       hotkey: "2",
       cost: { wood: 30, copper: 2 },
@@ -150,9 +148,9 @@ export var CFG = {
       blocks: true,
       desc: "가장 앞선 적을 빠르게 저격한다. 서리탑 근처에 두면 둔화된 적에게 추가 피해.",
       levels: [
-        { tier: "나무", hp: 180, dmg: 11, range: 13, rate: 1.15 },
-        { tier: "석조", hp: 280, dmg: 18, range: 14.5, rate: 1.35, cost: { stone: 40, copper: 5 } },
-        { tier: "강철", hp: 420, dmg: 29, range: 16, rate: 1.6, cost: { iron: 6, copper: 10 } }
+        { tier: "나무", hp: 180, dmg: 11, range: 13, rate: 1.15, mag: 40 },
+        { tier: "석조", hp: 280, dmg: 18, range: 14.5, rate: 1.35, mag: 60, cost: { stone: 40, copper: 5 } },
+        { tier: "강철", hp: 420, dmg: 29, range: 16, rate: 1.6, mag: 85, cost: { iron: 6, copper: 10 } }
       ]
     },
     frost: {
@@ -164,9 +162,9 @@ export var CFG = {
       blocks: true,
       desc: "적중한 적을 느리게 만든다. 빠른 몬스터 대응용. 화살탑과 붙여 지으면 궁합이 좋다.",
       levels: [
-        { tier: "나무", hp: 200, dmg: 5, range: 10, rate: 0.9, slow: 0.45, slowTime: 1.6 },
-        { tier: "석조", hp: 320, dmg: 9, range: 11.5, rate: 1, slow: 0.55, slowTime: 2, cost: { stone: 60, shard: 2 } },
-        { tier: "강철", hp: 480, dmg: 14, range: 13, rate: 1.1, slow: 0.65, slowTime: 2.4, cost: { iron: 5, shard: 4 } }
+        { tier: "나무", hp: 200, dmg: 5, range: 10, rate: 0.9, slow: 0.45, slowTime: 1.6, mag: 32 },
+        { tier: "석조", hp: 320, dmg: 9, range: 11.5, rate: 1, slow: 0.55, slowTime: 2, mag: 46, cost: { stone: 60, shard: 2 } },
+        { tier: "강철", hp: 480, dmg: 14, range: 13, rate: 1.1, slow: 0.65, slowTime: 2.4, mag: 62, cost: { iron: 5, shard: 4 } }
       ]
     },
     cannon: {
@@ -178,9 +176,9 @@ export var CFG = {
       blocks: true,
       desc: "느리지만 범위 피해를 준다. 뭉친 적에게 강하다.",
       levels: [
-        { tier: "나무", hp: 240, dmg: 26, range: 15, rate: 0.55, splash: 3.2 },
-        { tier: "석조", hp: 380, dmg: 42, range: 16.5, rate: 0.62, splash: 3.6, cost: { stone: 90, coal: 8 } },
-        { tier: "강철", hp: 560, dmg: 66, range: 18, rate: 0.7, splash: 4.2, cost: { iron: 8, coal: 14 } }
+        { tier: "나무", hp: 240, dmg: 26, range: 15, rate: 0.55, splash: 3.2, mag: 18 },
+        { tier: "석조", hp: 380, dmg: 42, range: 16.5, rate: 0.62, splash: 3.6, mag: 26, cost: { stone: 90, coal: 8 } },
+        { tier: "강철", hp: 560, dmg: 66, range: 18, rate: 0.7, splash: 4.2, mag: 36, cost: { iron: 8, coal: 14 } }
       ]
     },
     poison: {
@@ -192,9 +190,9 @@ export var CFG = {
       blocks: true,
       desc: "적중한 적에게 지속 피해를 남긴다. 독탑끼리 가까이 모으면 서로 독 피해가 강해진다.",
       levels: [
-        { tier: "나무", hp: 190, dmg: 4, range: 11, rate: 0.8, poisonDps: 6, poisonTime: 3 },
-        { tier: "석조", hp: 300, dmg: 6, range: 12.5, rate: 0.9, poisonDps: 10, poisonTime: 3.5, cost: { stone: 70, copper: 6 } },
-        { tier: "강철", hp: 460, dmg: 9, range: 14, rate: 1, poisonDps: 16, poisonTime: 4, cost: { iron: 6, copper: 12, coal: 4 } }
+        { tier: "나무", hp: 190, dmg: 4, range: 11, rate: 0.8, poisonDps: 6, poisonTime: 3, mag: 30 },
+        { tier: "석조", hp: 300, dmg: 6, range: 12.5, rate: 0.9, poisonDps: 10, poisonTime: 3.5, mag: 42, cost: { stone: 70, copper: 6 } },
+        { tier: "강철", hp: 460, dmg: 9, range: 14, rate: 1, poisonDps: 16, poisonTime: 4, mag: 58, cost: { iron: 6, copper: 12, coal: 4 } }
       ]
     },
     support: {
@@ -266,9 +264,9 @@ export var CFG = {
       blocks: true,
       desc: "적을 묶어 완전히 멈춘다(짧은 시간, 피해는 미미). 비행 몬스터에게도 통한다. 묶인 적을 다른 타워가 맞추면 추가 피해.",
       levels: [
-        { hp: 170, dmg: 4, range: 9, rate: 0.5, root: 1.4 },
-        { hp: 260, dmg: 6, range: 10.5, rate: 0.6, root: 1.8, cost: { wood: 60, stone: 40 } },
-        { hp: 380, dmg: 9, range: 12, rate: 0.7, root: 2.2, cost: { wood: 110, stone: 90, iron: 5 } }
+        { hp: 170, dmg: 4, range: 9, rate: 0.5, root: 1.4, mag: 20 },
+        { hp: 260, dmg: 6, range: 10.5, rate: 0.6, root: 1.8, mag: 28, cost: { wood: 60, stone: 40 } },
+        { hp: 380, dmg: 9, range: 12, rate: 0.7, root: 2.2, mag: 40, cost: { wood: 110, stone: 90, iron: 5 } }
       ]
     },
     // 다른 타워는 전부 한 놈만 맞추거나(단일 표적) 한 자리를 지정해서 넓게 맞춘다(대포 splash).
@@ -287,9 +285,9 @@ export var CFG = {
       blocks: true,
       desc: "명중한 적에서 가까운 다른 적으로 튀어 옮겨붙는다(튈수록 피해 감소). 뭉쳐 오는 잡몹 무리에 강하다.",
       levels: [
-        { hp: 170, dmg: 9, range: 11, rate: 0.85, chain: { count: 3, range: 4.5, falloff: 0.6 } },
-        { hp: 260, dmg: 14, range: 12.5, rate: 0.95, chain: { count: 4, range: 5, falloff: 0.65 }, cost: { wood: 55, stone: 65 } },
-        { hp: 400, dmg: 21, range: 14, rate: 1.05, chain: { count: 5, range: 5.5, falloff: 0.7 }, cost: { wood: 100, stone: 130, iron: 6 } }
+        { hp: 170, dmg: 9, range: 11, rate: 0.85, chain: { count: 3, range: 4.5, falloff: 0.6 }, mag: 30 },
+        { hp: 260, dmg: 14, range: 12.5, rate: 0.95, chain: { count: 4, range: 5, falloff: 0.65 }, mag: 44, cost: { wood: 55, stone: 65 } },
+        { hp: 400, dmg: 21, range: 14, rate: 1.05, chain: { count: 5, range: 5.5, falloff: 0.7 }, mag: 60, cost: { wood: 100, stone: 130, iron: 6 } }
       ]
     },
     // 굴착병(burrower)은 파묻혀 있는 동안(diving) 모든 타워의 _acquire 에서 제외되도록 설계됐다 —
@@ -344,7 +342,7 @@ export var CFG = {
     repairpost: {
       name: "정비소",
       icon: "🔧",
-      hotkey: "z",
+      hotkey: "[",
       cost: { wood: 45, stone: 65 },
       hp: 130,
       blocks: true,
@@ -354,12 +352,89 @@ export var CFG = {
         { hp: 190, healRadius: 7, healRate: 7, cost: { wood: 60, stone: 100 } },
         { hp: 260, healRadius: 8, healRate: 11, cost: { wood: 100, stone: 170, iron: 6 } }
       ]
+    },
+    // 병기창 — 탄약 시스템의 자동화 절반. 팀 탄약 재고에서 꺼내 반경 안 타워의 탄창을 초당
+    // supplyRate 발씩 저절로 채운다(재고가 없으면 아무것도 못 한다 — 만드는 건 여전히 플레이어 몫).
+    // 정비소가 "체력"을 자동으로 채워 주듯 이건 "탄약"을 채워 준다 — 같은 호스트 전용 반경 순회
+    // 패턴(_updateRepairPosts)을 그대로 재사용했다. 이 건물의 존재 이유는 타워 배치에 새 축을
+    // 하나 더 얹는 것이다: 지금까지 배치 기준은 "사거리가 길목을 덮는가" 하나뿐이었는데, 이제
+    // "보급 반경 안에 드는가"가 같이 걸린다 — 넓게 펴서 커버리지를 벌면 손으로 재장전하러
+    // 뛰어다녀야 하고, 병기창 주변에 모으면 편하지만 커버리지가 좁아진다.
+    armory: {
+      name: "병기창",
+      icon: "🏭",
+      hotkey: "-",
+      cost: { wood: 60, stone: 70, iron: 3 },
+      hp: 140,
+      blocks: true,
+      desc: "스스로 공격하지 않지만, 팀 탄약 재고를 꺼내 반경 안 타워의 탄창을 저절로 채운다. 재고가 비면 아무것도 못 하니 탄약은 계속 만들어 둬야 한다.",
+      levels: [
+        { hp: 140, supplyRadius: 8, supplyRate: 4 },
+        { hp: 210, supplyRadius: 10, supplyRate: 7, cost: { wood: 80, stone: 110, iron: 4 } },
+        { hp: 300, supplyRadius: 13, supplyRate: 11, cost: { wood: 140, stone: 190, iron: 8 } }
+      ]
+    },
+    // 지금까지 모든 공격 타워(화살·서리·대포·독·번개·덫)는 _acquire 에서 똑같은 기준(크리스탈에
+    // 가장 가까운 적)으로만 표적을 고른다 — "누구를 먼저 쏠지"에 플레이어가 개입할 여지가 전혀
+    // 없었다. 저격탑은 처음으로 다른 기준(targetMode: "highestHp" — 사거리 안에서 남은 체력이 가장
+    // 많은 적, 대개 보스나 브루트)으로 스스로 표적을 고르는 타워라, 이 한 채를 섞어 짓는 것 자체가
+    // "물량은 다른 타워에 맡기고 가장 두꺼운 표적은 여기가 전담한다"는 새로운 배치 판단을 만든다.
+    // 다른 타워보다 압도적으로 긴 사거리(가장 긴 대포탑보다도 훨씬 김)와 느린 발사 속도, 그리고
+    // 처음부터 철을 요구하는 진입 비용으로 "정예 한 방"이라는 정체성을 분명히 했다.
+    sniper: {
+      name: "저격탑",
+      icon: "🎯",
+      hotkey: "e",
+      cost: { wood: 70, stone: 100, iron: 4 },
+      hp: 130,
+      blocks: true,
+      targetMode: "highestHp",
+      desc: "다른 타워보다 사거리가 훨씬 길고 발사는 느리지만, 사거리 안에서 남은 체력이 가장 많은 적(대개 보스)을 골라 큰 피해를 준다. 독탑 근처에 두면 중독된 적에게 추가 피해.",
+      levels: [
+        { hp: 130, dmg: 120, range: 20, rate: 0.25, mag: 12 },
+        { hp: 190, dmg: 190, range: 22.5, rate: 0.28, mag: 18, cost: { wood: 110, stone: 160, iron: 8 } },
+        { hp: 280, dmg: 300, range: 25, rate: 0.32, mag: 26, cost: { wood: 180, stone: 260, iron: 14 } }
+      ]
     }
   },
   // 시설에 다가가 클릭하면 열리는 작업창. range 는 상호작용 가능 거리.
   station: { range: 3.6 },
   // 화로 제련: 광물 -> 철
   smelt: { cost: { stone: 6, coal: 2 }, yield: 1 },
+  // 탄약 — 지금까지 타워는 한 번 지으면 자원과 완전히 무관하게 영원히 쐈다. 건설 비용만 있고
+  // 유지 비용이 없어서, 자원은 "더 짓는 데"에만 쓰였고 이미 지은 방어선은 관리 대상이 아니었다.
+  // 이제 공격 타워는 종류에 맞는 탄약을 쏘면서 소모한다 — 그래서 "무엇을 짓느냐"가 건설 순간의
+  // 한 번짜리 선택이 아니라, 그 타워를 계속 먹여 살릴 수 있느냐는 지속적인 선택이 된다.
+  //
+  // 3종으로 묶은 건 종류마다 HUD 칸과 제작 항목이 하나씩 늘기 때문이다(7종이면 화면이 감당을
+  // 못 한다). 대신 세 종의 재료를 일부러 완전히 다르게 잡아서, 타워 종류마다 유지비의 성격이
+  // 확실히 갈리게 했다:
+  //   🏹 화살  — 목재만. 제일 싸고 대량으로 나온다. 화살탑을 도배하는 정석 플레이는 여전히 싸다.
+  //   💣 포탄  — 광물+철. 발당 단가가 압도적으로 비싸다. 대포탑 한 방이 센 만큼 대가를 치른다.
+  //   🧪 원소액 — 광물+철이지만 한 번에 많이 나온다. 상태이상 타워(서리·독·번개)의 중간 단가.
+  // 정수(shard)는 일부러 어느 조합에도 안 넣었다 — 스킬·크리스탈 강화·축복을 전부 잠그는
+  // 자원이라 여기까지 끌어오면 그 긴장이 통째로 무너진다.
+  ammo: {
+    types: {
+      arrow: { name: "화살", icon: "🏹", color: 12759680, station: "workbench", cost: { wood: 10 }, yield: 24, desc: "목재를 깎아 만든다. 화살탑·저격탑·덫탑이 쓴다." },
+      shell: { name: "포탄", icon: "💣", color: 16750848, station: "furnace", cost: { stone: 14, iron: 1 }, yield: 10, desc: "광물과 철을 녹여 만든다. 대포탑 전용 — 발당 단가가 가장 비싸다." },
+      elixir: { name: "원소액", icon: "🧪", color: 7527167, station: "furnace", cost: { stone: 8, iron: 1 }, yield: 18, desc: "광물과 철을 고아 만든다. 서리탑·독탑·번개탑이 쓴다." }
+    },
+    // 타워 종류 → 쓰는 탄약. 여기 없는 건물(벽·보루·감시탑·정비소·병기창·채집기·함정)은
+    // 탄약을 아예 안 쓴다 — 스스로 발사하지 않으므로 소모할 것도 없다.
+    towers: { arrow: "arrow", sniper: "arrow", snare: "arrow", cannon: "shell", frost: "elixir", poison: "elixir", lightning: "elixir" },
+    // 탄약이 떨어져도 타워가 완전히 멈추지는 않는다 — 보급이 한 박자 늦었다고 방어선이 통째로
+    // 무너지면 그건 난이도가 아니라 그냥 짜증이다. 대신 남은 부품을 긁어모아 쏘는 셈이라
+    // 피해와 발사 속도가 크게 떨어져서, "지금 탄약이 비었다"가 수치로 확실히 아프게 느껴진다.
+    emptyDmgMult: 0.35,
+    emptyRateMult: 0.6,
+    // 손으로 재장전할 때 이 거리 안에 있는 타워 하나를 가득 채운다 (제작대 상호작용 거리와 동일)
+    reloadRange: 3.6,
+    // 시작 재고 — 새로 지은 타워는 어차피 탄창이 가득 차 있어서 초반 몇 웨이브는 재고가 없어도
+    // 굴러간다. 그래도 처음 바닥났을 때 곧바로 한 번은 채워 볼 수 있게 화살만 조금 쥐여 준다
+    // (제일 싸고 기본이 되는 탄약이라 "이걸로 배우고 나머지는 직접 만들어라"가 된다).
+    start: { arrow: 24, shell: 0, elixir: 0 }
+  },
   // 무기 강화 — 화로에서 철을 태워 이미 만든 무기(곡괭이 제외)의 위력을 영구히 올린다.
   // 크리스탈 강화(정수)와 대칭되는 후반 자원 배출구: 정수는 크리스탈에, 철은 무기에 쓰게 된다.
   // 레벨당 비용이 오르고 최대 레벨이 있어 크리스탈 강화처럼 무한 스노우볼은 아니다.
@@ -376,7 +451,8 @@ export var CFG = {
       hammer: { dmg: 12 },
       bomb: { dmg: 20 },
       whip: { dmg: 6 },
-      shield: { dmg: 3 }
+      shield: { dmg: 3 },
+      frostaxe: { dmg: 7 }
     }
   },
   // 제작대에서 만드는 것들. 각자 하나씩만 가질 수 있다.
@@ -448,6 +524,20 @@ export var CFG = {
       cost: { wood: 14, iron: 8 },
       desc: "공격력은 거의 없지만, 손에 쥔 채 막기(Q)를 쓰면 피해 경감(65%→80%)과 이동 속도(40%→60%)가 크게 좋아진다.",
       block: { mitigation: 0.8, speedMult: 0.6 }
+    },
+    // 지금까지 근접 무기 7종(칼·창·망치·활·폭탄가방·채찍·방패)은 전부 대미지·사거리·판정·넉백처럼
+    // "얼마나 세게/어떻게 때리느냐"만 바꿨을 뿐, 상태이상은 순전히 타워(서리탑 둔화·독탑 중독·
+    // 덫탑 속박)만의 영역이었다. 얼음도끼는 처음으로 플레이어 근접 공격 자체가 서리탑과 똑같은
+    // applySlow를 직접 건다 — 혼자 있을 때도 도망가는 러너를 스스로 늦추거나, 서리탑 없는 방향에서
+    // 뚫고 들어온 적을 붙잡아 아군·타워가 정리할 시간을 버는 용도. attackStats의 out 객체가
+    // dmg/range/arc/cd/knockback만 미리 채워 둬서 slow/slowTime을 새로 더하면 undefined+=로
+    // NaN이 나므로, player.js attackStats에 slow:0/slowTime:0 초기값을 먼저 추가했다.
+    frostaxe: {
+      name: "얼음도끼",
+      icon: "❄️",
+      cost: { wood: 20, stone: 12, iron: 5 },
+      effect: { dmg: 16, slow: 0.35, slowTime: 1.4 },
+      desc: "근접 공격력 +16, 맞은 적을 잠깐 둔화시킨다 — 서리탑처럼 늦춰서 도망 못 가게 하거나 다른 화력이 마무리하기 쉽게 만든다."
     }
   },
   // 몬스터 종류 (일반형 / 빠른형 / 탱커형 / 원거리형 / 건물추적형 / 보스)
@@ -485,6 +575,12 @@ export var CFG = {
     // 향했다면 이쪽은 파밍한 자원 자체를 노린다. 놔두면 회복까지 겹쳐 싸움이 길어지므로, 캐스팅
     // 중(그 사이엔 무방비로 서 있다) 화력을 몰아 최대한 못 훔치게 끊는 것이 유일한 대응이다.
     looter: { name: "갈취자", icon: "🦂", hp: 1200, speed: 1.75, dmg: 52, rate: 0.65, radius: 1.5, color: 16766720, bounty: { wood: 36, stone: 36 }, scale: 2.4, boss: true, drainBoss: true },
+    // 다섯 번째 보스(25웨이브 주기로 나머지 넷과 순환). 소환·침묵·약탈은 전부 "플레이어에게 뭔가를
+    // 강요"했지만(잡졸 처리, 타워 무력화 대응, 화력 집중), 이쪽은 처음으로 자기 자신을 방어한다 —
+    // 체력 문턱마다 무쇠 방벽을 둘러 잠깐 받는 피해를 크게 줄인다(enemy.js 의 damage() 가
+    // fortifyUntil 을 직접 읽어 적용). 방벽이 떠 있는 동안 딜을 계속 부어도 큰 효율이 안 나므로,
+    // 무리해서 자원(정수 스킬·투척)을 쏟아붓기보다 잠깐 물러나 다음 국면을 준비하는 판단이 갈린다.
+    colossus: { name: "강철 수호자", icon: "🗿", hp: 1350, speed: 1.7, dmg: 58, rate: 0.6, radius: 1.55, color: 8945076, bounty: { wood: 40, stone: 40 }, scale: 2.5, boss: true, fortifyBoss: true },
     // 체력이 낮아 금방 죽지만, 죽는 순간(어떻게 죽었든) 그 자리에서 폭발해 주변 크리스탈·건물·플레이어에게
     // 피해를 준다 — 근접으로 마지막 일격을 넣으면 그 폭발을 그대로 맞는다. "닥치고 근접"이 항상 안전하지
     // 않게 만드는 가시(thorn) 변종과 목적은 비슷하지만, 이쪽은 변종이 아니라 종류 자체라 항상 그렇다.
@@ -503,6 +599,16 @@ export var CFG = {
     deer: { name: "사슴", icon: "🦌", hp: 30, speed: 4.9, dmg: 0, rate: 0, radius: 0.5, color: 11106111, bounty: { wood: 0, stone: 0 }, scale: 1.05, flees: true, wild: true, event: true, fleeRange: 11, meat: "deer" },
     // 유일하게 도망치지 않는다 — 때리면 오히려 달려들어 반격한다. 공짜 사냥감이 아니게 만드는 장치.
     boar: { name: "멧돼지", icon: "🐗", hp: 70, speed: 3.6, dmg: 16, rate: 0.8, radius: 0.6, color: 6048829, bounty: { wood: 0, stone: 0 }, scale: 0.95, wild: true, event: true, retaliates: true, aggroTime: 6, meat: "boar" },
+    // 토끼보다도 빠르고(가장 빠른 사냥감) 도망 반경도 가장 길어서, 셋 중 가장 잡기 어렵다 —
+    // 체력은 낮아 스치기만 해도 죽지만, 애초에 근접 사거리 안까지 접근하는 것 자체가 관건.
+    fox: { name: "여우", icon: "🦊", hp: 18, speed: 7.2, dmg: 0, rate: 0, radius: 0.4, color: 16744576, bounty: { wood: 0, stone: 0 }, scale: 0.7, flees: true, wild: true, event: true, fleeRange: 15, meat: "fox" },
+    // 지금까지 사냥감 4종(토끼·사슴·멧돼지·여우)은 전부 도망만 치거나(flees), 먼저 때려야만 반격한다
+    // (retaliates) — 준비 시간은 사실상 완전히 안전했다. 늑대는 처음으로 맞기 전부터 스스로
+    // 플레이어를 찾아 쫓아온다(hunts) — huntRange 안에 들어오면 도발 없이 곧장 달려든다. 플레이어
+    // 이동 속도(7.4)보다는 느려서(6) 도망은 항상 가능하지만, 무기 없이 방심하고 멀리 채집 나갔다가
+    // 붙잡히면 실제로 위협적이다(브루트에 준하는 공격력) — "준비 시간 = 완전한 안전지대"라는
+    // 그동안의 전제를 깨는 새로운 긴장이다.
+    wolf: { name: "늑대", icon: "🐺", hp: 58, speed: 6, dmg: 15, rate: 0.85, radius: 0.55, color: 6247214, bounty: { wood: 0, stone: 0 }, scale: 1.05, wild: true, event: true, hunts: true, huntRange: 10, meat: "wolf" },
     treasure: { name: "보물게", icon: "🦀", hp: 16, speed: 5.4, dmg: 0, rate: 0, radius: 0.4, color: 16766720, bounty: { wood: 16, stone: 12 }, scale: 0.85, flees: true, event: true, shardChance: 0.5 },
     // 박쥐(flies)가 "벽을 무시"한다면 이쪽은 "벽과 타워를 동시에 무시"한다 — 땅속에 파묻힌 채
     // 크리스탈로 직선 이동하고, 파묻혀 있는 동안(diving)은 타워가 조준 자체를 못 한다(buildings.js
@@ -523,7 +629,13 @@ export var CFG = {
     // 없이도 위협적인 수준으로 잡았다(그런트보다 세지만 브루트만큼은 아님) — "무작정 다 캐고 본다"는
     // 습관에 제동을 거는 게 목적. bounty 를 0으로 둔 건 애초에 "자원인 줄 알았던" 실망이 핵심이라,
     // 잡아도 위로 보상을 안 준다(순수 페널티 회피가 전부).
-    mimic: { name: "미믹", icon: "🎭", hp: 75, speed: 2.4, dmg: 13, rate: 0.85, radius: 0.55, color: 8998662, bounty: { wood: 0, stone: 0 }, scale: 1, event: true }
+    mimic: { name: "미믹", icon: "🎭", hp: 75, speed: 2.4, dmg: 13, rate: 0.85, radius: 0.55, color: 8998662, bounty: { wood: 0, stone: 0 }, scale: 1, event: true },
+    // 지금까지 준비 시간은 몬스터가 전혀 없는 완전히 안전한 계획 단계였다(야생 동물조차 늑대
+    // 정도만 살짝 위협적일 뿐 전투와 무관하다). 정찰병은 처음으로 준비 시간 자체에 "지금 당장
+    // 처리해야 하는 위협"을 끌어들인다 — 공격은 전혀 안 하지만(dmg:0), 포탈까지 도망치는 데
+    // 성공하면 다음 웨이브가 강해진다. wild가 아니라서(scout만 있고 wild 없음) 타워도 자동으로
+    // 조준해 협공할 수 있다 — 사냥감(wild)과 반대로 "다 같이 막아야 하는" 쪽이라 일부러 그렇게 뒀다.
+    scout: { name: "정찰병", icon: "🕵️", hp: 45, speed: 5.5, dmg: 0, rate: 0, radius: 0.5, color: 16751001, bounty: { wood: 15, stone: 15 }, scale: 0.95, event: true, scout: true }
   },
   // 몬스터 변종 접두사 — 종류를 늘리는 대신 기존 몬스터에 가끔 붙는다. 웨이브가 오를수록 등장 확률이 오른다.
   // 색 틴트 + 머리 위 아이콘으로 항상 표시되어(색약 여부와 무관하게) 눈에 띈다.
@@ -546,7 +658,14 @@ export var CFG = {
     // 크리스탈·건물·플레이어 중 무엇을 때리든, 그 피해의 일부를 자기 체력으로 되돌린다.
     // 방패(막아야 한다)·재생(안 때리면 회복)과 달리 "때리게 놔두면 회복"이라 무시하고 다른 놈부터
     // 잡는 선택이 오히려 손해가 되게 만든다 — 발견하면 최우선으로 끊어야 하는 표적
-    vampire: { name: "흡혈", icon: "🩸", tint: 10485760, healPct: 0.45 }
+    vampire: { name: "흡혈", icon: "🩸", tint: 10485760, healPct: 0.45 },
+    // 지금까지 7종은 전부 "피해를 어떻게 주고받느냐"를 바꿨을 뿐, 상태이상(서리탑 둔화·독탑
+    // 중독·덫탑 속박·얼음도끼 둔화)은 전부 무조건 먹혔다. 저항은 처음으로 이 셋을 전부 무시한다
+    // (enemy.js의 applySlow/applyRoot/applyPoison에서 조용히 리턴) — 그동안 CC(군중 제어) 위주로
+    // 짠 방어선(서리탑+화살탑 시너지, 덫탑으로 묶고 정리, 독탑 스택)이 이 한 놈 앞에서는 전부
+    // 무효화되고 순수 대미지만 통한다는 걸 발견하게 만드는 게 목적 — "느리게 만들어서 정리"가
+    // 항상 정답이 아니게 되는 순간을 만든다.
+    resist: { name: "저항", icon: "🔒", tint: 8952230 }
   },
   // 웨이브당 몬스터 1마리가 변종을 달 확률 (보스 제외, 분열체 제외)
   variantChance: { base: 0.05, perWave: 0.012, max: 0.32 },
@@ -561,7 +680,11 @@ export var CFG = {
     poisonStack: { radius: 7, dpsMultPerNeighbor: 0.35, max: 1 },
     // 덫탑에 묶여(root) 있는 적을 다른 타워가 맞추면 추가 피해 — 덫탑 자신은 제외(묶는 역할에 집중).
     // frostArrow 처럼 인접 배치가 필요 없다 — 묶인 상태 자체가 트리거라 어떤 타워 조합이든 이득을 본다
-    rootSnare: { dmgMult: 0.35 }
+    rootSnare: { dmgMult: 0.35 },
+    // frostArrow와 정확히 같은 구조를 저격탑 쪽으로 옮긴 것 — 저격탑이 이 반경 안에 독탑을 두면,
+    // 이미 중독된 적을 맞출 때 추가 피해. 저격탑은 가장 두꺼운 표적(highestHp)만 골라 쏘는데,
+    // 그 표적이 독탑에 미리 중독되어 있으면 저격 한 방의 값어치가 더 커지게 만드는 게 목적이다.
+    sniperVenom: { radius: 7, dmgMult: 0.4 }
   },
   // 타워 특화 — 최대 레벨에 도달한 전투 타워는 딱 한 번, 두 갈래 중 하나를 골라 성격을 바꾼다.
   // 되돌릴 수 없다(철거하고 새로 지어야 한다). 업그레이드가 "같은 타워를 더 세게"였다면 이건
@@ -600,6 +723,14 @@ export var CFG = {
     lightning: {
       spread: { name: "확산", icon: "🌐", ring: 6739199, desc: "튀는 대상 수와 사거리가 늘어난다(한 방은 약해진다) — 흩어진 잡몹 무리를 한 번에 쓸어담는다", mods: { dmg: 0.6, rate: 1.15 }, add: { chain: { count: 7, range: 6.5, falloff: 0.75 } } },
       focus: { name: "집속", icon: "🎯", ring: 16752640, desc: "튐을 포기하고 한 놈에게 모든 전력을 쏟는다 — 보스·브루트를 순식간에 녹인다", mods: { dmg: 2.5, range: 1.25 }, add: { chain: { count: 1, range: 0, falloff: 1 } } }
+    },
+    // 저격탑은 이미 targetMode로 "제일 체력 많은 적"을 고르므로, 두 갈래 다 그 위에서 "얼마나 한
+    // 놈에 집중하느냐"를 반대로 튼다. 관통탄은 lightning과 완전히 같은 chain 배관을 add로 얹은
+    // 것뿐이다 — chain은 명중 지점에서 가까운 다음 대상으로 옮겨붙을 뿐 targetMode를 안 가리므로,
+    // "가장 강한 놈을 저격 → 근처 한 마리를 관통" 이라는 새 조합이 새 로직 없이 그대로 나온다.
+    sniper: {
+      longshot: { name: "장거리 저격", icon: "🌟", ring: 16737845, desc: "사거리와 한 방이 더 늘지만 발사는 더 느려진다 — 순수하게 가장 강한 한 놈만 노린다", mods: { dmg: 1.35, range: 1.2, rate: 0.6 } },
+      piercing: { name: "관통탄", icon: "🔗", ring: 9351142, desc: "표적을 꿰뚫어 뒤쪽 가까운 적도 함께 맞힌다(한 방은 약해진다) — 발사도 조금 빨라진다", mods: { dmg: 0.78, rate: 1.15 }, add: { chain: { count: 2, range: 6, falloff: 0.55 } } }
     }
   },
   // 무기 특화 — 타워 특화와 정확히 같은 개념을 무기 쪽으로 옮긴 것. 무기 강화가 최대
@@ -642,6 +773,10 @@ export var CFG = {
     shield: {
       bulwark: { name: "철벽", icon: "🧱", desc: "피해 경감이 더 강해지지만(80%→92%) 그만큼 더 느려진다(60%→45%) — 자리를 지키는 탱커용", block: { mitigation: 0.92, speedMult: 0.45 } },
       guardian: { name: "기동방패", icon: "🏃", desc: "경감은 줄어들지만(80%→72%) 막는 동안에도 거의 정상 속도로 움직인다(60%→85%) — 버티며 이동하는 용도", block: { mitigation: 0.72, speedMult: 0.85 } }
+    },
+    frostaxe: {
+      deepchill: { name: "혹한날", icon: "🥶", desc: "둔화가 더 깊고 훨씬 오래 간다(대신 한 방은 약해진다) — 한 놈을 확실히 묶어 둔다", mods: { slow: 1.3, slowTime: 1.6, dmg: 0.9 } },
+      icebreaker: { name: "쇄빙도끼", icon: "💥", desc: "둔화를 내주고 대미지가 크게 오른다 — 얼리기보다 베어 넘기는 쪽", mods: { dmg: 1.7, slow: 0.5 } }
     }
   },
   // 보급품 투하 — 전투 중(웨이브 2부터) 가끔 지도 위에 상자가 떨어진다. 한 번에 최대 1개만 떠 있고,
@@ -666,14 +801,29 @@ export var CFG = {
     // 크리스탈에서 이만큼 떨어진 링 안쪽 어딘가에 나타난다(건설 구역 밖 -> 자연히 나가야 한다)
     minDist: 16,
     maxDist: 34,
-    // 종류별 등장 가중치 — 흔한 토끼, 가끔 사슴, 드물게 멧돼지
-    weights: { rabbit: 5, deer: 3, boar: 2 }
+    // 종류별 등장 가중치 — 흔한 토끼, 가끔 사슴, 드물게 멧돼지. 늑대는 wolfMinWave 이전에는
+    // game.js _updateHunt 가 가중치 목록에서 아예 제외해 초반 몇 판은 사냥이 완전히 안전하게 둔다.
+    weights: { rabbit: 5, deer: 3, boar: 2, fox: 2, wolf: 2 },
+    // 4웨이브부터(다른 신규 몬스터들의 "N웨이브부터" 관례와 맞춤) — this.wave.wave(완료한 웨이브 수)가
+    // 이 값 이상이면, 즉 4웨이브 준비 시간부터 늑대가 가중치 목록에 들어간다.
+    wolfMinWave: 3
   },
-  // 화살 — 🏹 화살탑이 발사할 때마다 한 발씩 쓴다. 지금까지 타워는 한 번 지으면 공짜로 영원히
-  // 쐈지만, 화살탑만은 보급이 끊기면 멈춘다. 목재와 구리를 계속 대야 하는 대신, 다른 타워보다
-  // 짓는 값이 싸다 — "싸게 깔고 계속 먹이느냐, 비싸게 짓고 잊느냐" 라는 선택을 만드는 게 목적.
-  // 제작대에서 한 번에 여러 발씩 만들고, 팀 자원 풀에 쌓여 모든 화살탑이 같이 꺼내 쓴다.
-  fletch: { cost: { wood: 6, copper: 1 }, yield: 12 },
+  // 여우·늑대는 죽여서 생고기를 얻는 대신 길들여 영구 동료로 삼을 수도 있다 — 초식동물
+  // (토끼·사슴·멧돼지) 생고기를 미끼로 써야 해서, 사냥으로 모은 재료를 "굽어서 한 판짜리 버프로
+  // 먹을지, 다른 동물을 길들이는 데 쓸지" 저울질하게 만든다. 팀 전체 동료 1마리 제한(정령 소환과
+  // 같은 원칙)이라 실패해도 다시 시도할 수 있지만 이미 하나 있으면 새로 못 들인다.
+  tame: {
+    baitCost: 2,
+    // 먹이주기 — 길들인 뒤에도 계속 생고기를 흘려보내야 하는 소모전 대신, 남는 고기를 태워
+    // 동료를 키우는 쪽으로 쓰게 하는 자원 배출구다. 요리(잔치 버프 1판용)와 먹이주기(동료 영구
+    // 강화)가 같은 생고기 재고를 두고 경쟁해서, 여윳돈을 어디에 쓸지 매 웨이브 계속 저울질하게 된다.
+    feedCost: 3,
+    maxLevel: 3,
+    lvDmgMult: 1.25,
+    lvRateMult: 1.15,
+    wolf: { name: "늑대", icon: "🐺", chance: 0.35, dmg: 16, rate: 0.8, range: 11, atkRange: 2.2, speed: 6.5, color: 6247214 },
+    fox: { name: "여우", icon: "🦊", chance: 0.3, dmg: 5, rate: 2.2, range: 9, atkRange: 2, speed: 8.5, color: 16744576 }
+  },
   // 제련 — 광물만으로는 안 되고 태울 것(석탄)이 있어야 철이 나온다. 석탄을 캐야 할 이유.
   // 화로에서 굽는다. 생고기 1 + 목재를 태워 그 자리에서 먹고, 효과는 다음 웨이브 한 판 동안 간다.
   // 상인의 물약(tempBoon)과 같은 "한 판짜리" 수명이지만, 자원이 아니라 사냥한 전리품으로만
@@ -681,12 +831,27 @@ export var CFG = {
   cook: {
     rabbit: { name: "토끼 꼬치", icon: "🍢", wood: 4, desc: "다음 웨이브 동안 이동 속도 +18%", kind: "speed", value: 1.18 },
     deer: { name: "사슴 스테이크", icon: "🥩", wood: 6, desc: "다음 웨이브 동안 최대 체력 +40 (즉시 그만큼 회복)", kind: "vigor", value: 40 },
-    boar: { name: "멧돼지 구이", icon: "🍖", wood: 8, desc: "다음 웨이브 동안 근접 공격력 +25%", kind: "might", value: 1.25 }
+    boar: { name: "멧돼지 구이", icon: "🍖", wood: 8, desc: "다음 웨이브 동안 근접 공격력 +25%", kind: "might", value: 1.25 },
+    // 지금까지 3개 요리(속도·최대체력·공격력)는 전부 "내가 더 세지는" 방향이었다. 여우 스튜는
+    // 처음으로 "맞을수록 상대가 손해 보는" 방향이다 — 가시(thorn) 변종이 근접 공격자에게 반사
+    // 피해를 주는 것과 똑같은 개념을, 몬스터가 플레이어를 때릴 때도 적용한다(onPlayerHit이
+    // 이미 쓰는 _hurtEnemy로 반사하므로 새 피해 배관이 필요 없다). 잡기 가장 어려운 여우가
+    // 재료라서, 방어적인 보상을 얻으려면 가장 손이 많이 가는 사냥을 해야 한다.
+    fox: { name: "여우 스튜", icon: "🍲", wood: 5, desc: "다음 웨이브 동안 근접 피격 시 공격자에게 받은 피해의 25%를 반사한다", kind: "guard", value: 0.25 },
+    // 가장 위험한 사냥감(hunts:true, 브루트급 공격력)을 잡은 보상답게, 처음으로 "받는 피해 자체를
+    // 줄이는" 요리다 — 속도·체력·공격력·반사 넷 다 공격 또는 생존 보조였지 방어력 자체를 올리는
+    // 것은 없었다. game.js onPlayerHit 이 이미 blocking 경감을 곱하는 자리에 배율 하나만 더
+    // 곱하면 되므로(feastArmorMult), 몬스터 종류를 가리지 않고 다음 웨이브 내내 모든 근접 피격에 적용된다.
+    wolf: { name: "늑대 다리 구이", icon: "🍗", wood: 7, desc: "다음 웨이브 동안 몬스터 근접 공격으로 받는 피해 -15%", kind: "armor", value: 0.85 }
   },
   // 보물게 — 전투 중(3웨이브부터) 가끔 튀어나와 도망만 다니는 몬스터. 웨이브 구성에 안 끼는 독립
   // 이벤트라 운석·보급품과 같은 패턴(호스트 전용 타이머)으로 처리한다. lifetime 안에 못 잡으면
   // 보상 없이 사라진다 — 보급품처럼 순수 이득이 아니라, 잡으려면 지금 하던 걸 멈추고 쫓아가야 한다.
   treasureEvent: { minWave: 3, firstDelay: 20, minGap: 35, maxGap: 55, lifetime: 13 },
+  // 정찰병 — 보물게와 정반대다: 보물게는 "잡으면 이득"(놓쳐도 손해가 없다), 정찰병은 "놓치면
+  // 손해"(잡아도 소소한 보상뿐이라 순수 이득은 아니다). 그리고 전투 중이 아니라 준비 시간에만
+  // 나타나 "지금 하던 채집·건설을 멈추고 쫓아갈지" 라는 새로운 판단을 요구한다.
+  scoutEvent: { minWave: 4, firstDelay: 18, minGap: 40, maxGap: 65, lifetime: 15, spawnRadius: [14, 20], catchRadius: 3, penaltyHpMult: 1.12, penaltyDmgMult: 1.12 },
   // 떠돌이 상인 — 웨이브를 클리어하고 준비 시간에 들어갈 때(2웨이브부터) 확률적으로 나타나,
   // 그 준비 시간 동안만 무작위 2개 품목을 판다. 축복(엔드리스 전용, 정수로 구매, 영구 적용)과
   // 달리 표준 캠페인부터 목재·광물로 살 수 있고, 물약 종류는 해당 웨이브 한 번만 지속되는
@@ -702,7 +867,24 @@ export var CFG = {
       atkTonic: { name: "힘의 물약", icon: "💪", desc: "다음 웨이브 동안 근접 공격력 +40%", cost: { wood: 35, stone: 20 }, kind: "tempAtk", value: 1.4 },
       towerTonic: { name: "포격 물약", icon: "🗼", desc: "다음 웨이브 동안 모든 타워 공격력 +25%", cost: { wood: 30, stone: 35 }, kind: "tempTower", value: 1.25 },
       shardTrade: { name: "정수 감정", icon: "💠", desc: "목재·광물을 정수 1개로 바꾼다", cost: { wood: 50, stone: 50 }, kind: "shard", value: 1 },
-      ironTrade: { name: "철 주괴 거래", icon: "⚙️", desc: "목재·광물을 철 3개로 바꾼다", cost: { wood: 60, stone: 40 }, kind: "iron", value: 3 }
+      ironTrade: { name: "철 주괴 거래", icon: "⚙️", desc: "목재·광물을 철 3개로 바꾼다", cost: { wood: 60, stone: 40 }, kind: "iron", value: 3 },
+      // 기존 5개 품목은 전부 "회복·공격력·자원 교환"이었지, 방어선 자체를 손보는 품목은 없었다.
+      // 정비소(passive, 서서히)·수리 모드(수동, 한 채씩) 둘 다 이미 있지만 "지금 당장 전체를"
+      // 커버하는 수단이 없었다 — 웨이브 시작 직전 급하게 방어선을 복구하고 싶을 때 한 채씩
+      // 클릭할 시간이 없는 상황을 위한 프리미엄(=돈으로 해결) 선택지.
+      repairKit: { name: "만능 수리 키트", icon: "🧰", desc: "모든 건물을 즉시 완전히 수리한다", cost: { wood: 50, stone: 50 }, kind: "repairAll" },
+      // atkTonic·towerTonic과 정확히 같은 "한 판짜리" 구조를 이동 속도 쪽으로 옮긴 것. 질주의
+      // 유물(haste)이 영구 +15%인 보스 전용 보상이라면, 이건 그 전에 초반부터 목재·광물로 살 수
+      // 있는 한 판짜리 맛보기 버전 — 운석·보급품·보물게를 놓치지 않고 쫓아가거나 다구리를 피해
+      // 도망칠 때 그 웨이브만 확실히 편해진다.
+      speedTonic: { name: "질풍의 물약", icon: "💨", desc: "다음 웨이브 동안 이동 속도 +30%", cost: { wood: 25, stone: 15 }, kind: "tempSpeed", value: 1.3 },
+      // 기존 7개 품목은 전부 사기 전에 결과를 정확히 알 수 있었다(확정 효과) — 상인 전체가
+      // "믿고 사는" 곳이었다. 미스터리 상자는 처음으로 결과를 모른 채 사는 도박 품목이다:
+      // 꽝(40%, 소량 회복)과 대박(25%, atkTonic·towerTonic보다도 센 +50%를 동시에) 사이의
+      // 낙차를 크게 벌려서, "이번엔 확실한 효과"와 "밑져야 본전, 잘하면 대박"을 매 판 저울질하게
+      // 만드는 게 목적. 실제 효과는 게임 로직(_applyMysteryBox)에서 결정되고 이 항목엔 cost만
+      // 실려 있다 — 확정 kind가 없는 유일한 품목이라 desc도 결과를 밝히지 않는다.
+      mystery: { name: "미스터리 상자", icon: "🎁", desc: "무엇이 나올지 열어보기 전엔 모른다 — 꽝부터 대박까지", cost: { wood: 35, stone: 35 }, kind: "mystery" }
     }
   },
   // 엔드리스 축복 — 10웨이브 승리 이후(엔드리스)에만 등장한다. 표준 캠페인 밸런스에는 영향이 없다.
@@ -736,7 +918,15 @@ export var CFG = {
     respite: { name: "여유의 유물", icon: "⏳", desc: "이후 모든 웨이브의 준비 시간이 8초 늘어난다", trigger: "boss", kind: "prepDelta", value: 8 },
     mend: { name: "회복의 유물", icon: "💚", desc: "즉시 크리스탈 최대 체력의 20%를 회복한다", trigger: "boss", kind: "instantPct", value: 0.2 },
     venom: { name: "맹독의 유물", icon: "☠️", desc: "근접 공격이 25% 확률로 적에게 독을 묻힌다(3초간 지속 피해)", trigger: "boss", kind: "venom", dps: 10, duration: 3, value: 0.25 },
-    vigor: { name: "투지의 유물", icon: "💪", desc: "크리스탈 위기(체력 30% 미만) 시 피해 보너스가 더 커진다", trigger: "boss", kind: "desperationBonus", value: 0.25 }
+    vigor: { name: "투지의 유물", icon: "💪", desc: "크리스탈 위기(체력 30% 미만) 시 피해 보너스가 더 커진다", trigger: "boss", kind: "desperationBonus", value: 0.25 },
+    // 기존 4개 유물(여유·회복·맹독·투지)은 전부 크리스탈이나 전투력을 건드렸을 뿐, 플레이어
+    // 이동 자체를 건드리는 유물은 없었다. 질주는 처음으로 "이동"을 영구히 강화한다 — 파밍하러
+    // 멀리 나갔다 돌아오는 왕복, 운석·보급품·보물게를 쫓아가는 순간 판단, 다구리를 맞을 때
+    // 도망치는 여유 전부가 조금씩 편해진다. `mult`/`moveSpeedMult` 조합은 완력(atk)·포격 강화
+    // (towerDmg)와 완전히 같은 제네릭 배관(`boonMult[key] *= value`)이라 새 적용 로직이 필요
+    // 없었고, 실제 소비처는 매 프레임 플레이어 이동 속도 계산에 인자 하나(`feastSpeedMult *
+    // boonMult.moveSpeedMult`)로 얹었다.
+    haste: { name: "질주의 유물", icon: "👟", desc: "이동 속도가 영구히 15% 빨라진다", trigger: "boss", kind: "mult", key: "moveSpeedMult", value: 1.15 }
   },
   // 보스 전용 패턴. 예고 시간을 반드시 두어서 플레이어가 반응할 수 있게 한다.
   bossPattern: {
@@ -762,7 +952,12 @@ export var CFG = {
     drainCast: 1.1,
     drainWood: 40,
     drainStone: 40,
-    drainHealPct: 0.06
+    drainHealPct: 0.06,
+    // 강철 수호자 전용 — summonAt 임계값마다 소환 대신 자기 자신에게 방벽을 두른다(summon·silence·
+    // drain과 배타적). 방벽이 떠 있는 동안 받는 피해가 fortifyMitigation 만큼 줄어든다.
+    fortifyCast: 1.1,
+    fortifyTime: 4,
+    fortifyMitigation: 0.7
   },
   wave: {
     goal: 10,
@@ -848,7 +1043,32 @@ export var SPECIAL_WAVES = {
   // 존재감이 옅다. 이 웨이브는 지휘관 여러 명을 동시에 풀어 그 함성이 "무리 전체가 계속 가속되는"
   // 압박으로 체감되게 만든다 — rush가 물량, siege가 건물 파괴였다면 이건 "먼저 잡아야 할 대상이
   // 뚜렷한" 축이다. 지휘관을 방치하면 뒤따르는 러너 무리가 끊임없이 1.7배로 밀려온다.
-  rally: { name: "돌격대", icon: "🥁", desc: "지휘관 여러 명이 무리를 이끈다 — 먼저 끊지 않으면 뒤따르는 무리가 계속 빨라진다" }
+  rally: { name: "돌격대", icon: "🥁", desc: "지휘관 여러 명이 무리를 이끈다 — 먼저 끊지 않으면 뒤따르는 무리가 계속 빨라진다" },
+  // 굴착병(burrower)은 평소 웨이브에 한둘만 섞여 나와 "감시탑 없인 못 잡는다"는 정체성이 잘 안
+  // 느껴졌다. 이 웨이브는 굴착병을 총량의 상당수로 올려 그 압박을 뚜렷하게 만든다 — rush가 물량,
+  // ward가 조준 불가였다면 이건 "타워만으론 절반도 안 보인다"는 축이다. SPECIAL_WAVES 맨 끝에
+  // 추가해서(기존 rush~rally 여섯 웨이브가 이미 차지한 3·6·9·12·18·21웨이브 자리를 그대로
+  // 보존) 처음 등장은 occurrence 7번째, 즉 24웨이브부터라 굴착병이 정상적으로 처음 나오는
+  // 9웨이브보다 한참 뒤다 — "정체 모를 몬스터가 특수 웨이브로 먼저 쏟아진다"는 순서 역전을 피한다.
+  burrow: { name: "땅굴 습격", icon: "🕳️", desc: "굴착병이 대거 파묻힌 채 접근한다 — 감시탑 없이는 타워 화력의 상당수가 아예 조준하지 못한다" },
+  // 주술사(shooter)는 평소엔 한둘만 섞여 나와 "벽으로 못 막는 원거리 공격"이라는 정체성이 잘 안
+  // 드러났다 — 벽만 두르면 대부분의 위협을 막을 수 있다는 인식을 이 웨이브가 뒤집는다. burrow가
+  // "타워가 안 보인다"는 축이었다면 이건 "벽이 안 막는다"는 축이다: 주술사는 사거리 안이면 벽 뒤에서도
+  // 크리스탈을 직접 저격하므로(enemy.js 의 ranged/atkRange 분기, 길찾기를 거치지 않음), 벽만 두르고
+  // 방심한 방어선이 이 웨이브에서 처음으로 뚫린다. SPECIAL_WAVES 맨 끝에 추가해 기존 rush~burrow
+  // 일곱 웨이브가 이미 차지한 3·6·9·12·18·21·24웨이브 자리는 그대로 두고, 처음 등장은 occurrence
+  // 8번째인 27웨이브부터다(burrow를 추가하기 전엔 27웨이브가 다시 rush였던 자리를 대신 차지한다).
+  snipe: { name: "저격전", icon: "🧙", desc: "주술사가 대거 몰려온다 — 벽으로 막아도 사거리 안이면 크리스탈을 직접 저격한다" },
+  // 🩸 흡혈 변종은 평소엔 확률에 실려 한둘만 섞여 나와 "발견하면 먼저 끊어야 하는 개체"였다.
+  // 이 웨이브는 그 규칙을 전체로 확대한다 — burrow가 "타워가 안 보인다", snipe가 "벽이 안
+  // 막는다"는 축이었다면 이건 "적당히 때리다 마는 평소 습관이 통하지 않는다"는 축이다: 흡혈
+  // 몬스터는 크리스탈·건물·플레이어 중 무엇을 때리든 그 피해의 상당량을 체력으로 되돌리므로,
+  // 여러 마리를 동시에 살짝씩 두들기며 물량을 분산 대응하던 평소 방식으로는 전혀 안 줄어들고
+  // 오히려 도로 차오른다 — 한 마리씩 확실하게 끊어 죽이는 집중 화력으로 습관을 바꿔야 한다.
+  // SPECIAL_WAVES 맨 끝에 추가해 기존 여덟 웨이브가 이미 차지한 자리는 그대로 두고, occurrence
+  // 9번째부터(30은 보스 웨이브라 건너뛰고 33웨이브)라 흡혈 변종이 정상적으로 처음 섞여 나오는
+  // 초반 웨이브보다 한참 뒤다.
+  frenzy: { name: "혈투", icon: "🩸", desc: "몬스터 전부가 흡혈 상태로 나온다 — 살짝살짝 때리다 말면 오히려 회복해버리니 한 마리씩 확실하게 끊어 죽여야 한다" }
 };
 var SPECIAL_KEYS = Object.keys(SPECIAL_WAVES);
 export function specialWaveKind(w2) {
@@ -856,7 +1076,7 @@ export function specialWaveKind(w2) {
   const occurrence = Math.floor(w2 / 3) - Math.floor(w2 / 15);
   return SPECIAL_KEYS[(occurrence - 1) % SPECIAL_KEYS.length];
 }
-var BOSS_CYCLE = ["boss", "frostlord", "warden", "looter"];
+var BOSS_CYCLE = ["boss", "frostlord", "warden", "looter", "colossus"];
 function _specialComposition(w2, kind) {
   const total = _standardTotal(w2);
   if (kind === "rush") {
@@ -880,6 +1100,18 @@ function _specialComposition(w2, kind) {
     return [
       { type: "commander", count: commanders },
       { type: "runner", count: Math.max(6, Math.round(total * 0.75)) }
+    ];
+  }
+  if (kind === "burrow") {
+    return [
+      { type: "burrower", count: Math.max(4, Math.round(total * 0.28)) },
+      { type: "grunt", count: Math.max(3, Math.round(total * 0.22)) }
+    ];
+  }
+  if (kind === "snipe") {
+    return [
+      { type: "shooter", count: Math.max(4, Math.round(total * 0.32)) },
+      { type: "grunt", count: Math.max(3, Math.round(total * 0.2)) }
     ];
   }
   return [{ type: "grunt", count: Math.max(3, Math.round(total * 0.32)) }];

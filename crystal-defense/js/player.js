@@ -15,7 +15,8 @@ var GEO4 = {
   bomb: new THREE.SphereGeometry(0.22, 10, 8),
   whip: new THREE.TorusGeometry(0.16, 0.04, 6, 14),
   shield: new THREE.CylinderGeometry(0.32, 0.32, 0.1, 16),
-  ring: new THREE.RingGeometry(0.62, 0.76, 20)
+  ring: new THREE.RingGeometry(0.62, 0.76, 20),
+  frostaxe: new THREE.ConeGeometry(0.28, 0.62, 4)
 };
 var WEAPON_MAT = {
   default: new THREE.MeshStandardMaterial({ color: 12093775, roughness: 0.7 }),
@@ -26,7 +27,8 @@ var WEAPON_MAT = {
   hammer: new THREE.MeshStandardMaterial({ color: 7034692, roughness: 0.55, metalness: 0.4 }),
   bomb: new THREE.MeshStandardMaterial({ color: 2829103, roughness: 0.5, metalness: 0.2 }),
   whip: new THREE.MeshStandardMaterial({ color: 4210752, roughness: 0.4, metalness: 0.8 }),
-  shield: new THREE.MeshStandardMaterial({ color: 10466760, roughness: 0.35, metalness: 0.7 })
+  shield: new THREE.MeshStandardMaterial({ color: 10466760, roughness: 0.35, metalness: 0.7 }),
+  frostaxe: new THREE.MeshStandardMaterial({ color: 12577023, emissive: 2777008, emissiveIntensity: 0.55, roughness: 0.3, metalness: 0.25 })
 };
 var WEAPON_LOOK = {
   default: { geo: GEO4.tool, mat: WEAPON_MAT.default, ry: 0, rz: 0 },
@@ -37,7 +39,8 @@ var WEAPON_LOOK = {
   hammer: { geo: GEO4.hammer, mat: WEAPON_MAT.hammer, ry: 0, rz: 0.85 },
   bomb: { geo: GEO4.bomb, mat: WEAPON_MAT.bomb, ry: 0, rz: 0 },
   whip: { geo: GEO4.whip, mat: WEAPON_MAT.whip, ry: Math.PI / 2, rz: 0 },
-  shield: { geo: GEO4.shield, mat: WEAPON_MAT.shield, ry: Math.PI / 2, rz: 0 }
+  shield: { geo: GEO4.shield, mat: WEAPON_MAT.shield, ry: Math.PI / 2, rz: 0 },
+  frostaxe: { geo: GEO4.frostaxe, mat: WEAPON_MAT.frostaxe, ry: 0, rz: 0.6 }
 };
 var PALETTE = [6280447, 10354539, 16757599, 16739286, 14065919, 7077840];
 var Player = class {
@@ -114,7 +117,7 @@ var Player = class {
   // 기본 공격치에 지금 손에 든 무기의 효과만 더한다 (여러 자루를 동시에 들 수는 없다)
   get attackStats() {
     const base = CFG.player.attack;
-    const out = { dmg: base.dmg, range: base.range, arc: base.arc, cd: base.cd, knockback: 0 };
+    const out = { dmg: base.dmg, range: base.range, arc: base.arc, cd: base.cd, knockback: 0, slow: 0, slowTime: 0 };
     const eff = CFG.craft[this.heldWeapon]?.effect;
     if (eff) for (const k2 of Object.keys(eff)) out[k2] += eff[k2];
     const bonus = CFG.weaponUpgrade.perLv[this.heldWeapon];
@@ -249,6 +252,7 @@ export var LocalPlayer = class extends Player {
     this.dashCd = 0;
     this.dashUntil = 0;
     this.dashDir = { x: 0, z: 1 };
+    this.lastStandUntil = 0;
   }
   // 회피 돌진 시작 — 쿨다운 중이거나 쓰러진 상태면 실패. 이동 입력이 있으면 그 방향으로, 없으면 바라보는 방향으로
   tryDash(input, sm2) {
@@ -283,12 +287,13 @@ export var LocalPlayer = class extends Player {
       return { moved: false };
     }
     this.dashCd -= dt2;
-    this.invulnerable = now < this.dashUntil;
+    const dashing = now < this.dashUntil;
+    this.invulnerable = dashing || now < this.lastStandUntil;
     if (now > this.combatUntil && this.hp < this.maxHp) {
       this.hp = Math.min(this.maxHp, this.hp + CFG.player.regen * dt2);
     }
     let moving;
-    if (this.invulnerable) {
+    if (dashing) {
       const dc2 = CFG.player.dash;
       this.x += this.dashDir.x * dc2.speed * dt2;
       this.z += this.dashDir.z * dc2.speed * dt2;

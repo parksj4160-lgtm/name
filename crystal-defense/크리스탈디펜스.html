@@ -67,6 +67,8 @@ button.mini:disabled { opacity: 0.45; cursor: not-allowed; }
   margin-top: 2px; font-size: 11px; color: var(--cyan);
   background: rgba(95,212,255,0.1); border-radius: 6px; padding: 2px 6px; align-self: flex-start;
 }
+/* 탄약 재고가 0인 종류 — 숫자만 빨갛게 띄워 "지금 이게 비었다"를 한눈에 보이게 한다 */
+.tag .out { color: var(--bad); font-weight: 700; }
 
 /* ---------- 웨이브 / 크리스탈 ---------- */
 #wave-panel { left: 50%; top: 14px; transform: translateX(-50%); width: min(460px, 60vw); }
@@ -315,6 +317,25 @@ button.ghost { background: transparent; color: var(--dim); }
   font-size: 11px; color: var(--dim);
 }
 
+/* ---------- 원정 준비(메타 진행) ---------- */
+.meta-upgrades {
+  list-style: none; padding: 8px 10px; margin: 6px 0 0; border-radius: 8px;
+  background: rgba(255,255,255,0.05); font-size: 12px; display: flex; flex-direction: column; gap: 8px; text-align: left;
+}
+.meta-upgrades li { display: flex; align-items: center; gap: 8px; color: var(--dim); }
+.meta-upgrades li.on { color: var(--text); }
+.meta-upgrades .mi-icon { font-size: 16px; width: 20px; text-align: center; flex: none; }
+.meta-upgrades .mi-body { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }
+.meta-upgrades .mi-name { font-weight: 700; color: var(--text); }
+.meta-upgrades .mi-lv { font-weight: 400; color: var(--cyan); font-size: 11px; }
+.meta-upgrades .mi-desc { font-size: 11px; opacity: 0.85; }
+.meta-upgrades .mi-buy {
+  flex: none; background: rgba(95,212,255,0.14); border: 1px solid var(--line); color: var(--cyan);
+  border-radius: 6px; padding: 5px 8px; font-size: 11px; font-weight: 700; cursor: pointer;
+}
+.meta-upgrades .mi-buy:disabled { opacity: 0.5; cursor: default; color: var(--dim); }
+.meta-upgrades .mi-buy.poor { color: var(--bad); border-color: rgba(255,106,125,0.4); }
+
 /* ---------- 업적 ---------- */
 .achievements {
   list-style: none; padding: 8px 10px; margin: 6px 0 0; border-radius: 8px;
@@ -527,6 +548,7 @@ button.corner.mute.off { opacity: 0.5; }
 </style>
 </head>
 <body>
+
 <canvas id="scene"></canvas>
 <div id="fx-layer"></div>
 <div id="crystal-warning" class="hidden"></div>
@@ -540,9 +562,10 @@ button.corner.mute.off { opacity: 0.5; }
     <div class="res"><span class="ic">🟠</span><b id="res-copper">0</b><span class="lbl">구리</span></div>
     <div class="res"><span class="ic">⚫</span><b id="res-coal">0</b><span class="lbl">석탄</span></div>
     <div class="res"><span class="ic">⚙️</span><b id="res-iron">0</b><span class="lbl">철</span></div>
-    <div class="res"><span class="ic">🏹</span><b id="res-arrow">0</b><span class="lbl">화살 (화살탑 탄약)</span></div>
     <div class="res"><span class="ic">💠</span><b id="res-shard">0</b><span class="lbl">정수 (스킬)</span></div>
+    <div id="ammo-row" class="tag hidden"></div>
     <div id="meat-row" class="tag hidden"></div>
+    <div id="pet-row" class="tag hidden"></div>
     <button id="btn-hup" class="mini">채집속도 <b id="hup-lv">Lv.1</b> <span id="hup-cost" class="cost"></span></button>
     <div id="tool-row" class="tools"></div>
     <div id="pool-mode" class="tag">팀 공유 자원</div>
@@ -641,9 +664,13 @@ button.corner.mute.off { opacity: 0.5; }
       <tr><td>건설</td><td>인벤토리 <b>건설</b> 탭에서 고르면 배치 모드가 된다 → 좌클릭으로 배치. 벽·타워는 <b>제작대를 먼저 지어야</b> 열린다</td></tr>
       <tr><td>🚪 성문</td><td>벽처럼 몬스터의 길을 막지만(체력은 벽보다 낮다), <b>플레이어는 그대로 통과</b>할 수 있다. 방어선을 완전히 둘러싸도 채집하러 나갈 때마다 벽을 부쉈다 다시 짓는 수고 없이 성문 하나로 드나들면 된다</td></tr>
       <tr><td>🧺 채집기</td><td>다른 건물과 달리 <b>방어선 밖 어디든</b> 지을 수 있다 — 채집 노드 옆에 놓으면 반경 안 나무·바위를 스스로 캔다(정수석은 캐지 않는다). 손으로 캐는 것보다 항상 느리지만 방치해도 알아서 채워진다. 대신 길을 막지 않고, 지나가는 몬스터(특히 건물을 노리는 🪓 약탈자)에게 부서질 수 있다</td></tr>
+      <tr><td>📦 탄약</td><td>공격 타워는 쏠 때마다 <b>종류에 맞는 탄약</b>을 하나씩 쓴다 — 🏹 화살(화살탑·저격탑·덫탑, <b>목재</b>로 제작대에서) · 💣 포탄(대포탑, <b>광물+철</b>을 화로에서, 발당 단가가 가장 비싸다) · 🧪 원소액(서리탑·독탑·번개탑, <b>광물+철</b>을 화로에서). 새로 짓거나 업그레이드한 타워는 탄창이 <b>가득 찬 채로</b> 나오니 초반엔 신경 쓸 게 없지만, 바닥나면 남은 부품을 긁어 쏘는 셈이라 <b>피해와 연사가 크게 떨어진다</b>(멈추지는 않는다). 타워 머리 위 얇은 게이지가 남은 탄약이고, 비면 빨갛게 바뀐다. 그래서 "무엇을 짓느냐"가 건설 순간의 한 번짜리 선택이 아니라 <b>계속 먹여 살릴 수 있느냐</b>는 선택이 된다 — 화살탑 도배는 목재만 있으면 유지되지만, 대포탑은 한 방이 센 대신 철을 계속 먹는다</td></tr>
+      <tr><td>🔁 재장전</td><td>탄약이 덜 찬 타워 <b>가까이에서</b> <kbd class="rebind" data-action="reload">\</kbd> — 재고에서 꺼내 그 타워 하나를 가득 채운다. 가장 가까운 <b>덜 찬</b> 타워를 고르므로 이미 꽉 찬 타워가 옆에 있어도 상관없다</td></tr>
+      <tr><td>🏭 병기창</td><td>스스로 공격하지 않지만, <b>반경 안 타워의 탄창을 저절로 채워 준다</b>(재고에서 꺼내 쓰므로 탄약은 계속 만들어 둬야 한다). 정비소가 체력을 자동으로 채우듯 이건 탄약을 채운다 — 덕분에 타워 배치에 축이 하나 늘어난다: 넓게 펴서 사거리를 벌면 손으로 재장전하러 뛰어다녀야 하고, 병기창 주변에 모으면 보급은 편하지만 커버리지가 좁아진다</td></tr>
       <tr><td>🔧 정비소</td><td>스스로 공격하지 않지만, 반경 안 손상된 건물을 <b>자원 없이</b> 초당 일정량씩 저절로 고쳐준다 — 전투 중 벽·타워를 일일이 찾아다니며 수리할 필요가 줄어든다. 여러 개를 겹쳐 지으면 회복량이 그대로 합산된다</td></tr>
       <tr><td>🪤 함정</td><td>벽·타워와 달리 <b>길을 막지 않는다</b> — 적이 지나가는 길목 한복판에 심어 두면, 적이 밟는 순간 큰 피해+둔화를 주고 사라지는 1회용이다. 벽 뒤가 아니라 통로 위에 놓는 게 핵심</td></tr>
-      <tr><td>제작</td><td><b>제작대</b>를 지으면 인벤토리 <b>제작</b> 탭에서 ⛏️ 곡괭이 · 🗡️ 칼 · 🏹 활 · 🔱 창 · 🔨 망치 · 🔗 채찍 · 💣 폭탄가방 · 🛡️ 방패를 만든다. 칼은 단단한 일격, <b>활은 실제로 화살을 쏘는 원거리</b>, 창은 좁고 긴 관통, 망치는 느리지만 사방을 강타, 채찍은 대미지 대신 맞은 적을 뒤로 밀쳐낸다. <b>화로</b>를 지으면 광물을 녹여 ⚙️ 철을 얻는다</td></tr>
+      <tr><td>🎯 저격탑</td><td>다른 타워보다 사거리가 훨씬 길고 발사는 느리지만, 사거리 안에서 <b>남은 체력이 가장 많은 적</b>(대개 보스)을 골라 큰 피해를 준다 — 물량은 다른 타워에 맡기고 가장 두꺼운 표적만 전담시키는 용도. 독탑 근처에 지으면 중독된 적에게 추가 피해가 붙는다</td></tr>
+      <tr><td>제작</td><td><b>제작대</b>를 지으면 인벤토리 <b>제작</b> 탭에서 ⛏️ 곡괭이 · 🗡️ 칼 · 🏹 활 · 🔱 창 · 🔨 망치 · 🔗 채찍 · 💣 폭탄가방 · 🛡️ 방패 · ❄️ 얼음도끼를 만든다. 칼은 단단한 일격, <b>활은 실제로 화살을 쏘는 원거리</b>, 창은 좁고 긴 관통, 망치는 느리지만 사방을 강타, 채찍은 대미지 대신 맞은 적을 뒤로 밀쳐내고, 얼음도끼는 맞은 적을 서리탑처럼 잠깐 둔화시킨다. <b>화로</b>를 지으면 광물을 녹여 ⚙️ 철을 얻는다</td></tr>
       <tr><td>🛡️ 방패</td><td>공격력은 거의 없지만(맨손과 동일), 손에 쥔 채 <b>막기(Q)</b>를 쓰면 피해 경감(65%→80%)과 이동 속도(40%→60%)가 크게 좋아진다 — 다른 무기가 전부 "더 세게 때리는" 선택인 것과 반대로, 이건 "덜 때리고 훨씬 오래 버티는" 선택이다. 최대 강화하면 ⚗️ 특화로 더 단단한 철벽(경감 92%, 대신 더 느림)이나 움직이는 기동방패(경감 72%, 속도 85%)로 갈린다</td></tr>
       <tr><td>🏹 활</td><td>손에 들면 공격이 근접 대신 <b>조준한 쪽으로 화살을 쏘는 것</b>으로 바뀐다(사거리 16). 폭탄가방과 달리 자원이 전혀 안 들지만 한 발에 한 마리만 맞고 피해도 낮다 — 안전한 거리에서 꾸준히 점사하는 용도</td></tr>
       <tr><td>💣 폭탄가방</td><td>손에 들면 공격이 근접 대신 <b>조준한 바닥 지점에 폭탄을 던지는 것</b>으로 바뀐다(사거리 9, 던질 때마다 목재4·광물3 소모). 정수 스킬과 달리 목재·광물로 계속 쓸 수 있다. 🌀 결계 몹처럼 타워가 못 맞추는 원거리 위협이나 멀리서 몰려온 무리에 좋다</td></tr>
@@ -654,21 +681,22 @@ button.corner.mute.off { opacity: 0.5; }
       <tr><td>🤝 협공 콤보</td><td>서로 다른 플레이어가 같은 적을(근접·활·폭탄 무엇이든) 1초 안에 연달아 맞히면 두 번째 타격에 피해 +30%가 붙는다(주황색 "협공!" 표시) — 각자 흩어져 몬스터를 나눠 잡기보다 같이 한 놈부터 끊는 편이 이득. 혼자 할 땐 절대 발동하지 않는다</td></tr>
       <tr><td>장비</td><td>인벤토리 <b>장비</b> 탭에서 고르면 손에 든다. ⛏️ 곡괭이도 쥐어야 정수석을 캘 수 있다</td></tr>
       <tr><td>몬스터</td><td>🧙 주술사는 벽을 무시하고 멀리서 크리스탈을 저격 · 🪓 약탈자는 가장 가까운 건물로 직행해 부순다 · 🦝 도둑너구리(4웨이브부터)는 크리스탈이 아니라 <b>채집 노드</b>로 달려가 자원을 훔친다 — 전투력은 약하니 죽이면 훔친 만큼 그대로 돌려받는다, 못 잡으면 그 노드는 한동안 못 쓴다 · 🦇 박쥐(6웨이브부터)는 벽·함정을 전부 무시하고 하늘로 크리스탈까지 직선 비행한다 — 체력이 낮아 타워로 요격하는 게 사실상 유일한 대응 · 🧨 폭탄병(8웨이브부터)은 죽는 순간 주변에 폭발 피해를 남긴다 — 코앞에서 마무리하면 같이 맞으니 거리를 두고 처리할 것 · 🕳️ 굴착병(9웨이브부터)은 땅속에서 벽뿐 아니라 <b>타워의 조준까지</b> 피해 직선으로 파고든다 — 흙먼지 자국만 보이니 직접 쫓아가 끊거나, 크리스탈 가까이서 떠오르는 순간(그때부터 타워도 맞힐 수 있다)을 노려야 한다. 땅 위 함정은 파묻힌 채로도 그대로 맞는다 · 🥁 지휘관(10웨이브부터)은 주기적으로 진군의 함성을 울려 반경 안 무리 전체를 잠깐 크게 빠르게 만든다 — 체력은 낮으니 먼저 잡으면 뒤따르는 무리가 다시 느려진다</td></tr>
-      <tr><td>🏹 사냥과 요리</td><td><b>준비 시간에만</b> 맵 바깥쪽에 야생 동물이 돌아다닌다 — 🐇 토끼(빠르고 잘 도망친다) · 🦌 사슴 · 🐗 멧돼지(<b>도망치지 않고 때리면 오히려 달려들어 들이받는다</b>). 잡으면 자원이 아니라 <b>생고기</b>가 나오고, 생고기는 그대로는 쓸모가 없다 — <b>화로</b>에서 목재를 태워 구워 먹어야 <b>다음 웨이브 한 판</b> 동안 효과가 붙는다: 🍢 토끼 꼬치(이동 속도 +18%) · 🥩 사슴 스테이크(최대 체력 +40, 즉시 회복) · 🍖 멧돼지 구이(근접 공격력 +25%). 웨이브가 시작되면 동물은 전부 흩어져 사라지니, 짧은 준비 시간을 <b>채집·건설·업그레이드·사냥</b> 중 어디에 쓸지가 매번 선택이 된다</td></tr>
+      <tr><td>🏹 사냥과 요리</td><td><b>준비 시간에만</b> 맵 바깥쪽에 야생 동물이 돌아다닌다 — 🐇 토끼(빠르고 잘 도망친다) · 🦌 사슴 · 🐗 멧돼지(<b>도망치지 않고 때리면 오히려 달려들어 들이받는다</b>) · 🦊 여우 · 🐺 늑대(<b>도망치지 않고 오히려 나를 먼저 쫓아온다</b>, 죽이는 대신 길들일 수도 있다 — 아래 동물 길들이기 참고). 잡으면 자원이 아니라 <b>생고기</b>가 나오고, 생고기는 그대로는 쓸모가 없다 — <b>화로</b>에서 목재를 태워 구워 먹어야 <b>다음 웨이브 한 판</b> 동안 효과가 붙는다: 🍢 토끼 꼬치(이동 속도 +18%) · 🥩 사슴 스테이크(최대 체력 +40, 즉시 회복) · 🍖 멧돼지 구이(근접 공격력 +25%) · 🍲 여우 스튜(근접 피격 시 받은 피해의 25%를 공격자에게 반사) · 🍗 늑대 다리 구이(몬스터 근접 공격 피해 -15%). 웨이브가 시작되면 동물은 전부 흩어져 사라지니, 짧은 준비 시간을 <b>채집·건설·업그레이드·사냥</b> 중 어디에 쓸지가 매번 선택이 된다</td></tr>
       <tr><td>🦀 보물게</td><td>3웨이브부터 전투 중 가끔 튀어나와 공격은 안 하고 도망만 다닌다. 시간 안에 못 잡으면 보상 없이 사라지니 지금 하던 걸 멈추고 쫓아갈지 판단해야 한다 — 잡으면 자원을 두둑히, 가끔 정수(💠)까지 준다</td></tr>
-      <tr><td>변종</td><td>웨이브가 오를수록 몬스터에 접두사가 붙는다: 🛡️ 방패(정면 피해 대폭 감소, 등 뒤를 쳐야 함) · ➗ 분열(죽으면 약한 개체 2마리로) · 💨 질주(주기적으로 폭발적 가속) · 💚 재생(잠시 안 맞으면 체력이 차오름, 끝까지 몰아쳐야 함) · 🌀 결계(타워가 조준 못함, 직접 처치해야 함) · 🌵 가시(근접으로 때리면 그 피해 일부를 반사로 되돌려 받음) · 🩸 흡혈(크리스탈·건물·플레이어를 때릴 때마다 그 피해 일부를 체력으로 되돌림, 놔두면 계속 회복). 색 틴트 + 머리 위 아이콘으로 항상 표시된다</td></tr>
+      <tr><td>🕵️ 정찰병</td><td>4웨이브부터 <b>준비 시간에만</b> 가끔 나타나 가장 가까운 포탈로 도망친다(공격은 안 한다). 포탈에 닿기 전에 처치하면 보상만 받지만, 놓치면 <b>다음 웨이브 전체가 살짝 강해진다</b>(체력·공격력 +12%) — 보물게와 반대로 "잡으면 이득"이 아니라 "놓치면 손해"라, 짓거나 캐던 걸 멈추고 쫓아갈지 판단해야 한다. 사냥감(wild)과 달리 타워도 자동으로 조준해 같이 잡아준다</td></tr>
+      <tr><td>변종</td><td>웨이브가 오를수록 몬스터에 접두사가 붙는다: 🛡️ 방패(정면 피해 대폭 감소, 등 뒤를 쳐야 함) · ➗ 분열(죽으면 약한 개체 2마리로) · 💨 질주(주기적으로 폭발적 가속) · 💚 재생(잠시 안 맞으면 체력이 차오름, 끝까지 몰아쳐야 함) · 🌀 결계(타워가 조준 못함, 직접 처치해야 함) · 🌵 가시(근접으로 때리면 그 피해 일부를 반사로 되돌려 받음) · 🩸 흡혈(크리스탈·건물·플레이어를 때릴 때마다 그 피해 일부를 체력으로 되돌림, 놔두면 계속 회복) · 🔒 저항(둔화·속박·중독을 전부 무시 — 서리탑·덫탑·독탑·얼음도끼가 안 통하니 순수 대미지로 밀어붙여야 함). 색 틴트 + 머리 위 아이콘으로 항상 표시된다</td></tr>
       <tr><td>⭐ 정예</td><td>3웨이브부터 웨이브당 최대 1마리, 확률적으로 골드빛 정예가 섞여 나온다. 체력·공격력이 크게 세지지만 처치 보상(목재·광물)은 3배 — 등장하면 토스트로 알려주니 그놈부터 집중해서 잡을지 무시할지는 선택</td></tr>
       <tr><td>☄️ 운석 낙하</td><td>4웨이브부터 전투 중 가끔 바닥에 빨간 경고 링이 뜨고, 2.5초 뒤 그 자리에 큰 범위 피해가 떨어진다. 몬스터 무리를 그 위로 끌어들이면 한 방에 정리할 수 있지만, 내 건물이나 캐릭터가 그 자리에 있으면 그대로 맞는다 — 보급품과 반대로 피해야 할 수도, 이용해야 할 수도 있는 양날의 검</td></tr>
       <tr><td>📦 보급품 투하</td><td>2웨이브부터 전투 중 가끔 상자가 떨어진다(한 번에 최대 1개, 미니맵에 노란 점으로 표시). 가까이 다가가면 자동으로 줍고 자원(목재·광물, 확률로 정수)을 얻는다 — 오래 안 챙기면 사라지니 방어를 잠깐 비우고 달려갈지 말지가 선택</td></tr>
-      <tr><td>🧳 떠돌이 상인</td><td>2웨이브 클리어 후부터 준비 시간에 가끔 나타나 그 준비 시간에만 무작위 2개 품목을 목재·광물로 판다(물약·정수/철 교환 등). 품목은 각자 한 번씩만 살 수 있고 웨이브가 시작되면 사라진다 — 축복과 달리 엔드리스가 아니어도, 정수가 없어도 쓸 수 있는 자원 소비처다</td></tr>
+      <tr><td>🧳 떠돌이 상인</td><td>2웨이브 클리어 후부터 준비 시간에 가끔 나타나 그 준비 시간에만 무작위 2개 품목을 목재·광물로 판다 — 🧪 치유 물약 · 💪 힘의 물약(근접 공격력) · 🗼 포격 물약(타워 공격력) · 💨 질풍의 물약(이동 속도, 전부 다음 웨이브 한 판) · 💠 정수 감정 · ⚙️ 철 주괴 거래(자원 교환) · 🧰 만능 수리 키트(모든 건물 즉시 완전 수리) · 🎁 미스터리 상자(사기 전엔 결과를 모른다 — 꽝부터 확정 효과보다 더 센 대박까지). 품목은 각자 한 번씩만 살 수 있고 웨이브가 시작되면 사라진다 — 축복과 달리 엔드리스가 아니어도, 정수가 없어도 쓸 수 있는 자원 소비처다</td></tr>
       <tr><td>지형</td><td>판마다 지형이 다르다: 🏔️ 협곡(입구가 좁아 길막기가 잘 먹히지만 자원 부족) · 🌾 개활지(자원은 넉넉하지만 적이 사방에서 온다) · 🗺️ 평지(표준). 좌상단 자원 패널에 항상 표시된다</td></tr>
       <tr><td>🌙 밤 웨이브</td><td>7웨이브마다(엔드리스에서도 반복) 조명이 어두워지고 안개가 짙어져 시야가 좁아진다. 크리스탈 불빛은 오히려 더 밝아져 등대 역할을 한다. 대신 그 웨이브에서 처치한 몬스터의 자원 보상이 30% 더 후하다 — 어두워서 위험한 만큼 보상도 따라온다</td></tr>
       <tr><td>날씨</td><td>밤이 아닌 웨이브에 가끔 낀다: 🌧️ 비(땅이 젖어 이동 속도 소폭 감소) · 🌫️ 안개(시야가 줄고 타워 사거리 소폭 감소). 웨이브 시작 토스트로 미리 알려준다</td></tr>
       <tr><td>♾️ 축복</td><td>엔드리스 모드에서 3웨이브마다 준비 시간이 멈추고 영구 버프 2개 중 하나를 고른다(공격력·타워 공격력·스킬 비용·즉시 회복). 표준 10웨이브에는 나오지 않는다</td></tr>
-      <tr><td>🏺 유물</td><td>보스를 처치할 때마다(표준 10웨이브의 5·10웨이브 포함) 준비 시간이 멈추고 영구 유물 2개 중 하나를 고른다 — ⏳ 준비 시간 연장 · 💚 즉시 회복 · ☠️ 근접 공격 맹독 확률 · 💪 위기 시 피해 보너스 강화. 축복과 달리 표준 캠페인에서도 뜬다</td></tr>
+      <tr><td>🏺 유물</td><td>보스를 처치할 때마다(표준 10웨이브의 5·10웨이브 포함) 준비 시간이 멈추고 영구 유물 2개 중 하나를 고른다 — ⏳ 준비 시간 연장 · 💚 즉시 회복 · ☠️ 근접 공격 맹독 확률 · 💪 위기 시 피해 보너스 강화 · 👟 이동 속도 영구 증가. 축복과 달리 표준 캠페인에서도 뜬다</td></tr>
       <tr><td>💎 크리스탈 강화</td><td>인벤토리 <b>크리스탈</b> 탭에서 정수(💠)로 크리스탈 자체를 영구히 키운다: 💪 강화(최대 체력 +150) · 💚 재생(초당 자동 회복) · ⚡ 오라(주변 적에게 주기 피해) · 🪞 반사(크리스탈을 때린 적에게 받은 피해 일부를 그대로 돌려줌). 각 5레벨까지, 레벨이 오를수록 비용도 오른다 — 지킬 대상이 강해지면 후반에 방어선을 좁혀 버티는 선택지가 생긴다</td></tr>
-      <tr><td>특수 웨이브</td><td>3웨이브마다(보스 웨이브 제외) 성격이 다른 웨이브가 섞인다: 🏃 러시(러너 대량, 물량전) · 🏰 공성(브루트+약탈자, 건물이 표적) · ⭐ 정예전(수는 적지만 전부 정예) · 🌀 결계(전부 결계를 둘러 타워가 조준 못함) · 💉 치유단(치유사가 잔뜩 섞여 서로 회복, 먼저 솎아내야 함) · 🥁 돌격대(지휘관 여러 명이 러너 무리를 이끈다, 21웨이브부터 — 지휘관부터 끊지 않으면 무리 전체가 계속 빨라진다). 준비 시간 웨이브 예고에 노란 배지로 미리 알려준다</td></tr>
-      <tr><td>보스</td><td>5웨이브마다 💀 파괴자 · 🧊 서리 군주 · 🔇 침묵의 군주 · 🦂 갈취자가 20웨이브 주기로 돌아가며 등장한다. 체력이 깎일 때마다 파괴자·서리 군주는 <b>잡졸을 소환</b>하고(서리 군주는 전부 🛡️ 방패 변종), 침묵의 군주는 <b>발밑에 침묵 장판</b>을 깔아 반경 안 타워를 전부 멈추며, 갈취자는 대신 <b>팀 자원을 훔쳐 체력을 회복</b>한다(캐스팅 중에 화력을 몰아야 손해를 줄인다). 멀리 있으면 넷 다 <b>크리스탈로 돌진</b>해 지나는 건물을 부순다. 전부 <b>예고가 먼저 뜨니</b> 그때 대응할 것</td></tr>
+      <tr><td>특수 웨이브</td><td>3웨이브마다(보스 웨이브 제외) 성격이 다른 웨이브가 섞인다: 🏃 러시(러너 대량, 물량전) · 🏰 공성(브루트+약탈자, 건물이 표적) · ⭐ 정예전(수는 적지만 전부 정예) · 🌀 결계(전부 결계를 둘러 타워가 조준 못함) · 💉 치유단(치유사가 잔뜩 섞여 서로 회복, 먼저 솎아내야 함) · 🥁 돌격대(지휘관 여러 명이 러너 무리를 이끈다, 21웨이브부터 — 지휘관부터 끊지 않으면 무리 전체가 계속 빨라진다) · 🕳️ 땅굴 습격(굴착병 대거 파묻힌 채 접근, 24웨이브부터 — 감시탑 없이는 타워 화력 상당수가 못 맞춘다) · 🧙 저격전(주술사 대거 몰려온다, 27웨이브부터 — 벽 뒤에서도 사거리 안이면 크리스탈을 직접 저격한다) · 🩸 혈투(몬스터 전부가 흡혈 상태, 33웨이브부터 — 살짝살짝 때리면 오히려 회복하니 한 마리씩 확실히 끊어야 함). 준비 시간 웨이브 예고에 노란 배지로 미리 알려준다</td></tr>
+      <tr><td>보스</td><td>5웨이브마다 💀 파괴자 · 🧊 서리 군주 · 🔇 침묵의 군주 · 🦂 갈취자 · 🗿 강철 수호자가 25웨이브 주기로 돌아가며 등장한다. 체력이 깎일 때마다 파괴자·서리 군주는 <b>잡졸을 소환</b>하고(서리 군주는 전부 🛡️ 방패 변종), 침묵의 군주는 <b>발밑에 침묵 장판</b>을 깔아 반경 안 타워를 전부 멈추며, 갈취자는 대신 <b>팀 자원을 훔쳐 체력을 회복</b>하고, 강철 수호자는 소환·침묵·약탈 없이 <b>자기 몸에 방벽을 둘러 받는 피해를 크게 줄인다</b>(캐스팅 중에 화력을 몰아야 손해를 줄인다). 멀리 있으면 전부 <b>크리스탈로 돌진</b>해 지나는 건물을 부순다. 전부 <b>예고가 먼저 뜨니</b> 그때 대응할 것</td></tr>
       <tr><td>⚗️ 특화</td><td>최대 레벨(Lv.3)에 도달한 전투 타워를 <b>업그레이드 모드로 다시 클릭</b>하면, 또는 최대 레벨까지 강화한 무기를 인벤토리 <b>제작</b> 탭에서 클릭하면, 두 갈래 중 하나를 골라 성격을 영구히 바꾼다(되돌릴 수 없다) — 같은 타워·무기라도 특화에 따라 역할이 크게 갈린다</td></tr>
       <tr><td>업그레이드</td><td><kbd class="rebind" data-action="upgrade">U</kbd> 후 건물 클릭</td></tr>
       <tr><td>수리</td><td><kbd class="rebind" data-action="repair">G</kbd> 후 건물 클릭 (손상 비례 자원 소모)</td></tr>
@@ -677,6 +705,7 @@ button.corner.mute.off { opacity: 0.5; }
       <tr><td>정수 스킬</td><td>💧 <kbd class="rebind" data-action="shard">R</kbd> 회복(1) · 💥 <kbd class="rebind" data-action="skillBlast">T</kbd> 폭발(2) · 🌀 <kbd class="rebind" data-action="skillChill">Y</kbd> 시간 왜곡(2) · 🛡️ <kbd class="rebind" data-action="skillBarrier">B</kbd> 방벽(3) · 🌌 <kbd class="rebind" data-action="skillRift">C</kbd> 중력 균열(3) · 🧚 <kbd class="rebind" data-action="skillSummon">N</kbd> 정령 소환(3) — 인벤토리 <b>스킬</b> 탭에서도 쓸 수 있다</td></tr>
       <tr><td>🌌 중력 균열</td><td>다른 스킬과 달리 내 발밑이 아니라 <b>조준한 지점</b>에 3.5초간 열린다. 반경 안의 적을 중심으로 끌어당기지만 <b>피해는 0</b> — 혼자서는 아무것도 못 죽인다. 흩어진 무리를 한 덩어리로 뭉쳐 놓고 💣 대포탑·🎇 융단폭격·폭탄가방·☄️ 운석 같은 범위 공격을 겹치는 용도다. 보스는 면역이고, 한 번에 하나만 열 수 있다</td></tr>
       <tr><td>🧚 정령 소환</td><td>즉발이 아니라 <b>10초간 지속</b>되는 유일한 스킬 — 나를 따라다니며 근처 적을 알아서 찾아가 공격한다. 타워와 똑같은 규칙이 적용돼(🌀 결계 몹·파묻힌 🕳️ 굴착병은 못 때린다) 그런 상대는 직접 처리해야 한다. 팀 전체 1마리까지만 부를 수 있다</td></tr>
+      <tr><td>🐾 동물 길들이기</td><td>🦊 여우나 🐺 늑대 근처에서 <kbd class="rebind" data-action="tame">Z</kbd> — 🐇 토끼·🦌 사슴·🐗 멧돼지 생고기 2개를 미끼로 써서 시도한다(성공 확률은 동물마다 다르고, 실패해도 미끼는 사라진다). 성공하면 그 동물이 <b>영구 동료</b>가 되어 정령처럼 나를 따라다니며 알아서 근처 적을 공격한다 — 정수도, 재시전도 필요 없다. 팀 전체 1마리까지만 둘 수 있다. 이미 동료가 있으면 같은 <kbd class="rebind" data-action="tame">Z</kbd>가 대신 <b>먹이주기</b>가 된다 — 생고기 3개로 레벨을 올려(최대 3) 공격력·공격속도를 키우고 몸집도 조금씩 커진다. 다른 동물로 바꾸고 싶으면 <kbd class="rebind" data-action="releasePet">]</kbd>로 놓아줄 수 있다(레벨은 사라지고 다시 빈 슬롯이 된다)</td></tr>
       <tr><td>카메라</td><td>우클릭 드래그 회전 · 휠 확대/축소</td></tr>
       <tr><td>취소</td><td><kbd class="rebind" data-action="cancel">Esc</kbd> 또는 우클릭</td></tr>
       <tr><td>🎵 배경음악</td><td>준비 시간엔 잔잔하게, 전투엔 긴박하게, 보스 웨이브엔 더 무겁게 — 웨이브 흐름에 맞춰 자동으로 바뀐다. 아래에서 효과음과 별도로 음량 조절 가능</td></tr>
@@ -750,6 +779,12 @@ button.corner.mute.off { opacity: 0.5; }
         <input id="in-server" placeholder="ws://192.168.0.10:8080" />
         <button id="btn-server">저장</button>
       </div>
+    </details>
+
+    <details class="settings" open>
+      <summary>🏕️ 원정 준비 <span id="meta-currency" class="dim"></span></summary>
+      <p class="dim">판을 마칠 때마다(승리·패배 모두) 막은 웨이브와 처치한 보스만큼 🔷 결정 조각을 받는다 — 이 조각으로 다음 판부터 영구히 적용되는 head start를 산다.</p>
+      <ul id="meta-list" class="meta-upgrades"></ul>
     </details>
 
     <details class="settings" open>
@@ -10247,12 +10282,17 @@ button.corner.mute.off { opacity: 0.5; }
     treasureHunter: { name: "\uBCF4\uBB3C \uC0AC\uB0E5\uAFBC", icon: "\u{1F980}", desc: "\uBCF4\uBB3C\uAC8C\uB97C 5\uB9C8\uB9AC \uC7A1\uC558\uB2E4" },
     nightmareConqueror: { name: "\uC545\uBABD \uC815\uBCF5", icon: "\u{1F631}", desc: "\uC545\uBABD \uB09C\uC774\uB3C4\uB85C 10\uC6E8\uC774\uBE0C\uB97C \uB9C9\uC544\uB0C8\uB2E4" },
     fourKings: { name: "\uC0AC\uCC9C\uC655", icon: "\u{1F409}", desc: "\uD55C \uD310\uC5D0\uC11C \uB124 \uBCF4\uC2A4(\uD30C\uAD34\uC790\xB7\uC11C\uB9AC \uAD70\uC8FC\xB7\uCE68\uBB35\uC758 \uAD70\uC8FC\xB7\uAC08\uCDE8\uC790)\uB97C \uC804\uBD80 \uCC98\uCE58\uD588\uB2E4" },
+    fiveGuardians: { name: "\uC624\uBC29\uC2E0\uC7A5", icon: "\u{1F31F}", desc: "\uD55C \uD310\uC5D0\uC11C \uB2E4\uC12F \uBCF4\uC2A4(\uD30C\uAD34\uC790\xB7\uC11C\uB9AC \uAD70\uC8FC\xB7\uCE68\uBB35\uC758 \uAD70\uC8FC\xB7\uAC08\uCDE8\uC790\xB7\uAC15\uCCA0 \uC218\uD638\uC790)\uB97C \uC804\uBD80 \uCC98\uCE58\uD588\uB2E4" },
     duoStrike: { name: "\uD638\uD761 \uCC99\uCC99", icon: "\u{1F91D}", desc: "\uD611\uACF5 \uCF64\uBCF4\uB97C 10\uBC88 \uBC1C\uB3D9\uC2DC\uCF30\uB2E4" },
     mimicHunter: { name: "\uC815\uCCB4 \uBC1C\uAC01", icon: "\u{1F3AD}", desc: "\uC704\uC7A5\uD55C \uBBF8\uBBF9\uC744 3\uB9C8\uB9AC \uCC98\uCE58\uD588\uB2E4" },
     blockMaster: { name: "\uC778\uB0B4\uC758 \uBC29\uD328", icon: "\u{1F6E1}\uFE0F", desc: "\uB9C9\uAE30\uB85C \uBAAC\uC2A4\uD130\uC758 \uADFC\uC811 \uACF5\uACA9\uC744 10\uD68C \uD758\uB824\uB0C8\uB2E4" },
     relicCollector: { name: "\uC720\uBB3C \uC218\uC9D1\uAC00", icon: "\u{1F3FA}", desc: "\uBCF4\uC2A4\uB97C \uCC98\uCE58\uD558\uACE0 \uC720\uBB3C\uC744 3\uAC1C \uBAA8\uC558\uB2E4" },
     medic: { name: "\uC815\uBE44\uBCD1", icon: "\u{1F527}", desc: "\uC815\uBE44\uC18C\uB85C \uC190\uC0C1\uB41C \uAC74\uBB3C\uC744 \uB204\uC801 500 \uC774\uC0C1 \uACE0\uCCE4\uB2E4" },
-    hunter: { name: "\uC0AC\uB0E5\uAFBC", icon: "\u{1F356}", desc: "\uC57C\uC0DD \uB3D9\uBB3C\uC744 10\uB9C8\uB9AC \uC0AC\uB0E5\uD588\uB2E4" }
+    hunter: { name: "\uC0AC\uB0E5\uAFBC", icon: "\u{1F356}", desc: "\uC57C\uC0DD \uB3D9\uBB3C\uC744 10\uB9C8\uB9AC \uC0AC\uB0E5\uD588\uB2E4" },
+    gourmet: { name: "\uBBF8\uC2DD\uAC00", icon: "\u{1F37D}\uFE0F", desc: "\uB2E4\uC12F \uAC00\uC9C0 \uC0AC\uB0E5\uAC10 \uC694\uB9AC\uB97C \uC804\uBD80 \uB9CC\uB4E4\uC5B4\uBD24\uB2E4" },
+    tamer: { name: "\uC870\uB828\uC0AC", icon: "\u{1F43E}", desc: "\uC5EC\uC6B0\uB098 \uB291\uB300\uB97C \uAE38\uB4E4\uC5EC \uB3D9\uB8CC\uB85C \uC0BC\uC558\uB2E4" },
+    interceptor: { name: "\uCC28\uB2E8\uC790", icon: "\u{1F575}\uFE0F", desc: "\uC815\uCC30\uBCD1\uC744 \uD3EC\uD0C8\uC5D0 \uB2FF\uAE30 \uC804\uC5D0 3\uBC88 \uCC98\uCE58\uD588\uB2E4" },
+    loyalCompanion: { name: "\uCDA9\uC9C1\uD55C \uB3D9\uB8CC", icon: "\u{1F9B4}", desc: "\uAE38\uB4E4\uC778 \uB3D9\uB8CC\uC5D0\uAC8C \uBA39\uC774\uB97C \uC918\uC11C \uCD5C\uB300 \uB808\uBCA8\uAE4C\uC9C0 \uD0A4\uC6E0\uB2E4" }
   };
   var STORE_KEY = "cd.achievements";
   function loadUnlocked() {
@@ -10715,6 +10755,9 @@ button.corner.mute.off { opacity: 0.5; }
     skillBarrier: "b",
     skillRift: "c",
     skillSummon: "n",
+    tame: "z",
+    releasePet: "]",
+    reload: "\\",
     startWave: "enter",
     pause: "p",
     help: "h",
@@ -10736,6 +10779,9 @@ button.corner.mute.off { opacity: 0.5; }
     skillBarrier: "\uC815\uC218 \uC2A4\uD0AC: \uAE34\uAE09 \uBC29\uBCBD",
     skillRift: "\uC815\uC218 \uC2A4\uD0AC: \uC911\uB825 \uADE0\uC5F4",
     skillSummon: "\uC815\uC218 \uC2A4\uD0AC: \uC815\uB839 \uC18C\uD658",
+    tame: "\uB3D9\uBB3C \uAE38\uB4E4\uC774\uAE30",
+    releasePet: "\uB3D9\uB8CC \uB193\uC544\uC8FC\uAE30",
+    reload: "\uD0C0\uC6CC \uC7AC\uC7A5\uC804",
     startWave: "\uC6E8\uC774\uBE0C \uC2DC\uC791",
     pause: "\uC77C\uC2DC\uC815\uC9C0",
     help: "\uB3C4\uC6C0\uB9D0",
@@ -10805,6 +10851,87 @@ button.corner.mute.off { opacity: 0.5; }
     if (k2 === "arrowleft") return "\u2190";
     if (k2 === "arrowright") return "\u2192";
     return k2.length === 1 ? k2.toUpperCase() : k2[0].toUpperCase() + k2.slice(1);
+  }
+
+  // js/meta.js
+  var STORE_KEY3 = "cd.meta";
+  var GEAR_ORDER = ["pickaxe", "sword", "bow"];
+  var META_UPGRADES = {
+    harvest: {
+      name: "\uBCA0\uD14C\uB791 \uCC44\uC9D1\uAFBC",
+      icon: "\u26CF\uFE0F",
+      desc: "\uB808\uBCA8\uB9C8\uB2E4 \uCC44\uC9D1 \uC18D\uB3C4 \uC5C5\uADF8\uB808\uC774\uB4DC\uB97C \uD55C \uB2E8\uACC4 \uC55E\uC11C\uC11C \uC2DC\uC791\uD55C\uB2E4",
+      max: 3,
+      cost: [6, 14, 24]
+    },
+    gear: {
+      name: "\uC5EC\uBC8C \uC7A5\uBE44",
+      icon: "\u{1F9F0}",
+      desc: "\uB808\uBCA8\uB9C8\uB2E4 \uD310 \uC2DC\uC791\uBD80\uD130 \uB3C4\uAD6C\uB97C \uD558\uB098\uC529 \uB354 \uB4E4\uACE0 \uC2DC\uC791\uD55C\uB2E4 \u2014 Lv.1 \uACE1\uAD2D\uC774 \xB7 Lv.2 +\uCE7C \xB7 Lv.3 +\uD65C (\uC81C\uC791\uB300 \uC5C6\uC774 \uC989\uC2DC \uC0AC\uC6A9 \uAC00\uB2A5)",
+      max: 3,
+      cost: [6, 14, 24]
+    },
+    vigor: {
+      name: "\uB2E4\uBD80\uC9C4 \uBAB8",
+      icon: "\u{1F4AA}",
+      desc: "\uB808\uBCA8\uB9C8\uB2E4 \uCD5C\uB300 \uCCB4\uB825 +20\uC73C\uB85C \uC2DC\uC791\uD55C\uB2E4",
+      max: 3,
+      cost: [6, 14, 24]
+    },
+    lastStand: {
+      name: "\uCD5C\uD6C4\uC758 \uC800\uD56D",
+      icon: "\u{1F525}",
+      desc: "\uC774\uBC88 \uD310 \uB0B4 \uCCB4\uB825\uC774 \uCC98\uC74C\uC73C\uB85C 0\uC774 \uB418\uB294 \uC21C\uAC04, \uB300\uC2E0 \uCD5C\uB300 \uCCB4\uB825\uC758 15%\uB85C \uBC84\uD2F0\uACE0 3\uCD08\uAC04 \uBB34\uC801\uC774 \uB41C\uB2E4 (\uD310\uB9C8\uB2E4 \uD55C \uBC88, \uC4F0\uB7EC\uC9C0\uC9C0 \uC54A\uB294\uB2E4)",
+      max: 1,
+      cost: [40]
+    }
+  };
+  function loadMeta() {
+    let d2;
+    try {
+      d2 = JSON.parse(localStorage.getItem(STORE_KEY3) || "{}");
+    } catch {
+      d2 = {};
+    }
+    return { currency: Number.isFinite(d2.currency) ? d2.currency : 0, levels: d2.levels && typeof d2.levels === "object" ? d2.levels : {} };
+  }
+  function saveMeta(m) {
+    try {
+      localStorage.setItem(STORE_KEY3, JSON.stringify(m));
+    } catch {
+    }
+  }
+  function earnMetaCurrency(amount) {
+    if (!amount || amount <= 0) return loadMeta().currency;
+    const m = loadMeta();
+    m.currency += amount;
+    saveMeta(m);
+    return m.currency;
+  }
+  function buyMetaUpgrade(key) {
+    const def = META_UPGRADES[key];
+    if (!def) return { ok: false, reason: "\uC54C \uC218 \uC5C6\uB294 \uD56D\uBAA9\uC785\uB2C8\uB2E4" };
+    const m = loadMeta();
+    const lv = m.levels[key] || 0;
+    if (lv >= def.max) return { ok: false, reason: "\uC774\uBBF8 \uCD5C\uB300 \uB808\uBCA8\uC785\uB2C8\uB2E4" };
+    const cost = def.cost[lv];
+    if (m.currency < cost) return { ok: false, reason: "\uACB0\uC815 \uC870\uAC01\uC774 \uBD80\uC871\uD569\uB2C8\uB2E4" };
+    m.currency -= cost;
+    m.levels[key] = lv + 1;
+    saveMeta(m);
+    return { ok: true, level: lv + 1, currency: m.currency, name: def.name, icon: def.icon };
+  }
+  function computeMetaPerks() {
+    const lv = loadMeta().levels;
+    const hLv = lv.harvest || 0;
+    const gLv = lv.gear || 0;
+    const vLv = lv.vigor || 0;
+    return {
+      harvestLv: 1 + hLv,
+      tools: GEAR_ORDER.slice(0, gLv),
+      hpBonus: vLv * 20,
+      lastStand: (lv.lastStand || 0) >= 1
+    };
   }
 
   // js/utils.js
@@ -10888,6 +11015,8 @@ button.corner.mute.off { opacity: 0.5; }
       this._specialKind = null;
       this._siegePortal = null;
       this.prepBonus = 0;
+      this._scoutPenalty = false;
+      this._thisWavePenalty = false;
     }
     get displayWave() {
       return Math.min(CFG.wave.goal, this.wave + 1);
@@ -10913,6 +11042,8 @@ button.corner.mute.off { opacity: 0.5; }
       this._eliteSpawnedThisWave = false;
       this._specialKind = specialWaveKind(w2);
       this._siegePortal = this._specialKind === "siege" ? pick(this.world.portals) : null;
+      this._thisWavePenalty = this._scoutPenalty;
+      this._scoutPenalty = false;
       this.onWaveStart?.(w2, this.totalThisWave);
       return true;
     }
@@ -10938,7 +11069,11 @@ button.corner.mute.off { opacity: 0.5; }
             const ec = CFG.elite;
             statMult = { hp: ec.hpMult, scale: ec.scaleMult, dmg: ec.dmgMult, bounty: ec.bountyMult, elite: true };
           } else if (!isBossType) {
-            variant = this._specialKind === "ward" ? "ward" : rollVariant(this.wave + 1);
+            variant = this._specialKind === "ward" ? "ward" : this._specialKind === "frenzy" ? "vampire" : rollVariant(this.wave + 1);
+          }
+          if (this._thisWavePenalty && !isBossType) {
+            const sc = CFG.scoutEvent;
+            statMult = statMult ? { ...statMult, hp: (statMult.hp ?? 1) * sc.penaltyHpMult, dmg: (statMult.dmg ?? 1) * sc.penaltyDmgMult } : { hp: sc.penaltyHpMult, dmg: sc.penaltyDmgMult };
           }
           const spawned = this.enemies.spawn(
             type,
@@ -11075,12 +11210,15 @@ button.corner.mute.off { opacity: 0.5; }
         meatRow: $2("meat-row"),
         copper: $2("res-copper"),
         coal: $2("res-coal"),
-        arrow: $2("res-arrow"),
+        ammoRow: $2("ammo-row"),
+        petRow: $2("pet-row"),
         tutorialText: $2("tutorial-text"),
         achList: $2("ach-list"),
         achCount: $2("ach-count"),
         historyList: $2("history-list"),
         historyCount: $2("history-count"),
+        metaList: $2("meta-list"),
+        metaCurrency: $2("meta-currency"),
         boonOverlay: $2("boon-overlay"),
         boonChoices: $2("boon-choices"),
         boonTitle: $2("boon-title"),
@@ -11098,6 +11236,47 @@ button.corner.mute.off { opacity: 0.5; }
       this._toastTimers = [];
       this.refreshAchievements();
       this.refreshHistory();
+      this.refreshMetaShop();
+    }
+    // 로비의 🏕️ 원정 준비 — 결정 조각 잔액과 업그레이드 목록을 그린다
+    refreshMetaShop() {
+      const list = this.el.metaList;
+      if (!list) return;
+      const m = loadMeta();
+      this.el.metaCurrency.textContent = `\u{1F537} ${m.currency}`;
+      list.innerHTML = Object.entries(META_UPGRADES).map(([key, def]) => {
+        const lv = m.levels[key] || 0;
+        const maxed = lv >= def.max;
+        const cost = maxed ? null : def.cost[lv];
+        const afford = !maxed && m.currency >= cost;
+        return `
+<li class="${maxed ? "on" : ""}">
+<span class="mi-icon">${def.icon}</span>
+<span class="mi-body">
+<span class="mi-name">${def.name} <span class="mi-lv">Lv.${lv}/${def.max}</span></span>
+<span class="mi-desc">${def.desc}</span>
+</span>
+<button type="button" class="mi-buy" data-meta="${key}" ${maxed ? "disabled" : ""}>${maxed ? "\uCD5C\uB300" : `\u{1F537}${cost}`}</button>
+</li>`;
+      }).join("");
+      for (const btn of list.querySelectorAll(".mi-buy")) {
+        if (btn.disabled) continue;
+        const key = btn.dataset.meta;
+        const def = META_UPGRADES[key];
+        const lv = m.levels[key] || 0;
+        const cost = def.cost[lv];
+        if (m.currency < cost) btn.classList.add("poor");
+        btn.onclick = () => {
+          const r = buyMetaUpgrade(key);
+          if (!r.ok) {
+            this.toast(r.reason, "bad");
+            return;
+          }
+          this.game.sfx.upgrade();
+          this.toast(`${r.icon} ${r.name} Lv.${r.level} \uC2B5\uB4DD! \uB2E4\uC74C \uD310\uBD80\uD130 \uC801\uC6A9\uB41C\uB2E4`, "good");
+          this.refreshMetaShop();
+        };
+      }
     }
     // ------------------------------------------------------------- 인벤토리
     // 건설 · 제작 · 장비를 한 창에서 고른다. 예전 하단 단축키 바를 대체한다.
@@ -11190,16 +11369,21 @@ button.corner.mute.off { opacity: 0.5; }
             action: () => g2.requestCook(mk)
           });
         }
-        rows2.push({
-          key: "fletch",
-          icon: "\u{1F3F9}",
-          name: `\uD654\uC0B4 ${CFG.fletch.yield}\uBC1C \uC81C\uC791`,
-          desc: "\u{1F3F9} \uD654\uC0B4\uD0D1\uC774 \uD55C \uBC1C \uC3E0 \uB54C\uB9C8\uB2E4 \uD558\uB098\uC529 \uC4F4\uB2E4. \uB5A8\uC5B4\uC9C0\uBA74 \uD654\uC0B4\uD0D1\uC774 \uBA48\uCD98\uB2E4.",
-          cost: CFG.fletch.cost,
-          state: !g2.hasStation("workbench") ? "locked" : canAfford(g2.myPool, CFG.fletch.cost) ? "" : "poor",
-          note: !g2.hasStation("workbench") ? "\uC81C\uC791\uB300 \uD544\uC694" : `\uBCF4\uC720 ${Math.floor(g2.myPool.arrow || 0)}\uBC1C`,
-          action: () => g2.requestFletch()
-        });
+        for (const [ak, a2] of Object.entries(CFG.ammo.types)) {
+          const stationName = a2.station === "workbench" ? "\uC81C\uC791\uB300" : "\uD654\uB85C";
+          const ready = g2.hasStation(a2.station);
+          const have = (g2.myPool.ammo || {})[ak] || 0;
+          rows2.push({
+            key: `ammo-${ak}`,
+            icon: a2.icon,
+            name: `${a2.name} ${a2.yield}\uBC1C \uC81C\uC791 (\uC7AC\uACE0 ${have})`,
+            desc: a2.desc,
+            cost: a2.cost,
+            state: !ready ? "locked" : canAfford(g2.myPool, a2.cost) ? "" : "poor",
+            note: !ready ? `${stationName} \uD544\uC694` : null,
+            action: () => g2.requestCraftAmmo(ak)
+          });
+        }
         rows2.push({
           key: "smelt",
           icon: "\u2699\uFE0F",
@@ -11999,7 +12183,11 @@ button.corner.mute.off { opacity: 0.5; }
         dailyLine = `<li class="${d2.isNewBest ? "new-best" : ""}">\u{1F5D3}\uFE0F \uC624\uB298\uC758 \uB3C4\uC804 \u2014 \uC6E8\uC774\uBE0C <b>${d2.best.wave}</b>${d2.isNewBest ? " \u2014 \uC624\uB298\uC758 \uC2E0\uAE30\uB85D!" : " (\uC624\uB298 \uCD5C\uACE0\uB294 \uADF8\uB300\uB85C)"}</li>`;
         this._refreshDailyBest();
       }
-      $2("result-record").innerHTML = `${dailyLine}
+      const metaBossCount = (stats.bossKillsSeen || []).length;
+      const metaEarned = finalWave + metaBossCount * 3 + (win ? 5 : 0);
+      const metaTotal = earnMetaCurrency(metaEarned);
+      const metaLine = `<li>\u{1F537} \uACB0\uC815 \uC870\uAC01 <b>+${metaEarned}</b> (\uCD1D ${metaTotal}) \u2014 \u{1F3D5}\uFE0F \uC6D0\uC815 \uC900\uBE44\uC5D0\uC11C \uC4F8 \uC218 \uC788\uB2E4</li>`;
+      $2("result-record").innerHTML = `${dailyLine}${metaLine}
 <li class="${rec.isNewBest ? "new-best" : ""}">\u{1F3C6} \uC5ED\uB300 \uCD5C\uACE0 \uC6E8\uC774\uBE0C <b>${rec.bestWave}</b>${rec.isNewBest ? " \u2014 \uC2E0\uAE30\uB85D!" : ""}</li>
 <li>\u2694\uFE0F \uB204\uC801 \uCC98\uCE58 <b>${rec.totalKills}</b></li>
 <li>\u{1F3AE} \uD50C\uB808\uC774 \uD69F\uC218 <b>${rec.plays}</b> (\uC2B9\uB9AC ${rec.wins}\uD68C)</li>`;
@@ -12017,6 +12205,7 @@ button.corner.mute.off { opacity: 0.5; }
       }
       this.refreshAchievements();
       this.refreshHistory();
+      this.refreshMetaShop();
     }
     // 로비의 업적 목록을 채운다 — 전체 달성 현황을 항상 볼 수 있게
     refreshAchievements() {
@@ -12176,11 +12365,30 @@ button.corner.mute.off { opacity: 0.5; }
       this.el.iron.textContent = Math.floor(pool.iron || 0);
       this.el.copper.textContent = Math.floor(pool.copper || 0);
       this.el.coal.textContent = Math.floor(pool.coal || 0);
-      this.el.arrow.textContent = Math.floor(pool.arrow || 0);
+      const stock = pool.ammo || {};
+      const usedTypes = /* @__PURE__ */ new Set();
+      for (const b of g2.buildMgr.buildings.values()) if (b.ammoType) usedTypes.add(b.ammoType);
+      this.el.ammoRow.classList.toggle("hidden", usedTypes.size === 0);
+      if (usedTypes.size) {
+        const parts = Object.keys(CFG.ammo.types).filter((t2) => usedTypes.has(t2)).map((t2) => {
+          const n = stock[t2] || 0;
+          const ic = CFG.ammo.types[t2].icon;
+          return n > 0 ? `${ic}${n}` : `<span class="out">${ic}0</span>`;
+        });
+        this.el.ammoRow.innerHTML = `\u{1F4E6} \uD0C4\uC57D ${parts.join(" ")}`;
+      }
       const meat = pool.meat || {};
       const meatParts = Object.keys(CFG.cook).filter((k2) => meat[k2] > 0).map((k2) => `${CFG.enemies[k2].icon}${meat[k2]}`);
       this.el.meatRow.classList.toggle("hidden", meatParts.length === 0);
       if (meatParts.length) this.el.meatRow.textContent = `\u{1F969} \uC0DD\uACE0\uAE30 ${meatParts.join(" ")}`;
+      const pet = g2.world.pet;
+      this.el.petRow.classList.toggle("hidden", !pet);
+      if (pet) {
+        const tc2 = CFG.tame[pet.type];
+        const lv = pet.lv || 0;
+        const star = lv >= CFG.tame.maxLevel ? " \u2605" : ` Lv.${lv}`;
+        this.el.petRow.textContent = `${tc2.icon} ${tc2.name}${star}`;
+      }
       this._refreshTools();
       const c2 = g2.world.crystal;
       const ratio = clamp(c2.hp / c2.maxHp, 0, 1);
@@ -12492,7 +12700,35 @@ button.corner.mute.off { opacity: 0.5; }
       }
       const bossPulse = 3 + Math.sin(performance.now() / 180) * 1.2;
       for (const e of g2.enemyMgr.list) {
-        if (e.dead) continue;
+        if (e.dead || !e.st.wild) continue;
+        const ex = tx(e.x), ez = tz(e.z);
+        ctx.fillStyle = e.st.hunts ? "#ff9a3d" : "#c9a45a";
+        ctx.beginPath();
+        ctx.arc(ex, ez, 1.8, 0, Math.PI * 2);
+        ctx.fill();
+        if (e.st.hunts) {
+          ctx.strokeStyle = "rgba(255,154,61,0.85)";
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.arc(ex, ez, 3.2, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+      }
+      if (g2.world.pet) {
+        const pet = g2.world.pet;
+        const px = tx(pet.x), pz = tz(pet.z);
+        ctx.fillStyle = "#7ce6a0";
+        ctx.beginPath();
+        ctx.arc(px, pz, 2.2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = "rgba(124,230,160,0.85)";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(px, pz, 3.6, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      for (const e of g2.enemyMgr.list) {
+        if (e.dead || e.st.wild) continue;
         const ex = tx(e.x), ez = tz(e.z), r = e.st.boss ? 3.2 : 2.2;
         ctx.fillStyle = e.st.boss ? "#ff3050" : "#ff6a7d";
         ctx.beginPath();
@@ -12679,8 +12915,6 @@ button.corner.mute.off { opacity: 0.5; }
       },
       arrow: {
         name: "\uD654\uC0B4\uD0D1",
-        // 발사할 때마다 화살 1발. 제작대에서 만들어 대야 한다.
-        ammo: "arrow",
         icon: "\u{1F3F9}",
         hotkey: "2",
         cost: { wood: 30, copper: 2 },
@@ -12688,9 +12922,9 @@ button.corner.mute.off { opacity: 0.5; }
         blocks: true,
         desc: "\uAC00\uC7A5 \uC55E\uC120 \uC801\uC744 \uBE60\uB974\uAC8C \uC800\uACA9\uD55C\uB2E4. \uC11C\uB9AC\uD0D1 \uADFC\uCC98\uC5D0 \uB450\uBA74 \uB454\uD654\uB41C \uC801\uC5D0\uAC8C \uCD94\uAC00 \uD53C\uD574.",
         levels: [
-          { tier: "\uB098\uBB34", hp: 180, dmg: 11, range: 13, rate: 1.15 },
-          { tier: "\uC11D\uC870", hp: 280, dmg: 18, range: 14.5, rate: 1.35, cost: { stone: 40, copper: 5 } },
-          { tier: "\uAC15\uCCA0", hp: 420, dmg: 29, range: 16, rate: 1.6, cost: { iron: 6, copper: 10 } }
+          { tier: "\uB098\uBB34", hp: 180, dmg: 11, range: 13, rate: 1.15, mag: 40 },
+          { tier: "\uC11D\uC870", hp: 280, dmg: 18, range: 14.5, rate: 1.35, mag: 60, cost: { stone: 40, copper: 5 } },
+          { tier: "\uAC15\uCCA0", hp: 420, dmg: 29, range: 16, rate: 1.6, mag: 85, cost: { iron: 6, copper: 10 } }
         ]
       },
       frost: {
@@ -12702,9 +12936,9 @@ button.corner.mute.off { opacity: 0.5; }
         blocks: true,
         desc: "\uC801\uC911\uD55C \uC801\uC744 \uB290\uB9AC\uAC8C \uB9CC\uB4E0\uB2E4. \uBE60\uB978 \uBAAC\uC2A4\uD130 \uB300\uC751\uC6A9. \uD654\uC0B4\uD0D1\uACFC \uBD99\uC5EC \uC9C0\uC73C\uBA74 \uAD81\uD569\uC774 \uC88B\uB2E4.",
         levels: [
-          { tier: "\uB098\uBB34", hp: 200, dmg: 5, range: 10, rate: 0.9, slow: 0.45, slowTime: 1.6 },
-          { tier: "\uC11D\uC870", hp: 320, dmg: 9, range: 11.5, rate: 1, slow: 0.55, slowTime: 2, cost: { stone: 60, shard: 2 } },
-          { tier: "\uAC15\uCCA0", hp: 480, dmg: 14, range: 13, rate: 1.1, slow: 0.65, slowTime: 2.4, cost: { iron: 5, shard: 4 } }
+          { tier: "\uB098\uBB34", hp: 200, dmg: 5, range: 10, rate: 0.9, slow: 0.45, slowTime: 1.6, mag: 32 },
+          { tier: "\uC11D\uC870", hp: 320, dmg: 9, range: 11.5, rate: 1, slow: 0.55, slowTime: 2, mag: 46, cost: { stone: 60, shard: 2 } },
+          { tier: "\uAC15\uCCA0", hp: 480, dmg: 14, range: 13, rate: 1.1, slow: 0.65, slowTime: 2.4, mag: 62, cost: { iron: 5, shard: 4 } }
         ]
       },
       cannon: {
@@ -12716,9 +12950,9 @@ button.corner.mute.off { opacity: 0.5; }
         blocks: true,
         desc: "\uB290\uB9AC\uC9C0\uB9CC \uBC94\uC704 \uD53C\uD574\uB97C \uC900\uB2E4. \uBB49\uCE5C \uC801\uC5D0\uAC8C \uAC15\uD558\uB2E4.",
         levels: [
-          { tier: "\uB098\uBB34", hp: 240, dmg: 26, range: 15, rate: 0.55, splash: 3.2 },
-          { tier: "\uC11D\uC870", hp: 380, dmg: 42, range: 16.5, rate: 0.62, splash: 3.6, cost: { stone: 90, coal: 8 } },
-          { tier: "\uAC15\uCCA0", hp: 560, dmg: 66, range: 18, rate: 0.7, splash: 4.2, cost: { iron: 8, coal: 14 } }
+          { tier: "\uB098\uBB34", hp: 240, dmg: 26, range: 15, rate: 0.55, splash: 3.2, mag: 18 },
+          { tier: "\uC11D\uC870", hp: 380, dmg: 42, range: 16.5, rate: 0.62, splash: 3.6, mag: 26, cost: { stone: 90, coal: 8 } },
+          { tier: "\uAC15\uCCA0", hp: 560, dmg: 66, range: 18, rate: 0.7, splash: 4.2, mag: 36, cost: { iron: 8, coal: 14 } }
         ]
       },
       poison: {
@@ -12730,9 +12964,9 @@ button.corner.mute.off { opacity: 0.5; }
         blocks: true,
         desc: "\uC801\uC911\uD55C \uC801\uC5D0\uAC8C \uC9C0\uC18D \uD53C\uD574\uB97C \uB0A8\uAE34\uB2E4. \uB3C5\uD0D1\uB07C\uB9AC \uAC00\uAE4C\uC774 \uBAA8\uC73C\uBA74 \uC11C\uB85C \uB3C5 \uD53C\uD574\uAC00 \uAC15\uD574\uC9C4\uB2E4.",
         levels: [
-          { tier: "\uB098\uBB34", hp: 190, dmg: 4, range: 11, rate: 0.8, poisonDps: 6, poisonTime: 3 },
-          { tier: "\uC11D\uC870", hp: 300, dmg: 6, range: 12.5, rate: 0.9, poisonDps: 10, poisonTime: 3.5, cost: { stone: 70, copper: 6 } },
-          { tier: "\uAC15\uCCA0", hp: 460, dmg: 9, range: 14, rate: 1, poisonDps: 16, poisonTime: 4, cost: { iron: 6, copper: 12, coal: 4 } }
+          { tier: "\uB098\uBB34", hp: 190, dmg: 4, range: 11, rate: 0.8, poisonDps: 6, poisonTime: 3, mag: 30 },
+          { tier: "\uC11D\uC870", hp: 300, dmg: 6, range: 12.5, rate: 0.9, poisonDps: 10, poisonTime: 3.5, mag: 42, cost: { stone: 70, copper: 6 } },
+          { tier: "\uAC15\uCCA0", hp: 460, dmg: 9, range: 14, rate: 1, poisonDps: 16, poisonTime: 4, mag: 58, cost: { iron: 6, copper: 12, coal: 4 } }
         ]
       },
       support: {
@@ -12804,9 +13038,9 @@ button.corner.mute.off { opacity: 0.5; }
         blocks: true,
         desc: "\uC801\uC744 \uBB36\uC5B4 \uC644\uC804\uD788 \uBA48\uCD98\uB2E4(\uC9E7\uC740 \uC2DC\uAC04, \uD53C\uD574\uB294 \uBBF8\uBBF8). \uBE44\uD589 \uBAAC\uC2A4\uD130\uC5D0\uAC8C\uB3C4 \uD1B5\uD55C\uB2E4. \uBB36\uC778 \uC801\uC744 \uB2E4\uB978 \uD0C0\uC6CC\uAC00 \uB9DE\uCD94\uBA74 \uCD94\uAC00 \uD53C\uD574.",
         levels: [
-          { hp: 170, dmg: 4, range: 9, rate: 0.5, root: 1.4 },
-          { hp: 260, dmg: 6, range: 10.5, rate: 0.6, root: 1.8, cost: { wood: 60, stone: 40 } },
-          { hp: 380, dmg: 9, range: 12, rate: 0.7, root: 2.2, cost: { wood: 110, stone: 90, iron: 5 } }
+          { hp: 170, dmg: 4, range: 9, rate: 0.5, root: 1.4, mag: 20 },
+          { hp: 260, dmg: 6, range: 10.5, rate: 0.6, root: 1.8, mag: 28, cost: { wood: 60, stone: 40 } },
+          { hp: 380, dmg: 9, range: 12, rate: 0.7, root: 2.2, mag: 40, cost: { wood: 110, stone: 90, iron: 5 } }
         ]
       },
       // 다른 타워는 전부 한 놈만 맞추거나(단일 표적) 한 자리를 지정해서 넓게 맞춘다(대포 splash).
@@ -12825,9 +13059,9 @@ button.corner.mute.off { opacity: 0.5; }
         blocks: true,
         desc: "\uBA85\uC911\uD55C \uC801\uC5D0\uC11C \uAC00\uAE4C\uC6B4 \uB2E4\uB978 \uC801\uC73C\uB85C \uD280\uC5B4 \uC62E\uACA8\uBD99\uB294\uB2E4(\uD288\uC218\uB85D \uD53C\uD574 \uAC10\uC18C). \uBB49\uCCD0 \uC624\uB294 \uC7A1\uBAB9 \uBB34\uB9AC\uC5D0 \uAC15\uD558\uB2E4.",
         levels: [
-          { hp: 170, dmg: 9, range: 11, rate: 0.85, chain: { count: 3, range: 4.5, falloff: 0.6 } },
-          { hp: 260, dmg: 14, range: 12.5, rate: 0.95, chain: { count: 4, range: 5, falloff: 0.65 }, cost: { wood: 55, stone: 65 } },
-          { hp: 400, dmg: 21, range: 14, rate: 1.05, chain: { count: 5, range: 5.5, falloff: 0.7 }, cost: { wood: 100, stone: 130, iron: 6 } }
+          { hp: 170, dmg: 9, range: 11, rate: 0.85, chain: { count: 3, range: 4.5, falloff: 0.6 }, mag: 30 },
+          { hp: 260, dmg: 14, range: 12.5, rate: 0.95, chain: { count: 4, range: 5, falloff: 0.65 }, mag: 44, cost: { wood: 55, stone: 65 } },
+          { hp: 400, dmg: 21, range: 14, rate: 1.05, chain: { count: 5, range: 5.5, falloff: 0.7 }, mag: 60, cost: { wood: 100, stone: 130, iron: 6 } }
         ]
       },
       // 굴착병(burrower)은 파묻혀 있는 동안(diving) 모든 타워의 _acquire 에서 제외되도록 설계됐다 —
@@ -12882,7 +13116,7 @@ button.corner.mute.off { opacity: 0.5; }
       repairpost: {
         name: "\uC815\uBE44\uC18C",
         icon: "\u{1F527}",
-        hotkey: "z",
+        hotkey: "[",
         cost: { wood: 45, stone: 65 },
         hp: 130,
         blocks: true,
@@ -12892,12 +13126,89 @@ button.corner.mute.off { opacity: 0.5; }
           { hp: 190, healRadius: 7, healRate: 7, cost: { wood: 60, stone: 100 } },
           { hp: 260, healRadius: 8, healRate: 11, cost: { wood: 100, stone: 170, iron: 6 } }
         ]
+      },
+      // 병기창 — 탄약 시스템의 자동화 절반. 팀 탄약 재고에서 꺼내 반경 안 타워의 탄창을 초당
+      // supplyRate 발씩 저절로 채운다(재고가 없으면 아무것도 못 한다 — 만드는 건 여전히 플레이어 몫).
+      // 정비소가 "체력"을 자동으로 채워 주듯 이건 "탄약"을 채워 준다 — 같은 호스트 전용 반경 순회
+      // 패턴(_updateRepairPosts)을 그대로 재사용했다. 이 건물의 존재 이유는 타워 배치에 새 축을
+      // 하나 더 얹는 것이다: 지금까지 배치 기준은 "사거리가 길목을 덮는가" 하나뿐이었는데, 이제
+      // "보급 반경 안에 드는가"가 같이 걸린다 — 넓게 펴서 커버리지를 벌면 손으로 재장전하러
+      // 뛰어다녀야 하고, 병기창 주변에 모으면 편하지만 커버리지가 좁아진다.
+      armory: {
+        name: "\uBCD1\uAE30\uCC3D",
+        icon: "\u{1F3ED}",
+        hotkey: "-",
+        cost: { wood: 60, stone: 70, iron: 3 },
+        hp: 140,
+        blocks: true,
+        desc: "\uC2A4\uC2A4\uB85C \uACF5\uACA9\uD558\uC9C0 \uC54A\uC9C0\uB9CC, \uD300 \uD0C4\uC57D \uC7AC\uACE0\uB97C \uAEBC\uB0B4 \uBC18\uACBD \uC548 \uD0C0\uC6CC\uC758 \uD0C4\uCC3D\uC744 \uC800\uC808\uB85C \uCC44\uC6B4\uB2E4. \uC7AC\uACE0\uAC00 \uBE44\uBA74 \uC544\uBB34\uAC83\uB3C4 \uBABB \uD558\uB2C8 \uD0C4\uC57D\uC740 \uACC4\uC18D \uB9CC\uB4E4\uC5B4 \uB46C\uC57C \uD55C\uB2E4.",
+        levels: [
+          { hp: 140, supplyRadius: 8, supplyRate: 4 },
+          { hp: 210, supplyRadius: 10, supplyRate: 7, cost: { wood: 80, stone: 110, iron: 4 } },
+          { hp: 300, supplyRadius: 13, supplyRate: 11, cost: { wood: 140, stone: 190, iron: 8 } }
+        ]
+      },
+      // 지금까지 모든 공격 타워(화살·서리·대포·독·번개·덫)는 _acquire 에서 똑같은 기준(크리스탈에
+      // 가장 가까운 적)으로만 표적을 고른다 — "누구를 먼저 쏠지"에 플레이어가 개입할 여지가 전혀
+      // 없었다. 저격탑은 처음으로 다른 기준(targetMode: "highestHp" — 사거리 안에서 남은 체력이 가장
+      // 많은 적, 대개 보스나 브루트)으로 스스로 표적을 고르는 타워라, 이 한 채를 섞어 짓는 것 자체가
+      // "물량은 다른 타워에 맡기고 가장 두꺼운 표적은 여기가 전담한다"는 새로운 배치 판단을 만든다.
+      // 다른 타워보다 압도적으로 긴 사거리(가장 긴 대포탑보다도 훨씬 김)와 느린 발사 속도, 그리고
+      // 처음부터 철을 요구하는 진입 비용으로 "정예 한 방"이라는 정체성을 분명히 했다.
+      sniper: {
+        name: "\uC800\uACA9\uD0D1",
+        icon: "\u{1F3AF}",
+        hotkey: "e",
+        cost: { wood: 70, stone: 100, iron: 4 },
+        hp: 130,
+        blocks: true,
+        targetMode: "highestHp",
+        desc: "\uB2E4\uB978 \uD0C0\uC6CC\uBCF4\uB2E4 \uC0AC\uAC70\uB9AC\uAC00 \uD6E8\uC52C \uAE38\uACE0 \uBC1C\uC0AC\uB294 \uB290\uB9AC\uC9C0\uB9CC, \uC0AC\uAC70\uB9AC \uC548\uC5D0\uC11C \uB0A8\uC740 \uCCB4\uB825\uC774 \uAC00\uC7A5 \uB9CE\uC740 \uC801(\uB300\uAC1C \uBCF4\uC2A4)\uC744 \uACE8\uB77C \uD070 \uD53C\uD574\uB97C \uC900\uB2E4. \uB3C5\uD0D1 \uADFC\uCC98\uC5D0 \uB450\uBA74 \uC911\uB3C5\uB41C \uC801\uC5D0\uAC8C \uCD94\uAC00 \uD53C\uD574.",
+        levels: [
+          { hp: 130, dmg: 120, range: 20, rate: 0.25, mag: 12 },
+          { hp: 190, dmg: 190, range: 22.5, rate: 0.28, mag: 18, cost: { wood: 110, stone: 160, iron: 8 } },
+          { hp: 280, dmg: 300, range: 25, rate: 0.32, mag: 26, cost: { wood: 180, stone: 260, iron: 14 } }
+        ]
       }
     },
     // 시설에 다가가 클릭하면 열리는 작업창. range 는 상호작용 가능 거리.
     station: { range: 3.6 },
     // 화로 제련: 광물 -> 철
     smelt: { cost: { stone: 6, coal: 2 }, yield: 1 },
+    // 탄약 — 지금까지 타워는 한 번 지으면 자원과 완전히 무관하게 영원히 쐈다. 건설 비용만 있고
+    // 유지 비용이 없어서, 자원은 "더 짓는 데"에만 쓰였고 이미 지은 방어선은 관리 대상이 아니었다.
+    // 이제 공격 타워는 종류에 맞는 탄약을 쏘면서 소모한다 — 그래서 "무엇을 짓느냐"가 건설 순간의
+    // 한 번짜리 선택이 아니라, 그 타워를 계속 먹여 살릴 수 있느냐는 지속적인 선택이 된다.
+    //
+    // 3종으로 묶은 건 종류마다 HUD 칸과 제작 항목이 하나씩 늘기 때문이다(7종이면 화면이 감당을
+    // 못 한다). 대신 세 종의 재료를 일부러 완전히 다르게 잡아서, 타워 종류마다 유지비의 성격이
+    // 확실히 갈리게 했다:
+    //   🏹 화살  — 목재만. 제일 싸고 대량으로 나온다. 화살탑을 도배하는 정석 플레이는 여전히 싸다.
+    //   💣 포탄  — 광물+철. 발당 단가가 압도적으로 비싸다. 대포탑 한 방이 센 만큼 대가를 치른다.
+    //   🧪 원소액 — 광물+철이지만 한 번에 많이 나온다. 상태이상 타워(서리·독·번개)의 중간 단가.
+    // 정수(shard)는 일부러 어느 조합에도 안 넣었다 — 스킬·크리스탈 강화·축복을 전부 잠그는
+    // 자원이라 여기까지 끌어오면 그 긴장이 통째로 무너진다.
+    ammo: {
+      types: {
+        arrow: { name: "\uD654\uC0B4", icon: "\u{1F3F9}", color: 12759680, station: "workbench", cost: { wood: 10 }, yield: 24, desc: "\uBAA9\uC7AC\uB97C \uAE4E\uC544 \uB9CC\uB4E0\uB2E4. \uD654\uC0B4\uD0D1\xB7\uC800\uACA9\uD0D1\xB7\uB36B\uD0D1\uC774 \uC4F4\uB2E4." },
+        shell: { name: "\uD3EC\uD0C4", icon: "\u{1F4A3}", color: 16750848, station: "furnace", cost: { stone: 14, iron: 1 }, yield: 10, desc: "\uAD11\uBB3C\uACFC \uCCA0\uC744 \uB179\uC5EC \uB9CC\uB4E0\uB2E4. \uB300\uD3EC\uD0D1 \uC804\uC6A9 \u2014 \uBC1C\uB2F9 \uB2E8\uAC00\uAC00 \uAC00\uC7A5 \uBE44\uC2F8\uB2E4." },
+        elixir: { name: "\uC6D0\uC18C\uC561", icon: "\u{1F9EA}", color: 7527167, station: "furnace", cost: { stone: 8, iron: 1 }, yield: 18, desc: "\uAD11\uBB3C\uACFC \uCCA0\uC744 \uACE0\uC544 \uB9CC\uB4E0\uB2E4. \uC11C\uB9AC\uD0D1\xB7\uB3C5\uD0D1\xB7\uBC88\uAC1C\uD0D1\uC774 \uC4F4\uB2E4." }
+      },
+      // 타워 종류 → 쓰는 탄약. 여기 없는 건물(벽·보루·감시탑·정비소·병기창·채집기·함정)은
+      // 탄약을 아예 안 쓴다 — 스스로 발사하지 않으므로 소모할 것도 없다.
+      towers: { arrow: "arrow", sniper: "arrow", snare: "arrow", cannon: "shell", frost: "elixir", poison: "elixir", lightning: "elixir" },
+      // 탄약이 떨어져도 타워가 완전히 멈추지는 않는다 — 보급이 한 박자 늦었다고 방어선이 통째로
+      // 무너지면 그건 난이도가 아니라 그냥 짜증이다. 대신 남은 부품을 긁어모아 쏘는 셈이라
+      // 피해와 발사 속도가 크게 떨어져서, "지금 탄약이 비었다"가 수치로 확실히 아프게 느껴진다.
+      emptyDmgMult: 0.35,
+      emptyRateMult: 0.6,
+      // 손으로 재장전할 때 이 거리 안에 있는 타워 하나를 가득 채운다 (제작대 상호작용 거리와 동일)
+      reloadRange: 3.6,
+      // 시작 재고 — 새로 지은 타워는 어차피 탄창이 가득 차 있어서 초반 몇 웨이브는 재고가 없어도
+      // 굴러간다. 그래도 처음 바닥났을 때 곧바로 한 번은 채워 볼 수 있게 화살만 조금 쥐여 준다
+      // (제일 싸고 기본이 되는 탄약이라 "이걸로 배우고 나머지는 직접 만들어라"가 된다).
+      start: { arrow: 24, shell: 0, elixir: 0 }
+    },
     // 무기 강화 — 화로에서 철을 태워 이미 만든 무기(곡괭이 제외)의 위력을 영구히 올린다.
     // 크리스탈 강화(정수)와 대칭되는 후반 자원 배출구: 정수는 크리스탈에, 철은 무기에 쓰게 된다.
     // 레벨당 비용이 오르고 최대 레벨이 있어 크리스탈 강화처럼 무한 스노우볼은 아니다.
@@ -12914,7 +13225,8 @@ button.corner.mute.off { opacity: 0.5; }
         hammer: { dmg: 12 },
         bomb: { dmg: 20 },
         whip: { dmg: 6 },
-        shield: { dmg: 3 }
+        shield: { dmg: 3 },
+        frostaxe: { dmg: 7 }
       }
     },
     // 제작대에서 만드는 것들. 각자 하나씩만 가질 수 있다.
@@ -12986,6 +13298,20 @@ button.corner.mute.off { opacity: 0.5; }
         cost: { wood: 14, iron: 8 },
         desc: "\uACF5\uACA9\uB825\uC740 \uAC70\uC758 \uC5C6\uC9C0\uB9CC, \uC190\uC5D0 \uC954 \uCC44 \uB9C9\uAE30(Q)\uB97C \uC4F0\uBA74 \uD53C\uD574 \uACBD\uAC10(65%\u219280%)\uACFC \uC774\uB3D9 \uC18D\uB3C4(40%\u219260%)\uAC00 \uD06C\uAC8C \uC88B\uC544\uC9C4\uB2E4.",
         block: { mitigation: 0.8, speedMult: 0.6 }
+      },
+      // 지금까지 근접 무기 7종(칼·창·망치·활·폭탄가방·채찍·방패)은 전부 대미지·사거리·판정·넉백처럼
+      // "얼마나 세게/어떻게 때리느냐"만 바꿨을 뿐, 상태이상은 순전히 타워(서리탑 둔화·독탑 중독·
+      // 덫탑 속박)만의 영역이었다. 얼음도끼는 처음으로 플레이어 근접 공격 자체가 서리탑과 똑같은
+      // applySlow를 직접 건다 — 혼자 있을 때도 도망가는 러너를 스스로 늦추거나, 서리탑 없는 방향에서
+      // 뚫고 들어온 적을 붙잡아 아군·타워가 정리할 시간을 버는 용도. attackStats의 out 객체가
+      // dmg/range/arc/cd/knockback만 미리 채워 둬서 slow/slowTime을 새로 더하면 undefined+=로
+      // NaN이 나므로, player.js attackStats에 slow:0/slowTime:0 초기값을 먼저 추가했다.
+      frostaxe: {
+        name: "\uC5BC\uC74C\uB3C4\uB07C",
+        icon: "\u2744\uFE0F",
+        cost: { wood: 20, stone: 12, iron: 5 },
+        effect: { dmg: 16, slow: 0.35, slowTime: 1.4 },
+        desc: "\uADFC\uC811 \uACF5\uACA9\uB825 +16, \uB9DE\uC740 \uC801\uC744 \uC7A0\uAE50 \uB454\uD654\uC2DC\uD0A8\uB2E4 \u2014 \uC11C\uB9AC\uD0D1\uCC98\uB7FC \uB2A6\uCDB0\uC11C \uB3C4\uB9DD \uBABB \uAC00\uAC8C \uD558\uAC70\uB098 \uB2E4\uB978 \uD654\uB825\uC774 \uB9C8\uBB34\uB9AC\uD558\uAE30 \uC27D\uAC8C \uB9CC\uB4E0\uB2E4."
       }
     },
     // 몬스터 종류 (일반형 / 빠른형 / 탱커형 / 원거리형 / 건물추적형 / 보스)
@@ -13023,6 +13349,12 @@ button.corner.mute.off { opacity: 0.5; }
       // 향했다면 이쪽은 파밍한 자원 자체를 노린다. 놔두면 회복까지 겹쳐 싸움이 길어지므로, 캐스팅
       // 중(그 사이엔 무방비로 서 있다) 화력을 몰아 최대한 못 훔치게 끊는 것이 유일한 대응이다.
       looter: { name: "\uAC08\uCDE8\uC790", icon: "\u{1F982}", hp: 1200, speed: 1.75, dmg: 52, rate: 0.65, radius: 1.5, color: 16766720, bounty: { wood: 36, stone: 36 }, scale: 2.4, boss: true, drainBoss: true },
+      // 다섯 번째 보스(25웨이브 주기로 나머지 넷과 순환). 소환·침묵·약탈은 전부 "플레이어에게 뭔가를
+      // 강요"했지만(잡졸 처리, 타워 무력화 대응, 화력 집중), 이쪽은 처음으로 자기 자신을 방어한다 —
+      // 체력 문턱마다 무쇠 방벽을 둘러 잠깐 받는 피해를 크게 줄인다(enemy.js 의 damage() 가
+      // fortifyUntil 을 직접 읽어 적용). 방벽이 떠 있는 동안 딜을 계속 부어도 큰 효율이 안 나므로,
+      // 무리해서 자원(정수 스킬·투척)을 쏟아붓기보다 잠깐 물러나 다음 국면을 준비하는 판단이 갈린다.
+      colossus: { name: "\uAC15\uCCA0 \uC218\uD638\uC790", icon: "\u{1F5FF}", hp: 1350, speed: 1.7, dmg: 58, rate: 0.6, radius: 1.55, color: 8945076, bounty: { wood: 40, stone: 40 }, scale: 2.5, boss: true, fortifyBoss: true },
       // 체력이 낮아 금방 죽지만, 죽는 순간(어떻게 죽었든) 그 자리에서 폭발해 주변 크리스탈·건물·플레이어에게
       // 피해를 준다 — 근접으로 마지막 일격을 넣으면 그 폭발을 그대로 맞는다. "닥치고 근접"이 항상 안전하지
       // 않게 만드는 가시(thorn) 변종과 목적은 비슷하지만, 이쪽은 변종이 아니라 종류 자체라 항상 그렇다.
@@ -13041,6 +13373,16 @@ button.corner.mute.off { opacity: 0.5; }
       deer: { name: "\uC0AC\uC2B4", icon: "\u{1F98C}", hp: 30, speed: 4.9, dmg: 0, rate: 0, radius: 0.5, color: 11106111, bounty: { wood: 0, stone: 0 }, scale: 1.05, flees: true, wild: true, event: true, fleeRange: 11, meat: "deer" },
       // 유일하게 도망치지 않는다 — 때리면 오히려 달려들어 반격한다. 공짜 사냥감이 아니게 만드는 장치.
       boar: { name: "\uBA67\uB3FC\uC9C0", icon: "\u{1F417}", hp: 70, speed: 3.6, dmg: 16, rate: 0.8, radius: 0.6, color: 6048829, bounty: { wood: 0, stone: 0 }, scale: 0.95, wild: true, event: true, retaliates: true, aggroTime: 6, meat: "boar" },
+      // 토끼보다도 빠르고(가장 빠른 사냥감) 도망 반경도 가장 길어서, 셋 중 가장 잡기 어렵다 —
+      // 체력은 낮아 스치기만 해도 죽지만, 애초에 근접 사거리 안까지 접근하는 것 자체가 관건.
+      fox: { name: "\uC5EC\uC6B0", icon: "\u{1F98A}", hp: 18, speed: 7.2, dmg: 0, rate: 0, radius: 0.4, color: 16744576, bounty: { wood: 0, stone: 0 }, scale: 0.7, flees: true, wild: true, event: true, fleeRange: 15, meat: "fox" },
+      // 지금까지 사냥감 4종(토끼·사슴·멧돼지·여우)은 전부 도망만 치거나(flees), 먼저 때려야만 반격한다
+      // (retaliates) — 준비 시간은 사실상 완전히 안전했다. 늑대는 처음으로 맞기 전부터 스스로
+      // 플레이어를 찾아 쫓아온다(hunts) — huntRange 안에 들어오면 도발 없이 곧장 달려든다. 플레이어
+      // 이동 속도(7.4)보다는 느려서(6) 도망은 항상 가능하지만, 무기 없이 방심하고 멀리 채집 나갔다가
+      // 붙잡히면 실제로 위협적이다(브루트에 준하는 공격력) — "준비 시간 = 완전한 안전지대"라는
+      // 그동안의 전제를 깨는 새로운 긴장이다.
+      wolf: { name: "\uB291\uB300", icon: "\u{1F43A}", hp: 58, speed: 6, dmg: 15, rate: 0.85, radius: 0.55, color: 6247214, bounty: { wood: 0, stone: 0 }, scale: 1.05, wild: true, event: true, hunts: true, huntRange: 10, meat: "wolf" },
       treasure: { name: "\uBCF4\uBB3C\uAC8C", icon: "\u{1F980}", hp: 16, speed: 5.4, dmg: 0, rate: 0, radius: 0.4, color: 16766720, bounty: { wood: 16, stone: 12 }, scale: 0.85, flees: true, event: true, shardChance: 0.5 },
       // 박쥐(flies)가 "벽을 무시"한다면 이쪽은 "벽과 타워를 동시에 무시"한다 — 땅속에 파묻힌 채
       // 크리스탈로 직선 이동하고, 파묻혀 있는 동안(diving)은 타워가 조준 자체를 못 한다(buildings.js
@@ -13061,7 +13403,13 @@ button.corner.mute.off { opacity: 0.5; }
       // 없이도 위협적인 수준으로 잡았다(그런트보다 세지만 브루트만큼은 아님) — "무작정 다 캐고 본다"는
       // 습관에 제동을 거는 게 목적. bounty 를 0으로 둔 건 애초에 "자원인 줄 알았던" 실망이 핵심이라,
       // 잡아도 위로 보상을 안 준다(순수 페널티 회피가 전부).
-      mimic: { name: "\uBBF8\uBBF9", icon: "\u{1F3AD}", hp: 75, speed: 2.4, dmg: 13, rate: 0.85, radius: 0.55, color: 8998662, bounty: { wood: 0, stone: 0 }, scale: 1, event: true }
+      mimic: { name: "\uBBF8\uBBF9", icon: "\u{1F3AD}", hp: 75, speed: 2.4, dmg: 13, rate: 0.85, radius: 0.55, color: 8998662, bounty: { wood: 0, stone: 0 }, scale: 1, event: true },
+      // 지금까지 준비 시간은 몬스터가 전혀 없는 완전히 안전한 계획 단계였다(야생 동물조차 늑대
+      // 정도만 살짝 위협적일 뿐 전투와 무관하다). 정찰병은 처음으로 준비 시간 자체에 "지금 당장
+      // 처리해야 하는 위협"을 끌어들인다 — 공격은 전혀 안 하지만(dmg:0), 포탈까지 도망치는 데
+      // 성공하면 다음 웨이브가 강해진다. wild가 아니라서(scout만 있고 wild 없음) 타워도 자동으로
+      // 조준해 협공할 수 있다 — 사냥감(wild)과 반대로 "다 같이 막아야 하는" 쪽이라 일부러 그렇게 뒀다.
+      scout: { name: "\uC815\uCC30\uBCD1", icon: "\u{1F575}\uFE0F", hp: 45, speed: 5.5, dmg: 0, rate: 0, radius: 0.5, color: 16751001, bounty: { wood: 15, stone: 15 }, scale: 0.95, event: true, scout: true }
     },
     // 몬스터 변종 접두사 — 종류를 늘리는 대신 기존 몬스터에 가끔 붙는다. 웨이브가 오를수록 등장 확률이 오른다.
     // 색 틴트 + 머리 위 아이콘으로 항상 표시되어(색약 여부와 무관하게) 눈에 띈다.
@@ -13084,7 +13432,14 @@ button.corner.mute.off { opacity: 0.5; }
       // 크리스탈·건물·플레이어 중 무엇을 때리든, 그 피해의 일부를 자기 체력으로 되돌린다.
       // 방패(막아야 한다)·재생(안 때리면 회복)과 달리 "때리게 놔두면 회복"이라 무시하고 다른 놈부터
       // 잡는 선택이 오히려 손해가 되게 만든다 — 발견하면 최우선으로 끊어야 하는 표적
-      vampire: { name: "\uD761\uD608", icon: "\u{1FA78}", tint: 10485760, healPct: 0.45 }
+      vampire: { name: "\uD761\uD608", icon: "\u{1FA78}", tint: 10485760, healPct: 0.45 },
+      // 지금까지 7종은 전부 "피해를 어떻게 주고받느냐"를 바꿨을 뿐, 상태이상(서리탑 둔화·독탑
+      // 중독·덫탑 속박·얼음도끼 둔화)은 전부 무조건 먹혔다. 저항은 처음으로 이 셋을 전부 무시한다
+      // (enemy.js의 applySlow/applyRoot/applyPoison에서 조용히 리턴) — 그동안 CC(군중 제어) 위주로
+      // 짠 방어선(서리탑+화살탑 시너지, 덫탑으로 묶고 정리, 독탑 스택)이 이 한 놈 앞에서는 전부
+      // 무효화되고 순수 대미지만 통한다는 걸 발견하게 만드는 게 목적 — "느리게 만들어서 정리"가
+      // 항상 정답이 아니게 되는 순간을 만든다.
+      resist: { name: "\uC800\uD56D", icon: "\u{1F512}", tint: 8952230 }
     },
     // 웨이브당 몬스터 1마리가 변종을 달 확률 (보스 제외, 분열체 제외)
     variantChance: { base: 0.05, perWave: 0.012, max: 0.32 },
@@ -13099,7 +13454,11 @@ button.corner.mute.off { opacity: 0.5; }
       poisonStack: { radius: 7, dpsMultPerNeighbor: 0.35, max: 1 },
       // 덫탑에 묶여(root) 있는 적을 다른 타워가 맞추면 추가 피해 — 덫탑 자신은 제외(묶는 역할에 집중).
       // frostArrow 처럼 인접 배치가 필요 없다 — 묶인 상태 자체가 트리거라 어떤 타워 조합이든 이득을 본다
-      rootSnare: { dmgMult: 0.35 }
+      rootSnare: { dmgMult: 0.35 },
+      // frostArrow와 정확히 같은 구조를 저격탑 쪽으로 옮긴 것 — 저격탑이 이 반경 안에 독탑을 두면,
+      // 이미 중독된 적을 맞출 때 추가 피해. 저격탑은 가장 두꺼운 표적(highestHp)만 골라 쏘는데,
+      // 그 표적이 독탑에 미리 중독되어 있으면 저격 한 방의 값어치가 더 커지게 만드는 게 목적이다.
+      sniperVenom: { radius: 7, dmgMult: 0.4 }
     },
     // 타워 특화 — 최대 레벨에 도달한 전투 타워는 딱 한 번, 두 갈래 중 하나를 골라 성격을 바꾼다.
     // 되돌릴 수 없다(철거하고 새로 지어야 한다). 업그레이드가 "같은 타워를 더 세게"였다면 이건
@@ -13138,6 +13497,14 @@ button.corner.mute.off { opacity: 0.5; }
       lightning: {
         spread: { name: "\uD655\uC0B0", icon: "\u{1F310}", ring: 6739199, desc: "\uD280\uB294 \uB300\uC0C1 \uC218\uC640 \uC0AC\uAC70\uB9AC\uAC00 \uB298\uC5B4\uB09C\uB2E4(\uD55C \uBC29\uC740 \uC57D\uD574\uC9C4\uB2E4) \u2014 \uD769\uC5B4\uC9C4 \uC7A1\uBAB9 \uBB34\uB9AC\uB97C \uD55C \uBC88\uC5D0 \uC4F8\uC5B4\uB2F4\uB294\uB2E4", mods: { dmg: 0.6, rate: 1.15 }, add: { chain: { count: 7, range: 6.5, falloff: 0.75 } } },
         focus: { name: "\uC9D1\uC18D", icon: "\u{1F3AF}", ring: 16752640, desc: "\uD290\uC744 \uD3EC\uAE30\uD558\uACE0 \uD55C \uB188\uC5D0\uAC8C \uBAA8\uB4E0 \uC804\uB825\uC744 \uC3DF\uB294\uB2E4 \u2014 \uBCF4\uC2A4\xB7\uBE0C\uB8E8\uD2B8\uB97C \uC21C\uC2DD\uAC04\uC5D0 \uB179\uC778\uB2E4", mods: { dmg: 2.5, range: 1.25 }, add: { chain: { count: 1, range: 0, falloff: 1 } } }
+      },
+      // 저격탑은 이미 targetMode로 "제일 체력 많은 적"을 고르므로, 두 갈래 다 그 위에서 "얼마나 한
+      // 놈에 집중하느냐"를 반대로 튼다. 관통탄은 lightning과 완전히 같은 chain 배관을 add로 얹은
+      // 것뿐이다 — chain은 명중 지점에서 가까운 다음 대상으로 옮겨붙을 뿐 targetMode를 안 가리므로,
+      // "가장 강한 놈을 저격 → 근처 한 마리를 관통" 이라는 새 조합이 새 로직 없이 그대로 나온다.
+      sniper: {
+        longshot: { name: "\uC7A5\uAC70\uB9AC \uC800\uACA9", icon: "\u{1F31F}", ring: 16737845, desc: "\uC0AC\uAC70\uB9AC\uC640 \uD55C \uBC29\uC774 \uB354 \uB298\uC9C0\uB9CC \uBC1C\uC0AC\uB294 \uB354 \uB290\uB824\uC9C4\uB2E4 \u2014 \uC21C\uC218\uD558\uAC8C \uAC00\uC7A5 \uAC15\uD55C \uD55C \uB188\uB9CC \uB178\uB9B0\uB2E4", mods: { dmg: 1.35, range: 1.2, rate: 0.6 } },
+        piercing: { name: "\uAD00\uD1B5\uD0C4", icon: "\u{1F517}", ring: 9351142, desc: "\uD45C\uC801\uC744 \uAFF0\uB6AB\uC5B4 \uB4A4\uCABD \uAC00\uAE4C\uC6B4 \uC801\uB3C4 \uD568\uAED8 \uB9DE\uD78C\uB2E4(\uD55C \uBC29\uC740 \uC57D\uD574\uC9C4\uB2E4) \u2014 \uBC1C\uC0AC\uB3C4 \uC870\uAE08 \uBE68\uB77C\uC9C4\uB2E4", mods: { dmg: 0.78, rate: 1.15 }, add: { chain: { count: 2, range: 6, falloff: 0.55 } } }
       }
     },
     // 무기 특화 — 타워 특화와 정확히 같은 개념을 무기 쪽으로 옮긴 것. 무기 강화가 최대
@@ -13180,6 +13547,10 @@ button.corner.mute.off { opacity: 0.5; }
       shield: {
         bulwark: { name: "\uCCA0\uBCBD", icon: "\u{1F9F1}", desc: "\uD53C\uD574 \uACBD\uAC10\uC774 \uB354 \uAC15\uD574\uC9C0\uC9C0\uB9CC(80%\u219292%) \uADF8\uB9CC\uD07C \uB354 \uB290\uB824\uC9C4\uB2E4(60%\u219245%) \u2014 \uC790\uB9AC\uB97C \uC9C0\uD0A4\uB294 \uD0F1\uCEE4\uC6A9", block: { mitigation: 0.92, speedMult: 0.45 } },
         guardian: { name: "\uAE30\uB3D9\uBC29\uD328", icon: "\u{1F3C3}", desc: "\uACBD\uAC10\uC740 \uC904\uC5B4\uB4E4\uC9C0\uB9CC(80%\u219272%) \uB9C9\uB294 \uB3D9\uC548\uC5D0\uB3C4 \uAC70\uC758 \uC815\uC0C1 \uC18D\uB3C4\uB85C \uC6C0\uC9C1\uC778\uB2E4(60%\u219285%) \u2014 \uBC84\uD2F0\uBA70 \uC774\uB3D9\uD558\uB294 \uC6A9\uB3C4", block: { mitigation: 0.72, speedMult: 0.85 } }
+      },
+      frostaxe: {
+        deepchill: { name: "\uD639\uD55C\uB0A0", icon: "\u{1F976}", desc: "\uB454\uD654\uAC00 \uB354 \uAE4A\uACE0 \uD6E8\uC52C \uC624\uB798 \uAC04\uB2E4(\uB300\uC2E0 \uD55C \uBC29\uC740 \uC57D\uD574\uC9C4\uB2E4) \u2014 \uD55C \uB188\uC744 \uD655\uC2E4\uD788 \uBB36\uC5B4 \uB454\uB2E4", mods: { slow: 1.3, slowTime: 1.6, dmg: 0.9 } },
+        icebreaker: { name: "\uC1C4\uBE59\uB3C4\uB07C", icon: "\u{1F4A5}", desc: "\uB454\uD654\uB97C \uB0B4\uC8FC\uACE0 \uB300\uBBF8\uC9C0\uAC00 \uD06C\uAC8C \uC624\uB978\uB2E4 \u2014 \uC5BC\uB9AC\uAE30\uBCF4\uB2E4 \uBCA0\uC5B4 \uB118\uAE30\uB294 \uCABD", mods: { dmg: 1.7, slow: 0.5 } }
       }
     },
     // 보급품 투하 — 전투 중(웨이브 2부터) 가끔 지도 위에 상자가 떨어진다. 한 번에 최대 1개만 떠 있고,
@@ -13204,14 +13575,29 @@ button.corner.mute.off { opacity: 0.5; }
       // 크리스탈에서 이만큼 떨어진 링 안쪽 어딘가에 나타난다(건설 구역 밖 -> 자연히 나가야 한다)
       minDist: 16,
       maxDist: 34,
-      // 종류별 등장 가중치 — 흔한 토끼, 가끔 사슴, 드물게 멧돼지
-      weights: { rabbit: 5, deer: 3, boar: 2 }
+      // 종류별 등장 가중치 — 흔한 토끼, 가끔 사슴, 드물게 멧돼지. 늑대는 wolfMinWave 이전에는
+      // game.js _updateHunt 가 가중치 목록에서 아예 제외해 초반 몇 판은 사냥이 완전히 안전하게 둔다.
+      weights: { rabbit: 5, deer: 3, boar: 2, fox: 2, wolf: 2 },
+      // 4웨이브부터(다른 신규 몬스터들의 "N웨이브부터" 관례와 맞춤) — this.wave.wave(완료한 웨이브 수)가
+      // 이 값 이상이면, 즉 4웨이브 준비 시간부터 늑대가 가중치 목록에 들어간다.
+      wolfMinWave: 3
     },
-    // 화살 — 🏹 화살탑이 발사할 때마다 한 발씩 쓴다. 지금까지 타워는 한 번 지으면 공짜로 영원히
-    // 쐈지만, 화살탑만은 보급이 끊기면 멈춘다. 목재와 구리를 계속 대야 하는 대신, 다른 타워보다
-    // 짓는 값이 싸다 — "싸게 깔고 계속 먹이느냐, 비싸게 짓고 잊느냐" 라는 선택을 만드는 게 목적.
-    // 제작대에서 한 번에 여러 발씩 만들고, 팀 자원 풀에 쌓여 모든 화살탑이 같이 꺼내 쓴다.
-    fletch: { cost: { wood: 6, copper: 1 }, yield: 12 },
+    // 여우·늑대는 죽여서 생고기를 얻는 대신 길들여 영구 동료로 삼을 수도 있다 — 초식동물
+    // (토끼·사슴·멧돼지) 생고기를 미끼로 써야 해서, 사냥으로 모은 재료를 "굽어서 한 판짜리 버프로
+    // 먹을지, 다른 동물을 길들이는 데 쓸지" 저울질하게 만든다. 팀 전체 동료 1마리 제한(정령 소환과
+    // 같은 원칙)이라 실패해도 다시 시도할 수 있지만 이미 하나 있으면 새로 못 들인다.
+    tame: {
+      baitCost: 2,
+      // 먹이주기 — 길들인 뒤에도 계속 생고기를 흘려보내야 하는 소모전 대신, 남는 고기를 태워
+      // 동료를 키우는 쪽으로 쓰게 하는 자원 배출구다. 요리(잔치 버프 1판용)와 먹이주기(동료 영구
+      // 강화)가 같은 생고기 재고를 두고 경쟁해서, 여윳돈을 어디에 쓸지 매 웨이브 계속 저울질하게 된다.
+      feedCost: 3,
+      maxLevel: 3,
+      lvDmgMult: 1.25,
+      lvRateMult: 1.15,
+      wolf: { name: "\uB291\uB300", icon: "\u{1F43A}", chance: 0.35, dmg: 16, rate: 0.8, range: 11, atkRange: 2.2, speed: 6.5, color: 6247214 },
+      fox: { name: "\uC5EC\uC6B0", icon: "\u{1F98A}", chance: 0.3, dmg: 5, rate: 2.2, range: 9, atkRange: 2, speed: 8.5, color: 16744576 }
+    },
     // 제련 — 광물만으로는 안 되고 태울 것(석탄)이 있어야 철이 나온다. 석탄을 캐야 할 이유.
     // 화로에서 굽는다. 생고기 1 + 목재를 태워 그 자리에서 먹고, 효과는 다음 웨이브 한 판 동안 간다.
     // 상인의 물약(tempBoon)과 같은 "한 판짜리" 수명이지만, 자원이 아니라 사냥한 전리품으로만
@@ -13219,12 +13605,27 @@ button.corner.mute.off { opacity: 0.5; }
     cook: {
       rabbit: { name: "\uD1A0\uB07C \uAF2C\uCE58", icon: "\u{1F362}", wood: 4, desc: "\uB2E4\uC74C \uC6E8\uC774\uBE0C \uB3D9\uC548 \uC774\uB3D9 \uC18D\uB3C4 +18%", kind: "speed", value: 1.18 },
       deer: { name: "\uC0AC\uC2B4 \uC2A4\uD14C\uC774\uD06C", icon: "\u{1F969}", wood: 6, desc: "\uB2E4\uC74C \uC6E8\uC774\uBE0C \uB3D9\uC548 \uCD5C\uB300 \uCCB4\uB825 +40 (\uC989\uC2DC \uADF8\uB9CC\uD07C \uD68C\uBCF5)", kind: "vigor", value: 40 },
-      boar: { name: "\uBA67\uB3FC\uC9C0 \uAD6C\uC774", icon: "\u{1F356}", wood: 8, desc: "\uB2E4\uC74C \uC6E8\uC774\uBE0C \uB3D9\uC548 \uADFC\uC811 \uACF5\uACA9\uB825 +25%", kind: "might", value: 1.25 }
+      boar: { name: "\uBA67\uB3FC\uC9C0 \uAD6C\uC774", icon: "\u{1F356}", wood: 8, desc: "\uB2E4\uC74C \uC6E8\uC774\uBE0C \uB3D9\uC548 \uADFC\uC811 \uACF5\uACA9\uB825 +25%", kind: "might", value: 1.25 },
+      // 지금까지 3개 요리(속도·최대체력·공격력)는 전부 "내가 더 세지는" 방향이었다. 여우 스튜는
+      // 처음으로 "맞을수록 상대가 손해 보는" 방향이다 — 가시(thorn) 변종이 근접 공격자에게 반사
+      // 피해를 주는 것과 똑같은 개념을, 몬스터가 플레이어를 때릴 때도 적용한다(onPlayerHit이
+      // 이미 쓰는 _hurtEnemy로 반사하므로 새 피해 배관이 필요 없다). 잡기 가장 어려운 여우가
+      // 재료라서, 방어적인 보상을 얻으려면 가장 손이 많이 가는 사냥을 해야 한다.
+      fox: { name: "\uC5EC\uC6B0 \uC2A4\uD29C", icon: "\u{1F372}", wood: 5, desc: "\uB2E4\uC74C \uC6E8\uC774\uBE0C \uB3D9\uC548 \uADFC\uC811 \uD53C\uACA9 \uC2DC \uACF5\uACA9\uC790\uC5D0\uAC8C \uBC1B\uC740 \uD53C\uD574\uC758 25%\uB97C \uBC18\uC0AC\uD55C\uB2E4", kind: "guard", value: 0.25 },
+      // 가장 위험한 사냥감(hunts:true, 브루트급 공격력)을 잡은 보상답게, 처음으로 "받는 피해 자체를
+      // 줄이는" 요리다 — 속도·체력·공격력·반사 넷 다 공격 또는 생존 보조였지 방어력 자체를 올리는
+      // 것은 없었다. game.js onPlayerHit 이 이미 blocking 경감을 곱하는 자리에 배율 하나만 더
+      // 곱하면 되므로(feastArmorMult), 몬스터 종류를 가리지 않고 다음 웨이브 내내 모든 근접 피격에 적용된다.
+      wolf: { name: "\uB291\uB300 \uB2E4\uB9AC \uAD6C\uC774", icon: "\u{1F357}", wood: 7, desc: "\uB2E4\uC74C \uC6E8\uC774\uBE0C \uB3D9\uC548 \uBAAC\uC2A4\uD130 \uADFC\uC811 \uACF5\uACA9\uC73C\uB85C \uBC1B\uB294 \uD53C\uD574 -15%", kind: "armor", value: 0.85 }
     },
     // 보물게 — 전투 중(3웨이브부터) 가끔 튀어나와 도망만 다니는 몬스터. 웨이브 구성에 안 끼는 독립
     // 이벤트라 운석·보급품과 같은 패턴(호스트 전용 타이머)으로 처리한다. lifetime 안에 못 잡으면
     // 보상 없이 사라진다 — 보급품처럼 순수 이득이 아니라, 잡으려면 지금 하던 걸 멈추고 쫓아가야 한다.
     treasureEvent: { minWave: 3, firstDelay: 20, minGap: 35, maxGap: 55, lifetime: 13 },
+    // 정찰병 — 보물게와 정반대다: 보물게는 "잡으면 이득"(놓쳐도 손해가 없다), 정찰병은 "놓치면
+    // 손해"(잡아도 소소한 보상뿐이라 순수 이득은 아니다). 그리고 전투 중이 아니라 준비 시간에만
+    // 나타나 "지금 하던 채집·건설을 멈추고 쫓아갈지" 라는 새로운 판단을 요구한다.
+    scoutEvent: { minWave: 4, firstDelay: 18, minGap: 40, maxGap: 65, lifetime: 15, spawnRadius: [14, 20], catchRadius: 3, penaltyHpMult: 1.12, penaltyDmgMult: 1.12 },
     // 떠돌이 상인 — 웨이브를 클리어하고 준비 시간에 들어갈 때(2웨이브부터) 확률적으로 나타나,
     // 그 준비 시간 동안만 무작위 2개 품목을 판다. 축복(엔드리스 전용, 정수로 구매, 영구 적용)과
     // 달리 표준 캠페인부터 목재·광물로 살 수 있고, 물약 종류는 해당 웨이브 한 번만 지속되는
@@ -13240,7 +13641,24 @@ button.corner.mute.off { opacity: 0.5; }
         atkTonic: { name: "\uD798\uC758 \uBB3C\uC57D", icon: "\u{1F4AA}", desc: "\uB2E4\uC74C \uC6E8\uC774\uBE0C \uB3D9\uC548 \uADFC\uC811 \uACF5\uACA9\uB825 +40%", cost: { wood: 35, stone: 20 }, kind: "tempAtk", value: 1.4 },
         towerTonic: { name: "\uD3EC\uACA9 \uBB3C\uC57D", icon: "\u{1F5FC}", desc: "\uB2E4\uC74C \uC6E8\uC774\uBE0C \uB3D9\uC548 \uBAA8\uB4E0 \uD0C0\uC6CC \uACF5\uACA9\uB825 +25%", cost: { wood: 30, stone: 35 }, kind: "tempTower", value: 1.25 },
         shardTrade: { name: "\uC815\uC218 \uAC10\uC815", icon: "\u{1F4A0}", desc: "\uBAA9\uC7AC\xB7\uAD11\uBB3C\uC744 \uC815\uC218 1\uAC1C\uB85C \uBC14\uAFBC\uB2E4", cost: { wood: 50, stone: 50 }, kind: "shard", value: 1 },
-        ironTrade: { name: "\uCCA0 \uC8FC\uAD34 \uAC70\uB798", icon: "\u2699\uFE0F", desc: "\uBAA9\uC7AC\xB7\uAD11\uBB3C\uC744 \uCCA0 3\uAC1C\uB85C \uBC14\uAFBC\uB2E4", cost: { wood: 60, stone: 40 }, kind: "iron", value: 3 }
+        ironTrade: { name: "\uCCA0 \uC8FC\uAD34 \uAC70\uB798", icon: "\u2699\uFE0F", desc: "\uBAA9\uC7AC\xB7\uAD11\uBB3C\uC744 \uCCA0 3\uAC1C\uB85C \uBC14\uAFBC\uB2E4", cost: { wood: 60, stone: 40 }, kind: "iron", value: 3 },
+        // 기존 5개 품목은 전부 "회복·공격력·자원 교환"이었지, 방어선 자체를 손보는 품목은 없었다.
+        // 정비소(passive, 서서히)·수리 모드(수동, 한 채씩) 둘 다 이미 있지만 "지금 당장 전체를"
+        // 커버하는 수단이 없었다 — 웨이브 시작 직전 급하게 방어선을 복구하고 싶을 때 한 채씩
+        // 클릭할 시간이 없는 상황을 위한 프리미엄(=돈으로 해결) 선택지.
+        repairKit: { name: "\uB9CC\uB2A5 \uC218\uB9AC \uD0A4\uD2B8", icon: "\u{1F9F0}", desc: "\uBAA8\uB4E0 \uAC74\uBB3C\uC744 \uC989\uC2DC \uC644\uC804\uD788 \uC218\uB9AC\uD55C\uB2E4", cost: { wood: 50, stone: 50 }, kind: "repairAll" },
+        // atkTonic·towerTonic과 정확히 같은 "한 판짜리" 구조를 이동 속도 쪽으로 옮긴 것. 질주의
+        // 유물(haste)이 영구 +15%인 보스 전용 보상이라면, 이건 그 전에 초반부터 목재·광물로 살 수
+        // 있는 한 판짜리 맛보기 버전 — 운석·보급품·보물게를 놓치지 않고 쫓아가거나 다구리를 피해
+        // 도망칠 때 그 웨이브만 확실히 편해진다.
+        speedTonic: { name: "\uC9C8\uD48D\uC758 \uBB3C\uC57D", icon: "\u{1F4A8}", desc: "\uB2E4\uC74C \uC6E8\uC774\uBE0C \uB3D9\uC548 \uC774\uB3D9 \uC18D\uB3C4 +30%", cost: { wood: 25, stone: 15 }, kind: "tempSpeed", value: 1.3 },
+        // 기존 7개 품목은 전부 사기 전에 결과를 정확히 알 수 있었다(확정 효과) — 상인 전체가
+        // "믿고 사는" 곳이었다. 미스터리 상자는 처음으로 결과를 모른 채 사는 도박 품목이다:
+        // 꽝(40%, 소량 회복)과 대박(25%, atkTonic·towerTonic보다도 센 +50%를 동시에) 사이의
+        // 낙차를 크게 벌려서, "이번엔 확실한 효과"와 "밑져야 본전, 잘하면 대박"을 매 판 저울질하게
+        // 만드는 게 목적. 실제 효과는 게임 로직(_applyMysteryBox)에서 결정되고 이 항목엔 cost만
+        // 실려 있다 — 확정 kind가 없는 유일한 품목이라 desc도 결과를 밝히지 않는다.
+        mystery: { name: "\uBBF8\uC2A4\uD130\uB9AC \uC0C1\uC790", icon: "\u{1F381}", desc: "\uBB34\uC5C7\uC774 \uB098\uC62C\uC9C0 \uC5F4\uC5B4\uBCF4\uAE30 \uC804\uC5D4 \uBAA8\uB978\uB2E4 \u2014 \uAF5D\uBD80\uD130 \uB300\uBC15\uAE4C\uC9C0", cost: { wood: 35, stone: 35 }, kind: "mystery" }
       }
     },
     // 엔드리스 축복 — 10웨이브 승리 이후(엔드리스)에만 등장한다. 표준 캠페인 밸런스에는 영향이 없다.
@@ -13274,7 +13692,15 @@ button.corner.mute.off { opacity: 0.5; }
       respite: { name: "\uC5EC\uC720\uC758 \uC720\uBB3C", icon: "\u23F3", desc: "\uC774\uD6C4 \uBAA8\uB4E0 \uC6E8\uC774\uBE0C\uC758 \uC900\uBE44 \uC2DC\uAC04\uC774 8\uCD08 \uB298\uC5B4\uB09C\uB2E4", trigger: "boss", kind: "prepDelta", value: 8 },
       mend: { name: "\uD68C\uBCF5\uC758 \uC720\uBB3C", icon: "\u{1F49A}", desc: "\uC989\uC2DC \uD06C\uB9AC\uC2A4\uD0C8 \uCD5C\uB300 \uCCB4\uB825\uC758 20%\uB97C \uD68C\uBCF5\uD55C\uB2E4", trigger: "boss", kind: "instantPct", value: 0.2 },
       venom: { name: "\uB9F9\uB3C5\uC758 \uC720\uBB3C", icon: "\u2620\uFE0F", desc: "\uADFC\uC811 \uACF5\uACA9\uC774 25% \uD655\uB960\uB85C \uC801\uC5D0\uAC8C \uB3C5\uC744 \uBB3B\uD78C\uB2E4(3\uCD08\uAC04 \uC9C0\uC18D \uD53C\uD574)", trigger: "boss", kind: "venom", dps: 10, duration: 3, value: 0.25 },
-      vigor: { name: "\uD22C\uC9C0\uC758 \uC720\uBB3C", icon: "\u{1F4AA}", desc: "\uD06C\uB9AC\uC2A4\uD0C8 \uC704\uAE30(\uCCB4\uB825 30% \uBBF8\uB9CC) \uC2DC \uD53C\uD574 \uBCF4\uB108\uC2A4\uAC00 \uB354 \uCEE4\uC9C4\uB2E4", trigger: "boss", kind: "desperationBonus", value: 0.25 }
+      vigor: { name: "\uD22C\uC9C0\uC758 \uC720\uBB3C", icon: "\u{1F4AA}", desc: "\uD06C\uB9AC\uC2A4\uD0C8 \uC704\uAE30(\uCCB4\uB825 30% \uBBF8\uB9CC) \uC2DC \uD53C\uD574 \uBCF4\uB108\uC2A4\uAC00 \uB354 \uCEE4\uC9C4\uB2E4", trigger: "boss", kind: "desperationBonus", value: 0.25 },
+      // 기존 4개 유물(여유·회복·맹독·투지)은 전부 크리스탈이나 전투력을 건드렸을 뿐, 플레이어
+      // 이동 자체를 건드리는 유물은 없었다. 질주는 처음으로 "이동"을 영구히 강화한다 — 파밍하러
+      // 멀리 나갔다 돌아오는 왕복, 운석·보급품·보물게를 쫓아가는 순간 판단, 다구리를 맞을 때
+      // 도망치는 여유 전부가 조금씩 편해진다. `mult`/`moveSpeedMult` 조합은 완력(atk)·포격 강화
+      // (towerDmg)와 완전히 같은 제네릭 배관(`boonMult[key] *= value`)이라 새 적용 로직이 필요
+      // 없었고, 실제 소비처는 매 프레임 플레이어 이동 속도 계산에 인자 하나(`feastSpeedMult *
+      // boonMult.moveSpeedMult`)로 얹었다.
+      haste: { name: "\uC9C8\uC8FC\uC758 \uC720\uBB3C", icon: "\u{1F45F}", desc: "\uC774\uB3D9 \uC18D\uB3C4\uAC00 \uC601\uAD6C\uD788 15% \uBE68\uB77C\uC9C4\uB2E4", trigger: "boss", kind: "mult", key: "moveSpeedMult", value: 1.15 }
     },
     // 보스 전용 패턴. 예고 시간을 반드시 두어서 플레이어가 반응할 수 있게 한다.
     bossPattern: {
@@ -13300,7 +13726,12 @@ button.corner.mute.off { opacity: 0.5; }
       drainCast: 1.1,
       drainWood: 40,
       drainStone: 40,
-      drainHealPct: 0.06
+      drainHealPct: 0.06,
+      // 강철 수호자 전용 — summonAt 임계값마다 소환 대신 자기 자신에게 방벽을 두른다(summon·silence·
+      // drain과 배타적). 방벽이 떠 있는 동안 받는 피해가 fortifyMitigation 만큼 줄어든다.
+      fortifyCast: 1.1,
+      fortifyTime: 4,
+      fortifyMitigation: 0.7
     },
     wave: {
       goal: 10,
@@ -13386,7 +13817,32 @@ button.corner.mute.off { opacity: 0.5; }
     // 존재감이 옅다. 이 웨이브는 지휘관 여러 명을 동시에 풀어 그 함성이 "무리 전체가 계속 가속되는"
     // 압박으로 체감되게 만든다 — rush가 물량, siege가 건물 파괴였다면 이건 "먼저 잡아야 할 대상이
     // 뚜렷한" 축이다. 지휘관을 방치하면 뒤따르는 러너 무리가 끊임없이 1.7배로 밀려온다.
-    rally: { name: "\uB3CC\uACA9\uB300", icon: "\u{1F941}", desc: "\uC9C0\uD718\uAD00 \uC5EC\uB7EC \uBA85\uC774 \uBB34\uB9AC\uB97C \uC774\uB048\uB2E4 \u2014 \uBA3C\uC800 \uB04A\uC9C0 \uC54A\uC73C\uBA74 \uB4A4\uB530\uB974\uB294 \uBB34\uB9AC\uAC00 \uACC4\uC18D \uBE68\uB77C\uC9C4\uB2E4" }
+    rally: { name: "\uB3CC\uACA9\uB300", icon: "\u{1F941}", desc: "\uC9C0\uD718\uAD00 \uC5EC\uB7EC \uBA85\uC774 \uBB34\uB9AC\uB97C \uC774\uB048\uB2E4 \u2014 \uBA3C\uC800 \uB04A\uC9C0 \uC54A\uC73C\uBA74 \uB4A4\uB530\uB974\uB294 \uBB34\uB9AC\uAC00 \uACC4\uC18D \uBE68\uB77C\uC9C4\uB2E4" },
+    // 굴착병(burrower)은 평소 웨이브에 한둘만 섞여 나와 "감시탑 없인 못 잡는다"는 정체성이 잘 안
+    // 느껴졌다. 이 웨이브는 굴착병을 총량의 상당수로 올려 그 압박을 뚜렷하게 만든다 — rush가 물량,
+    // ward가 조준 불가였다면 이건 "타워만으론 절반도 안 보인다"는 축이다. SPECIAL_WAVES 맨 끝에
+    // 추가해서(기존 rush~rally 여섯 웨이브가 이미 차지한 3·6·9·12·18·21웨이브 자리를 그대로
+    // 보존) 처음 등장은 occurrence 7번째, 즉 24웨이브부터라 굴착병이 정상적으로 처음 나오는
+    // 9웨이브보다 한참 뒤다 — "정체 모를 몬스터가 특수 웨이브로 먼저 쏟아진다"는 순서 역전을 피한다.
+    burrow: { name: "\uB545\uAD74 \uC2B5\uACA9", icon: "\u{1F573}\uFE0F", desc: "\uAD74\uCC29\uBCD1\uC774 \uB300\uAC70 \uD30C\uBB3B\uD78C \uCC44 \uC811\uADFC\uD55C\uB2E4 \u2014 \uAC10\uC2DC\uD0D1 \uC5C6\uC774\uB294 \uD0C0\uC6CC \uD654\uB825\uC758 \uC0C1\uB2F9\uC218\uAC00 \uC544\uC608 \uC870\uC900\uD558\uC9C0 \uBABB\uD55C\uB2E4" },
+    // 주술사(shooter)는 평소엔 한둘만 섞여 나와 "벽으로 못 막는 원거리 공격"이라는 정체성이 잘 안
+    // 드러났다 — 벽만 두르면 대부분의 위협을 막을 수 있다는 인식을 이 웨이브가 뒤집는다. burrow가
+    // "타워가 안 보인다"는 축이었다면 이건 "벽이 안 막는다"는 축이다: 주술사는 사거리 안이면 벽 뒤에서도
+    // 크리스탈을 직접 저격하므로(enemy.js 의 ranged/atkRange 분기, 길찾기를 거치지 않음), 벽만 두르고
+    // 방심한 방어선이 이 웨이브에서 처음으로 뚫린다. SPECIAL_WAVES 맨 끝에 추가해 기존 rush~burrow
+    // 일곱 웨이브가 이미 차지한 3·6·9·12·18·21·24웨이브 자리는 그대로 두고, 처음 등장은 occurrence
+    // 8번째인 27웨이브부터다(burrow를 추가하기 전엔 27웨이브가 다시 rush였던 자리를 대신 차지한다).
+    snipe: { name: "\uC800\uACA9\uC804", icon: "\u{1F9D9}", desc: "\uC8FC\uC220\uC0AC\uAC00 \uB300\uAC70 \uBAB0\uB824\uC628\uB2E4 \u2014 \uBCBD\uC73C\uB85C \uB9C9\uC544\uB3C4 \uC0AC\uAC70\uB9AC \uC548\uC774\uBA74 \uD06C\uB9AC\uC2A4\uD0C8\uC744 \uC9C1\uC811 \uC800\uACA9\uD55C\uB2E4" },
+    // 🩸 흡혈 변종은 평소엔 확률에 실려 한둘만 섞여 나와 "발견하면 먼저 끊어야 하는 개체"였다.
+    // 이 웨이브는 그 규칙을 전체로 확대한다 — burrow가 "타워가 안 보인다", snipe가 "벽이 안
+    // 막는다"는 축이었다면 이건 "적당히 때리다 마는 평소 습관이 통하지 않는다"는 축이다: 흡혈
+    // 몬스터는 크리스탈·건물·플레이어 중 무엇을 때리든 그 피해의 상당량을 체력으로 되돌리므로,
+    // 여러 마리를 동시에 살짝씩 두들기며 물량을 분산 대응하던 평소 방식으로는 전혀 안 줄어들고
+    // 오히려 도로 차오른다 — 한 마리씩 확실하게 끊어 죽이는 집중 화력으로 습관을 바꿔야 한다.
+    // SPECIAL_WAVES 맨 끝에 추가해 기존 여덟 웨이브가 이미 차지한 자리는 그대로 두고, occurrence
+    // 9번째부터(30은 보스 웨이브라 건너뛰고 33웨이브)라 흡혈 변종이 정상적으로 처음 섞여 나오는
+    // 초반 웨이브보다 한참 뒤다.
+    frenzy: { name: "\uD608\uD22C", icon: "\u{1FA78}", desc: "\uBAAC\uC2A4\uD130 \uC804\uBD80\uAC00 \uD761\uD608 \uC0C1\uD0DC\uB85C \uB098\uC628\uB2E4 \u2014 \uC0B4\uC9DD\uC0B4\uC9DD \uB54C\uB9AC\uB2E4 \uB9D0\uBA74 \uC624\uD788\uB824 \uD68C\uBCF5\uD574\uBC84\uB9AC\uB2C8 \uD55C \uB9C8\uB9AC\uC529 \uD655\uC2E4\uD558\uAC8C \uB04A\uC5B4 \uC8FD\uC5EC\uC57C \uD55C\uB2E4" }
   };
   var SPECIAL_KEYS = Object.keys(SPECIAL_WAVES);
   function specialWaveKind(w2) {
@@ -13394,7 +13850,7 @@ button.corner.mute.off { opacity: 0.5; }
     const occurrence = Math.floor(w2 / 3) - Math.floor(w2 / 15);
     return SPECIAL_KEYS[(occurrence - 1) % SPECIAL_KEYS.length];
   }
-  var BOSS_CYCLE = ["boss", "frostlord", "warden", "looter"];
+  var BOSS_CYCLE = ["boss", "frostlord", "warden", "looter", "colossus"];
   function _specialComposition(w2, kind) {
     const total = _standardTotal(w2);
     if (kind === "rush") {
@@ -13418,6 +13874,18 @@ button.corner.mute.off { opacity: 0.5; }
       return [
         { type: "commander", count: commanders },
         { type: "runner", count: Math.max(6, Math.round(total * 0.75)) }
+      ];
+    }
+    if (kind === "burrow") {
+      return [
+        { type: "burrower", count: Math.max(4, Math.round(total * 0.28)) },
+        { type: "grunt", count: Math.max(3, Math.round(total * 0.22)) }
+      ];
+    }
+    if (kind === "snipe") {
+      return [
+        { type: "shooter", count: Math.max(4, Math.round(total * 0.32)) },
+        { type: "grunt", count: Math.max(3, Math.round(total * 0.2)) }
       ];
     }
     return [{ type: "grunt", count: Math.max(3, Math.round(total * 0.32)) }];
@@ -13540,7 +14008,9 @@ button.corner.mute.off { opacity: 0.5; }
     harvesterSpoke: new qs(0.06, 1, 0.06),
     harvesterBasket: new su(0.32, 0.24, 0.4, 8),
     repairCrossV: new qs(0.24, 0.74, 0.24),
-    repairCrossH: new qs(0.74, 0.24, 0.24)
+    repairCrossH: new qs(0.74, 0.24, 0.24),
+    sniperBarrel: new su(0.13, 0.17, 2.3, 8),
+    sniperScope: new su(0.12, 0.12, 0.6, 10)
   };
   var MAT2 = {
     wall: [
@@ -13568,6 +14038,8 @@ button.corner.mute.off { opacity: 0.5; }
     harvesterWheel: new sd({ color: 10309763, roughness: 0.7, metalness: 0.15 }),
     harvesterBasket: new sd({ color: 12159565, roughness: 0.8 }),
     repairpost: new sd({ color: 6274976, emissive: 2790492, emissiveIntensity: 0.85, roughness: 0.35 }),
+    sniper: new sd({ color: 3817291, roughness: 0.35, metalness: 0.75 }),
+    sniperScope: new sd({ color: 16726843, emissive: 16720418, emissiveIntensity: 0.9, roughness: 0.3 }),
     ghostOk: new sd({ color: 5570463, transparent: true, opacity: 0.45, emissive: 2002770, emissiveIntensity: 0.6 }),
     ghostBad: new sd({ color: 16734826, transparent: true, opacity: 0.4, emissive: 9379372, emissiveIntensity: 0.6 }),
     barBg: new es({ color: 1119519, transparent: true, opacity: 0.8, depthTest: false }),
@@ -13575,8 +14047,13 @@ button.corner.mute.off { opacity: 0.5; }
     rangeRing: new es({ color: 14061311, transparent: true, opacity: 0.35, side: p }),
     buffRing: new es({ color: 14061311, transparent: true, opacity: 0.5, side: p })
   };
+  function barLayer(bg, fg) {
+    bg.renderOrder = 5;
+    fg.material.transparent = true;
+    fg.renderOrder = 6;
+  }
   var RANGE_RING_GEO = new qu(0.96, 1, 40);
-  var PROJECTILE_COLOR = { arrow: 16769162, frost: 8382719, cannon: 16751178, poison: 3526479, snare: 13215862, lightning: 16769126 };
+  var PROJECTILE_COLOR = { arrow: 16769162, frost: 8382719, cannon: 16751178, poison: 3526479, snare: 13215862, lightning: 16769126, sniper: 16726843 };
   var nextId = 1;
   function resetBuildingIds() {
     nextId = 1;
@@ -13597,10 +14074,21 @@ button.corner.mute.off { opacity: 0.5; }
       this.maxHp = def.levels[0].hp;
       this.hp = this.maxHp;
       this.cooldown = 0;
+      this.ammo = this.magazine;
       this.mesh = buildMesh(key, 1);
       this.mesh.position.set(x2, 0, z2);
       this.mesh.userData.building = this;
       this._makeBar();
+    }
+    // 이 타워가 쓰는 탄약 종류 (안 쓰는 건물이면 null)
+    get ammoType() {
+      return CFG.ammo.towers[this.key] || null;
+    }
+    get magazine() {
+      return this.ammoType ? this.def.levels[this.level - 1].mag || 0 : 0;
+    }
+    get ammoEmpty() {
+      return !!this.ammoType && this.ammo <= 0;
     }
     // 특화를 고른 타워는 레벨 스탯에 배율·추가 속성을 얹은 값을 쓴다. 매 프레임 조준·사격에서
     // 읽히므로 레벨·특화가 바뀔 때만 다시 만들고 그 뒤로는 캐시를 돌려준다.
@@ -13660,6 +14148,7 @@ button.corner.mute.off { opacity: 0.5; }
       const bg = new Xs(GEO2.bar, MAT2.barBg);
       const fg = new Xs(GEO2.bar, MAT2.barFg.clone());
       fg.position.z = 0.01;
+      barLayer(bg, fg);
       g2.add(bg, fg);
       g2.position.y = this.key === "wall" || this.key === "gate" ? 2.7 : this.key === "workbench" ? 1.6 : this.key === "trap" ? 0.7 : this.key === "harvester" ? 1.9 : 3.4;
       g2.visible = false;
@@ -13667,6 +14156,31 @@ button.corner.mute.off { opacity: 0.5; }
       this.mesh.add(g2);
       this.bar = g2;
       this.barFg = fg;
+      if (this.ammoType) {
+        const a2 = new Wl();
+        const abg = new Xs(GEO2.bar, MAT2.barBg);
+        const afg = new Xs(GEO2.bar, MAT2.barFg.clone());
+        afg.position.z = 0.01;
+        barLayer(abg, afg);
+        a2.add(abg, afg);
+        a2.scale.y = 0.55;
+        a2.position.copy(g2.position);
+        a2.position.y -= 0.26;
+        a2.renderOrder = 5;
+        this.mesh.add(a2);
+        this.ammoBar = a2;
+        this.ammoBarFg = afg;
+        this.refreshAmmoBar();
+      }
+    }
+    refreshAmmoBar() {
+      if (!this.ammoBar) return;
+      const max = this.magazine || 1;
+      const r = Math.max(0, Math.min(1, this.ammo / max));
+      this.ammoBar.visible = true;
+      this.ammoBarFg.scale.x = Math.max(1e-3, r);
+      this.ammoBarFg.position.x = -(1 - r) * 0.75;
+      this.ammoBarFg.material.color.setHex(r <= 0 ? 16734826 : r < 0.25 ? 16763989 : CFG.ammo.types[this.ammoType].color);
     }
     // 보루 버프를 받는 동안 발치에 보라색 고리를 띄운다. 세기에 따라 밝기가 달라진다.
     showBuff(mult) {
@@ -13723,6 +14237,7 @@ button.corner.mute.off { opacity: 0.5; }
       const ratio = this.hp / this.maxHp;
       this.maxHp = st.hp;
       this.hp = Math.min(this.maxHp, Math.max(1, Math.round(this.maxHp * ratio)));
+      this.ammo = this.magazine;
       const old = this.mesh;
       const pos = old.position.clone();
       const parent = old.parent;
@@ -13755,6 +14270,7 @@ button.corner.mute.off { opacity: 0.5; }
     }
     faceBar(camera) {
       if (this.bar.visible) this.bar.quaternion.copy(camera.quaternion);
+      if (this.ammoBar) this.ammoBar.quaternion.copy(camera.quaternion);
     }
   };
   function buildMesh(key, level) {
@@ -13918,6 +14434,16 @@ button.corner.mute.off { opacity: 0.5; }
       ringG.rotation.x = Math.PI / 2;
       ringG.position.y = -0.3;
       turret.add(ringG);
+    } else if (key === "sniper") {
+      const barrel = new Xs(GEO2.sniperBarrel, MAT2.sniper);
+      barrel.rotation.x = Math.PI / 2;
+      barrel.position.z = 1.15;
+      barrel.castShadow = true;
+      const scope = new Xs(GEO2.sniperScope, MAT2.sniperScope);
+      scope.rotation.z = Math.PI / 2;
+      scope.position.set(0, 0.3, 0.15);
+      scope.castShadow = true;
+      turret.add(barrel, scope);
     } else {
       const head = new Xs(GEO2.headCannon, MAT2.cannon);
       head.castShadow = true;
@@ -14134,15 +14660,13 @@ button.corner.mute.off { opacity: 0.5; }
           b.turret.rotation.y = ang;
         }
         if (target && b.cooldown <= 0) {
-          if (b.def.ammo) {
-            if (!this.takeAmmo?.(b.def.ammo)) {
-              b.ammoOut = true;
-              continue;
-            }
-            b.ammoOut = false;
+          const empty = b.ammoEmpty;
+          if (!empty && b.ammoType) {
+            b.ammo -= 1;
+            if (b.ammo <= 0) this.onAmmoEmpty?.(b);
           }
-          b.cooldown = 1 / st.rate;
-          this.shoot(b, target);
+          b.cooldown = 1 / (st.rate * (empty ? CFG.ammo.emptyRateMult : 1));
+          this.shoot(b, target, empty);
         }
       }
     }
@@ -14151,6 +14675,15 @@ button.corner.mute.off { opacity: 0.5; }
       const r = CFG.synergy.frostArrow.radius;
       for (const o of this.buildings.values()) {
         if (o === b || o.key !== "frost") continue;
+        if (dist(b.x, b.z, o.x, o.z) <= r) return true;
+      }
+      return false;
+    }
+    // 저격탑 시너지: hasNearbyFrost와 정확히 같은 구조 — 사거리 안(인접 반경)에 독탑이 있으면 true
+    hasNearbyPoison(b) {
+      const r = CFG.synergy.sniperVenom.radius;
+      for (const o of this.buildings.values()) {
+        if (o === b || o.key !== "poison") continue;
         if (dist(b.x, b.z, o.x, o.z) <= r) return true;
       }
       return false;
@@ -14189,9 +14722,11 @@ button.corner.mute.off { opacity: 0.5; }
       }
       return 1 + Math.min(1, bonus);
     }
-    // 사거리 안에서 크리스탈에 가장 가까운(=가장 위협적인) 적
+    // 사거리 안에서 크리스탈에 가장 가까운(=가장 위협적인) 적을 고른다. targetMode가 "highestHp"인
+    // 타워(저격탑)만 예외로, 대신 사거리 안에서 남은 체력이 가장 많은 적을 고른다.
     _acquire(b, enemies, range) {
-      let best = null, bestScore = Infinity;
+      const byHp = b.def.targetMode === "highestHp";
+      let best = null, bestScore = byHp ? -Infinity : Infinity;
       const r2 = range * range;
       let detector = null;
       for (const e of enemies) {
@@ -14204,6 +14739,13 @@ button.corner.mute.off { opacity: 0.5; }
         }
         const d2 = (e.x - b.x) ** 2 + (e.z - b.z) ** 2;
         if (d2 > r2) continue;
+        if (byHp) {
+          if (e.hp > bestScore) {
+            bestScore = e.hp;
+            best = e;
+          }
+          continue;
+        }
         const score = e.x * e.x + e.z * e.z;
         if (score < bestScore) {
           bestScore = score;
@@ -14214,7 +14756,7 @@ button.corner.mute.off { opacity: 0.5; }
       return best;
     }
     // 투사체 발사 연출 → 명중 시 onImpact (데미지 적용은 호스트에서만)
-    shoot(b, target) {
+    shoot(b, target, empty = false) {
       const st = b.stats;
       const mult = this.supportBuffMult(b);
       let effStats = mult !== 1 ? { ...st, dmg: Math.round(st.dmg * mult) } : st;
@@ -14222,10 +14764,18 @@ button.corner.mute.off { opacity: 0.5; }
         const pm = this.poisonSynergyMult(b);
         if (pm !== 1) effStats = { ...effStats, poisonDps: Math.round(effStats.poisonDps * pm) };
       }
+      if (empty) {
+        const m = CFG.ammo.emptyDmgMult;
+        effStats = { ...effStats };
+        effStats.dmg = Math.max(1, Math.round(effStats.dmg * m));
+        if (effStats.poisonDps) effStats.poisonDps = Math.max(1, Math.round(effStats.poisonDps * m));
+        if (effStats.slowTime) effStats.slowTime = effStats.slowTime * m;
+        if (effStats.root) effStats.root = effStats.root * m;
+      }
       const from = new Ui(b.x, 2.9, b.z);
       const to2 = new Ui(target.x, 0.8, target.z);
       const color = PROJECTILE_COLOR[b.key];
-      const speed = b.key === "cannon" ? 26 : 42;
+      const speed = b.key === "cannon" ? 26 : b.key === "sniper" ? 65 : 42;
       this.projectiles.fire(from, to2, speed, color, (pos) => {
         this.fx.burst(pos.x, pos.y, pos.z, color, b.key === "cannon" ? 12 : 5, b.key === "cannon" ? 6 : 3);
         if (b.key === "cannon") this.fx.ring(pos.x, pos.z, color, st.splash);
@@ -14249,6 +14799,7 @@ button.corner.mute.off { opacity: 0.5; }
       if (this._buffTimer <= 0) {
         this._buffTimer = 0.25;
         for (const b of this.buildings.values()) {
+          if (b.ammoBar) b.refreshAmmoBar();
           if (b.isTower) b.showBuff(this.supportBuffMult(b));
           if (b.key === "arrow") {
             const active = this.hasNearbyFrost(b);
@@ -14263,6 +14814,13 @@ button.corner.mute.off { opacity: 0.5; }
             if (pm > 1 && !b._synergyNotified) {
               b._synergyNotified = true;
               this.onSynergy?.("poisonStack");
+            }
+          } else if (b.key === "sniper") {
+            const active = this.hasNearbyPoison(b);
+            b.showSynergy(active, 9419324);
+            if (active && !b._synergyNotified) {
+              b._synergyNotified = true;
+              this.onSynergy?.("sniperVenom");
             }
           }
         }
@@ -14280,13 +14838,13 @@ button.corner.mute.off { opacity: 0.5; }
     snapshot() {
       const out = [];
       for (const b of this.buildings.values()) {
-        out.push([b.id, b.key, b.gx, b.gz, b.level, Math.round(b.hp), b.ownerId || "", b.spec || ""]);
+        out.push([b.id, b.key, b.gx, b.gz, b.level, Math.round(b.hp), b.ownerId || "", b.spec || "", b.ammo]);
       }
       return out;
     }
     applySnapshot(list) {
       const seen = /* @__PURE__ */ new Set();
-      for (const [id, key, gx, gz, level, hp, owner, spec] of list) {
+      for (const [id, key, gx, gz, level, hp, owner, spec, ammo] of list) {
         seen.add(id);
         let b = this.buildings.get(id);
         if (!b) b = this.place(key, gx, gz, owner, id);
@@ -14302,6 +14860,10 @@ button.corner.mute.off { opacity: 0.5; }
         }
         b.hp = hp;
         b.refreshBar();
+        if (ammo !== void 0 && b.ammoType) {
+          b.ammo = ammo;
+          b.refreshAmmoBar();
+        }
       }
       for (const id of [...this.buildings.keys()]) {
         if (!seen.has(id)) this.remove(id);
@@ -14408,6 +14970,7 @@ button.corner.mute.off { opacity: 0.5; }
         this.chargeCd = CFG.bossPattern.chargeCd * 0.6;
         this.chargeDir = { x: 0, z: 0 };
         this.silenceUntil = 0;
+        this.fortifyUntil = 0;
       }
     }
     get isCasting() {
@@ -14444,8 +15007,10 @@ button.corner.mute.off { opacity: 0.5; }
       }
       const barG = new Wl();
       const bg = new Xs(GEO3.bar, MAT_BAR_BG);
-      const fg = new Xs(GEO3.bar, new es({ color: 16738922, depthTest: false }));
+      const fg = new Xs(GEO3.bar, new es({ color: 16738922, depthTest: false, transparent: true }));
       fg.position.z = 0.01;
+      bg.renderOrder = 5;
+      fg.renderOrder = 6;
       barG.add(bg, fg);
       barG.position.y = 1.9;
       barG.renderOrder = 5;
@@ -14462,7 +15027,12 @@ button.corner.mute.off { opacity: 0.5; }
       this.barFg.scale.x = Math.max(1e-3, r);
       this.barFg.position.x = -(1 - r) * 0.6;
     }
+    // 저항 변종은 셋 다(둔화·속박·중독) 그냥 무시한다 — 서리탑·덫탑·독탑·얼음도끼가 전부 이 세
+    // 메서드 하나씩을 거쳐가므로, 여기서 조용히 리턴하는 것만으로 새 배관 없이 모든 상태이상
+    // 소스에 동시에 면역이 적용된다(반대로 기존 필드는 손대지 않으니 slowUntil 등 기본값 0이
+    // 그대로 유지돼 "항상 안 걸린 상태"와 동일하게 처리된다).
     applySlow(factor, duration, now) {
+      if (this.variant === "resist") return;
       this.slowFactor = Math.min(this.slowFactor, 1 - factor);
       this.slowUntil = Math.max(this.slowUntil, now + duration);
       if (this.bodyMat) {
@@ -14473,6 +15043,7 @@ button.corner.mute.off { opacity: 0.5; }
     // 덫탑 전용 — 둔화(비율 감소)와 달리 이동 속도를 완전히 0으로 묶는다. 슬로우와는 별개 상태라
     // 둘 다 걸려도 root 가 우선한다(simulate() 의 speed 계산에서 처리)
     applyRoot(duration, now) {
+      if (this.variant === "resist") return;
       this.rootUntil = Math.max(this.rootUntil, now + duration);
       if (this.bodyMat) {
         this.bodyMat.emissive?.setHex(13215862);
@@ -14480,6 +15051,7 @@ button.corner.mute.off { opacity: 0.5; }
       }
     }
     applyPoison(dps, duration, now) {
+      if (this.variant === "resist") return;
       this.poisonDps = Math.max(this.poisonDps, dps);
       this.poisonUntil = Math.max(this.poisonUntil, now + duration);
     }
@@ -14487,6 +15059,9 @@ button.corner.mute.off { opacity: 0.5; }
     // 방패 변종: 정면(진행 방향 기준 앞쪽 144˚)에서 맞으면 피해가 크게 줄어든다 — 등 뒤로 돌아가야 제대로 들어간다
     damage(amount, fromX, fromZ) {
       let applied = amount;
+      if (this.fortifyUntil && performance.now() / 1e3 < this.fortifyUntil) {
+        applied = amount * (1 - CFG.bossPattern.fortifyMitigation);
+      }
       if (this.variant === "shield" && typeof fromX === "number") {
         const v = CFG.variants.shield;
         const angToAttacker = Math.atan2(fromX - this.x, fromZ - this.z);
@@ -14653,6 +15228,10 @@ button.corner.mute.off { opacity: 0.5; }
         }
         if (e.st.wild) {
           this._wildTick(e, dt2, now, players);
+          continue;
+        }
+        if (e.st.scout) {
+          this._scoutTick(e, dt2, now);
           continue;
         }
         if (e.st.rallyAura) {
@@ -14848,6 +15427,7 @@ button.corner.mute.off { opacity: 0.5; }
         if (kind === "summon") this._bossSummon(e);
         else if (kind === "silence") this._bossSilence(e);
         else if (kind === "drain") this._bossDrain(e);
+        else if (kind === "fortify") this._bossFortify(e);
         else this._bossBeginCharge(e);
         return true;
       }
@@ -14865,10 +15445,11 @@ button.corner.mute.off { opacity: 0.5; }
         e.summonsDone++;
         const silence = !!e.st.silenceBoss;
         const drain = !!e.st.drainBoss;
-        const kind2 = silence ? "silence" : drain ? "drain" : "summon";
+        const fortify = !!e.st.fortifyBoss;
+        const kind2 = silence ? "silence" : drain ? "drain" : fortify ? "fortify" : "summon";
         e.castKind = kind2;
-        e.castUntil = silence ? P2.silenceCast : drain ? P2.drainCast : P2.summonCast;
-        const color = silence ? 8011711 : drain ? 16766720 : 16733525;
+        e.castUntil = silence ? P2.silenceCast : drain ? P2.drainCast : fortify ? P2.fortifyCast : P2.summonCast;
+        const color = silence ? 8011711 : drain ? 16766720 : fortify ? 8945076 : 16733525;
         this.fx.ring(e.x, e.z, color, 5);
         this.onBossTelegraph?.(e, kind2);
         return true;
@@ -14906,6 +15487,14 @@ button.corner.mute.off { opacity: 0.5; }
     _bossDrain(e) {
       this.fx.ring(e.x, e.z, 16766720, 6);
       this.onBossDrain?.(e);
+    }
+    // 강철 수호자 전용 — 자기 자신에게 방벽을 두른다 (실제 피해 감소 판정은 damage() 가
+    // fortifyUntil 을 직접 읽어서 한다)
+    _bossFortify(e) {
+      const P2 = CFG.bossPattern;
+      e.fortifyUntil = performance.now() / 1e3 + P2.fortifyTime;
+      this.fx.ring(e.x, e.z, 8945076, 5);
+      this.onBossTelegraph?.(e, "fortifyGo");
     }
     _bossBeginCharge(e) {
       const P2 = CFG.bossPattern;
@@ -14955,6 +15544,16 @@ button.corner.mute.off { opacity: 0.5; }
           e.aggroUntil = 0;
         }
       }
+      if (!chasing && st.hunts) {
+        const near2 = this._nearestPlayer(players, e.x, e.z, st.huntRange || 10);
+        if (near2) {
+          e.aggroTarget = near2.id;
+          e.aggroUntil = now + 1;
+          tx = near2.x;
+          tz = near2.z;
+          chasing = true;
+        }
+      }
       if (!chasing) {
         const near = st.flees ? this._nearestPlayer(players, e.x, e.z, st.fleeRange || 12) : null;
         if (near) {
@@ -14990,6 +15589,27 @@ button.corner.mute.off { opacity: 0.5; }
           this.onPlayerHit?.(e, p2);
         }
       }
+      this._face(e, e.x + mx, e.z + mz, dt2);
+      this._applyPosition(e, dt2, now);
+    }
+    // 가장 가까운 포탈을 향해 직선으로 달린다 — 도착 여부(포탈까지 거리) 판정은 game.js 의
+    // _updateScout 가 한다(이 메서드는 순수 이동만 담당)
+    _scoutTick(e, dt2, now) {
+      const portals = this.world.portals;
+      if (!portals || !portals.length) return;
+      let target = portals[0], bestD = Infinity;
+      for (const p2 of portals) {
+        const d2 = (p2.x - e.x) ** 2 + (p2.z - e.z) ** 2;
+        if (d2 < bestD) {
+          bestD = d2;
+          target = p2;
+        }
+      }
+      const dx = target.x - e.x, dz = target.z - e.z;
+      const len = Math.hypot(dx, dz) || 1;
+      const mx = dx / len * e.st.speed, mz = dz / len * e.st.speed;
+      e.x += mx * dt2;
+      e.z += mz * dt2;
       this._face(e, e.x + mx, e.z + mz, dt2);
       this._applyPosition(e, dt2, now);
     }
@@ -15149,6 +15769,9 @@ button.corner.mute.off { opacity: 0.5; }
           } else if (boss === 0 && prevBoss === 1 && e.st.silenceBoss) {
             e.silenceUntil = performance.now() / 1e3 + CFG.bossPattern.silenceTime;
             this.fx.ring(x2, z2, 8011711, CFG.bossPattern.silenceRadius);
+          } else if (boss === 0 && prevBoss === 1 && e.st.fortifyBoss) {
+            e.fortifyUntil = performance.now() / 1e3 + CFG.bossPattern.fortifyTime;
+            this.fx.ring(x2, z2, 8945076, 5);
           }
         }
       }
@@ -15880,7 +16503,8 @@ button.corner.mute.off { opacity: 0.5; }
     bomb: new Zu(0.22, 10, 8),
     whip: new Ku(0.16, 0.04, 6, 14),
     shield: new su(0.32, 0.32, 0.1, 16),
-    ring: new qu(0.62, 0.76, 20)
+    ring: new qu(0.62, 0.76, 20),
+    frostaxe: new au(0.28, 0.62, 4)
   };
   var WEAPON_MAT = {
     default: new sd({ color: 12093775, roughness: 0.7 }),
@@ -15891,7 +16515,8 @@ button.corner.mute.off { opacity: 0.5; }
     hammer: new sd({ color: 7034692, roughness: 0.55, metalness: 0.4 }),
     bomb: new sd({ color: 2829103, roughness: 0.5, metalness: 0.2 }),
     whip: new sd({ color: 4210752, roughness: 0.4, metalness: 0.8 }),
-    shield: new sd({ color: 10466760, roughness: 0.35, metalness: 0.7 })
+    shield: new sd({ color: 10466760, roughness: 0.35, metalness: 0.7 }),
+    frostaxe: new sd({ color: 12577023, emissive: 2777008, emissiveIntensity: 0.55, roughness: 0.3, metalness: 0.25 })
   };
   var WEAPON_LOOK = {
     default: { geo: GEO4.tool, mat: WEAPON_MAT.default, ry: 0, rz: 0 },
@@ -15902,7 +16527,8 @@ button.corner.mute.off { opacity: 0.5; }
     hammer: { geo: GEO4.hammer, mat: WEAPON_MAT.hammer, ry: 0, rz: 0.85 },
     bomb: { geo: GEO4.bomb, mat: WEAPON_MAT.bomb, ry: 0, rz: 0 },
     whip: { geo: GEO4.whip, mat: WEAPON_MAT.whip, ry: Math.PI / 2, rz: 0 },
-    shield: { geo: GEO4.shield, mat: WEAPON_MAT.shield, ry: Math.PI / 2, rz: 0 }
+    shield: { geo: GEO4.shield, mat: WEAPON_MAT.shield, ry: Math.PI / 2, rz: 0 },
+    frostaxe: { geo: GEO4.frostaxe, mat: WEAPON_MAT.frostaxe, ry: 0, rz: 0.6 }
   };
   var PALETTE = [6280447, 10354539, 16757599, 16739286, 14065919, 7077840];
   var Player = class {
@@ -15979,7 +16605,7 @@ button.corner.mute.off { opacity: 0.5; }
     // 기본 공격치에 지금 손에 든 무기의 효과만 더한다 (여러 자루를 동시에 들 수는 없다)
     get attackStats() {
       const base = CFG.player.attack;
-      const out = { dmg: base.dmg, range: base.range, arc: base.arc, cd: base.cd, knockback: 0 };
+      const out = { dmg: base.dmg, range: base.range, arc: base.arc, cd: base.cd, knockback: 0, slow: 0, slowTime: 0 };
       const eff = CFG.craft[this.heldWeapon]?.effect;
       if (eff) for (const k2 of Object.keys(eff)) out[k2] += eff[k2];
       const bonus = CFG.weaponUpgrade.perLv[this.heldWeapon];
@@ -16114,6 +16740,7 @@ button.corner.mute.off { opacity: 0.5; }
       this.dashCd = 0;
       this.dashUntil = 0;
       this.dashDir = { x: 0, z: 1 };
+      this.lastStandUntil = 0;
     }
     // 회피 돌진 시작 — 쿨다운 중이거나 쓰러진 상태면 실패. 이동 입력이 있으면 그 방향으로, 없으면 바라보는 방향으로
     tryDash(input, sm2) {
@@ -16148,12 +16775,13 @@ button.corner.mute.off { opacity: 0.5; }
         return { moved: false };
       }
       this.dashCd -= dt2;
-      this.invulnerable = now < this.dashUntil;
+      const dashing = now < this.dashUntil;
+      this.invulnerable = dashing || now < this.lastStandUntil;
       if (now > this.combatUntil && this.hp < this.maxHp) {
         this.hp = Math.min(this.maxHp, this.hp + CFG.player.regen * dt2);
       }
       let moving;
-      if (this.invulnerable) {
+      if (dashing) {
         const dc2 = CFG.player.dash;
         this.x += this.dashDir.x * dc2.speed * dt2;
         this.z += this.dashDir.z * dc2.speed * dt2;
@@ -16560,7 +17188,12 @@ button.corner.mute.off { opacity: 0.5; }
     riftRing: new qu(0.86, 1, 48),
     riftCore: new ru(1, 32),
     spiritCore: new Xu(0.42, 1),
-    spiritRing: new qu(0.5, 0.64, 24)
+    spiritRing: new qu(0.5, 0.64, 24),
+    petBody: new Zu(0.34, 10, 8),
+    petSnout: new au(0.13, 0.32, 6),
+    petEar: new au(0.09, 0.2, 5),
+    petTail: new au(0.08, 0.4, 5),
+    petRing: new qu(0.42, 0.54, 24)
   };
   var MAT = {
     trunk: new sd({ color: 5979428, roughness: 0.95 }),
@@ -16597,7 +17230,9 @@ button.corner.mute.off { opacity: 0.5; }
     riftRing: new es({ color: 11239935, transparent: true, opacity: 0.75, side: p, depthWrite: false }),
     riftCore: new es({ color: 4530126, transparent: true, opacity: 0.4, side: p, depthWrite: false }),
     spiritCore: new sd({ color: 9430015, emissive: 6736127, emissiveIntensity: 1.6, roughness: 0.2, transparent: true, opacity: 0.92 }),
-    spiritRing: new es({ color: 9430015, transparent: true, opacity: 0.5, side: p, depthWrite: false })
+    spiritRing: new es({ color: 9430015, transparent: true, opacity: 0.5, side: p, depthWrite: false }),
+    petBody: new sd({ color: 6247214, roughness: 0.75 }),
+    petRing: new es({ color: 6247214, transparent: true, opacity: 0.55, side: p, depthWrite: false })
   };
   var World = class {
     constructor(sceneMgr, seed = 1) {
@@ -16887,6 +17522,34 @@ button.corner.mute.off { opacity: 0.5; }
       sr2.visible = false;
       this.scene.add(sr2);
       this.spiritRing = sr2;
+      const petBodyMat = MAT.petBody.clone();
+      const petGroup = new Wl();
+      const petBody = new Xs(GEO.petBody, petBodyMat);
+      petBody.castShadow = true;
+      petGroup.add(petBody);
+      const petSnout = new Xs(GEO.petSnout, petBodyMat);
+      petSnout.rotation.x = Math.PI / 2;
+      petSnout.position.set(0, -0.02, 0.34);
+      petGroup.add(petSnout);
+      for (const side of [-1, 1]) {
+        const ear = new Xs(GEO.petEar, petBodyMat);
+        ear.position.set(0.17 * side, 0.32, 0.05);
+        ear.rotation.z = 0.25 * side;
+        petGroup.add(ear);
+      }
+      const petTail = new Xs(GEO.petTail, petBodyMat);
+      petTail.rotation.x = -Math.PI / 2.6;
+      petTail.position.set(0, 0.08, -0.42);
+      petGroup.add(petTail);
+      petGroup.visible = false;
+      this.scene.add(petGroup);
+      this.petGroup = petGroup;
+      this.petBodyMat = petBodyMat;
+      const pr2 = new Xs(GEO.petRing, MAT.petRing.clone());
+      pr2.rotation.x = -Math.PI / 2;
+      pr2.visible = false;
+      this.scene.add(pr2);
+      this.petRing = pr2;
     }
     setRift(x2, z2, timeLeft, radius) {
       this.rift = { x: x2, z: z2, timeLeft, radius };
@@ -16935,6 +17598,38 @@ button.corner.mute.off { opacity: 0.5; }
       this.spiritRing.visible = true;
       this.spiritRing.position.set(x2, 0.06, z2);
       this.spiritRing.material.opacity = 0.35 + Math.abs(Math.sin(now * 4)) * 0.25;
+    }
+    // 정령과 달리 시간제한이 없어 timeLeft 인자가 없다 — type(여우/늑대)에 따라 색·크기만 다시 칠한다.
+    // lv(먹이주기 레벨)가 오르면 몸집이 조금씩 커져서, 강해졌다는 게 스탯 창을 안 열어봐도 눈으로 보인다.
+    setPet(x2, z2, type, rot, lv) {
+      lv = lv || 0;
+      if (this.pet?.type !== type || this.pet?.lv !== lv) {
+        const tc2 = CFG.tame[type];
+        this.petBodyMat.color.setHex(tc2.color);
+        const base = type === "wolf" ? 1.15 : 0.85;
+        this.petGroup.scale.setScalar(base * (1 + lv * 0.12));
+        this.petRing.material.color.setHex(tc2.color);
+      }
+      this.pet = { x: x2, z: z2, type, rot, lv };
+    }
+    clearPet() {
+      this.pet = null;
+      if (this.petGroup) this.petGroup.visible = false;
+      if (this.petRing) this.petRing.visible = false;
+    }
+    updatePetVisual(now) {
+      if (!this.pet) {
+        if (this.petGroup) this.petGroup.visible = false;
+        if (this.petRing) this.petRing.visible = false;
+        return;
+      }
+      const { x: x2, z: z2, rot } = this.pet;
+      this.petGroup.visible = true;
+      this.petGroup.position.set(x2, 0.36 + Math.abs(Math.sin(now * 5)) * 0.08, z2);
+      if (rot !== void 0) this.petGroup.rotation.y = rot;
+      this.petRing.visible = true;
+      this.petRing.position.set(x2, 0.05, z2);
+      this.petRing.material.opacity = 0.35 + Math.abs(Math.sin(now * 3)) * 0.25;
     }
     setMeteor(x2, z2, timeLeft, radius) {
       this.meteor = { x: x2, z: z2, timeLeft, radius };
@@ -17055,6 +17750,7 @@ button.corner.mute.off { opacity: 0.5; }
       this.updateMeteorVisual(now);
       this.updateRiftVisual(now);
       this.updateSpiritVisual(now);
+      this.updatePetVisual(now);
     }
   };
 
@@ -17094,7 +17790,7 @@ button.corner.mute.off { opacity: 0.5; }
       this.local = new LocalPlayer(this.net.selfId, this.net.name, this._colorIndex(this.net.selfId));
       this.sm.scene.add(this.local.mesh);
       this.players.set(this.local.id, this.local);
-      this.pools.team = { wood: this.difficultyPreset.startWood, stone: this.difficultyPreset.startStone, iron: 0, copper: 0, coal: 0, shard: 0, arrow: 0, meat: { rabbit: 0, deer: 0, boar: 0 } };
+      this.pools.team = { wood: this.difficultyPreset.startWood, stone: this.difficultyPreset.startStone, iron: 0, copper: 0, coal: 0, shard: 0, meat: { rabbit: 0, deer: 0, boar: 0 }, ammo: { ...CFG.ammo.start } };
       this.pools.byId = {};
       this._poolOf(this.local.id);
       this._wireCallbacks();
@@ -17124,7 +17820,9 @@ button.corner.mute.off { opacity: 0.5; }
         comboCount: 0,
         repairPostHealed: 0,
         mimicsKilled: 0,
-        blocksCount: 0
+        blocksCount: 0,
+        dishesCooked: [],
+        scoutsIntercepted: 0
       };
       this._waveMark = { time: 0, kills: 0 };
       this._bossActive = false;
@@ -17141,7 +17839,28 @@ button.corner.mute.off { opacity: 0.5; }
       this._seenBow = false;
       this._seenHealer = false;
       this._seenBlock = false;
-      this.boonMult = { atk: 1, towerDmg: 1, skillCostDelta: 0, bounty: 1, crystalUpgradeCostDelta: 0, weaponUpgradeCostDelta: 0, weaponSpecCostDelta: 0, prepDelta: 0, venomChance: 0, desperationBonus: 0 };
+      this._seenSniper = false;
+      this._seenBomber = false;
+      this._seenBurrower = false;
+      this._seenChain = false;
+      this._seenCombo = false;
+      this._seenCommander = false;
+      this._seenDetect = false;
+      this._seenFoxGuard = false;
+      this._seenFrostaxe = false;
+      this._seenHarvester = false;
+      this._seenHunt = false;
+      this._seenKnockback = false;
+      this._seenRaccoon = false;
+      this._seenReflect = false;
+      this._seenRepairPost = false;
+      this._seenSniperSynergy = false;
+      this._seenTreasure = false;
+      this._seenWolf = false;
+      this._seenAmmoEmpty = false;
+      this._seenArmory = false;
+      this._lastStandReady = false;
+      this.boonMult = { atk: 1, towerDmg: 1, skillCostDelta: 0, bounty: 1, crystalUpgradeCostDelta: 0, weaponUpgradeCostDelta: 0, weaponSpecCostDelta: 0, prepDelta: 0, venomChance: 0, desperationBonus: 0, moveSpeedMult: 1 };
       this.pendingBoon = null;
       this._queuedEndlessBoon = false;
       this._dropTimer = CFG.supplyDrop.firstDelay;
@@ -17151,21 +17870,48 @@ button.corner.mute.off { opacity: 0.5; }
       this._huntTimer = 0;
       this.feast = { kind: null, wavesLeft: 0 };
       this._spirit = null;
+      this._pet = null;
       this._meteorPending = null;
       this.world.clearMeteor();
       this.world.clearSpirit();
+      this.world.clearPet();
       this._treasureTimer = CFG.treasureEvent.firstDelay;
       this._treasureId = null;
       this._treasureLifeLeft = 0;
+      this._scoutTimer = CFG.scoutEvent.firstDelay;
+      this._scoutId = null;
+      this._scoutLifeLeft = 0;
       this._merchant = null;
-      this.tempBoon = { atk: 1, towerDmg: 1, atkWavesLeft: 0, towerWavesLeft: 0 };
+      this.tempBoon = { atk: 1, towerDmg: 1, speed: 1, atkWavesLeft: 0, towerWavesLeft: 0, speedWavesLeft: 0 };
       this._pingCd = 0;
       this.buildMode = null;
       this.paused = false;
       this.running = true;
       this.result = null;
+      if (!resumed) this._grantMetaPerks();
       this.sm.focus.set(this.local.x, 0, this.local.z);
       this.ui?.onGameStart(resumed);
+    }
+    // 🏕️ 원정 준비(로비의 영구 메타 업그레이드)를 판 시작 시 실제 플레이어 상태에 반영한다.
+    // 호스트는 자기 자신의 플레이어 객체를 바로 고치면 그게 곧 다음 스냅샷의 근거가 되지만,
+    // 참가자가 자기 로컬 상태만 고치면 호스트가 모르는 값이라 다음 스냅샷에 그대로 덮여 사라진다
+    // — 그래서 참가자는 craft/upgrade 같은 다른 액션과 똑같이 호스트에게 요청만 보낸다.
+    _grantMetaPerks() {
+      const perks = computeMetaPerks();
+      this._lastStandReady = !!perks.lastStand;
+      if (perks.harvestLv <= 1 && perks.tools.length === 0 && perks.hpBonus <= 0) return;
+      if (this.isHost) this._applyMetaPerks(this.local.id, perks);
+      else this.net.send("metaPerks", perks);
+    }
+    _applyMetaPerks(playerId, perks) {
+      const p2 = this.players.get(playerId);
+      if (!p2) return;
+      if (perks.harvestLv > p2.harvestLv) p2.harvestLv = perks.harvestLv;
+      for (const k2 of perks.tools || []) p2.tools[k2] = true;
+      if (perks.hpBonus > 0) {
+        p2.maxHp = CFG.player.hp + perks.hpBonus;
+        p2.hp = p2.maxHp;
+      }
     }
     dispose() {
       if (!this.grid) return;
@@ -17193,11 +17939,17 @@ button.corner.mute.off { opacity: 0.5; }
     }
     _poolOf(id) {
       if (this.shared) return this.pools.team;
-      if (!this.pools.byId[id]) this.pools.byId[id] = { wood: this.difficultyPreset.startWood, stone: this.difficultyPreset.startStone, iron: 0, copper: 0, coal: 0, shard: 0, arrow: 0, meat: { rabbit: 0, deer: 0, boar: 0 } };
+      if (!this.pools.byId[id]) this.pools.byId[id] = { wood: this.difficultyPreset.startWood, stone: this.difficultyPreset.startStone, iron: 0, copper: 0, coal: 0, shard: 0, meat: { rabbit: 0, deer: 0, boar: 0 }, ammo: { ...CFG.ammo.start } };
       return this.pools.byId[id];
     }
     get myPool() {
       return this._poolOf(this.local.id);
+    }
+    // 구버전 저장(탄약 시스템 이전)에는 이 칸이 없다 — 읽는 쪽에서 조용히 만들어 준다.
+    // 생고기(pool.meat)가 쓰는 것과 정확히 같은 지연 초기화 패턴이다.
+    _ammoOf(pool) {
+      if (!pool.ammo) pool.ammo = { ...CFG.ammo.start };
+      return pool.ammo;
     }
     _harvestLvOf(id) {
       const p2 = this.players.get(id);
@@ -17205,12 +17957,12 @@ button.corner.mute.off { opacity: 0.5; }
     }
     // ---------------------------------------------------------------- 콜백 연결
     _wireCallbacks() {
-      this.buildMgr.takeAmmo = (kind) => this._takeAmmo(kind);
       this.buildMgr.onImpact = (b, st, pos) => {
         if (!this.isHost) return;
         const targets = st.splash ? this.enemyMgr.list.filter((e) => !e.dead && dist(e.x, e.z, pos.x, pos.z) <= st.splash) : this.enemyMgr.list.filter((e) => !e.dead && dist(e.x, e.z, pos.x, pos.z) <= 1.2);
         if (!targets.length) return;
         const now = performance.now() / 1e3;
+        const sniperSynergy = b.key === "sniper" && this.buildMgr.hasNearbyPoison(b);
         if (st.chain) {
           let candidates = this.enemyMgr.list.filter((e) => !e.dead);
           let last2 = pos;
@@ -17234,6 +17986,7 @@ button.corner.mute.off { opacity: 0.5; }
           hitChain.forEach((e, i) => {
             const wasRooted = now < e.rootUntil;
             let base = st.dmg * Math.pow(st.chain.falloff, i);
+            if (sniperSynergy && now < e.poisonUntil) base *= 1 + CFG.synergy.sniperVenom.dmgMult;
             if (wasRooted) {
               base *= 1 + CFG.synergy.rootSnare.dmgMult;
               if (!this._seenRootSynergy) {
@@ -17260,6 +18013,7 @@ button.corner.mute.off { opacity: 0.5; }
           if (st.root) e.applyRoot(st.root, now);
           let base = st.dmg;
           if (frostSynergy && now < e.slowUntil) base *= 1 + CFG.synergy.frostArrow.dmgMult;
+          if (sniperSynergy && now < e.poisonUntil) base *= 1 + CFG.synergy.sniperVenom.dmgMult;
           if (wasRooted) {
             base *= 1 + CFG.synergy.rootSnare.dmgMult;
             if (!this._seenRootSynergy) {
@@ -17285,6 +18039,12 @@ button.corner.mute.off { opacity: 0.5; }
         } else if (kind === "drain") {
           this.ui?.toast(`${nm}\uAC00 \uC790\uC6D0\uC744 \uD6D4\uCE60 \uC900\uBE44\uB97C \uD55C\uB2E4 \u2014 \uC9C0\uAE08 \uD654\uB825\uC744 \uBAB0\uC544 \uB04A\uC5B4\uB77C!`, "warn");
           this.sfx.bossWaveStart();
+        } else if (kind === "fortify") {
+          this.ui?.toast(`${nm}\uAC00 \uBC29\uBCBD\uC744 \uB450\uB97C \uC900\uBE44\uB97C \uD55C\uB2E4 \u2014 \uBC1C\uB3D9\uD558\uBA74 \uBC1B\uB294 \uD53C\uD574\uAC00 \uD06C\uAC8C \uC904\uC5B4\uB4E0\uB2E4!`, "warn");
+          this.sfx.bossWaveStart();
+        } else if (kind === "fortifyGo") {
+          this.ui?.toast(`\u{1F5FF} \uBB34\uC1E0 \uBC29\uBCBD \uBC1C\uB3D9! \uC7A0\uC2DC \uBC1B\uB294 \uD53C\uD574\uAC00 \uD06C\uAC8C \uC904\uC5C8\uB2E4 \u2014 \uBB34\uB9AC\uD574\uC11C \uC3DF\uC544\uBD93\uC9C0 \uB9D0\uACE0 \uB2E4\uC74C \uAD6D\uBA74\uC744 \uC900\uBE44\uD558\uC790`, "bad");
+          this.fx.ring(e.x, e.z, 8945076, 5);
         } else if (kind === "charge") {
           this.ui?.toast(`${nm}\uAC00 \uB3CC\uC9C4 \uC790\uC138\uB97C \uC7A1\uB294\uB2E4 \u2014 \uAE38\uC744 \uBE44\uCF1C\uB77C!`, "warn");
           this.sfx.bossWaveStart();
@@ -17302,6 +18062,12 @@ button.corner.mute.off { opacity: 0.5; }
         if (this._seenDetect) return;
         this._seenDetect = true;
         this.ui?.toast("\u{1F5FC} \uAC10\uC2DC\uD0D1\uC774 \uD30C\uBB3B\uD78C \uAD74\uCC29\uBCD1\uC744 \uCC3E\uC544\uB0C8\uB2E4! \uBC18\uACBD \uC548 \uD0C0\uC6CC\uAC00 \uC870\uC900\uD560 \uC218 \uC788\uB2E4", "good");
+      };
+      this.buildMgr.onAmmoEmpty = (b) => {
+        const a2 = CFG.ammo.types[b.ammoType];
+        if (this._seenAmmoEmpty) return;
+        this._seenAmmoEmpty = true;
+        this.ui?.toast(`${a2.icon} ${b.def.name}\uC758 ${a2.name}\uC774(\uAC00) \uB5A8\uC5B4\uC84C\uB2E4! \uD53C\uD574\uAC00 \uD06C\uAC8C \uC900\uB2E4 \u2014 \uAC00\uAE4C\uC774 \uAC00\uC11C \uC7AC\uC7A5\uC804(${keyLabel(this.km.get("reload"))})\uD558\uAC70\uB098 \u{1F3ED} \uBCD1\uAE30\uCC3D\uC744 \uC9C0\uC5B4 \uC790\uB3D9 \uBCF4\uAE09\uD558\uC790`, "bad");
       };
       this.enemyMgr.onBossSummon = (e, n) => {
         const msg = e.st.summonVariant === "shield" ? `\u{1F6E1}\uFE0F \uBC29\uD328 \uB450\uB978 \uC7A1\uC878 ${n}\uB9C8\uB9AC\uAC00 \uD280\uC5B4\uB098\uC654\uB2E4 \u2014 \uB4F1 \uB4A4\uB97C \uB178\uB824\uB77C` : `\uC7A1\uC878 ${n}\uB9C8\uB9AC\uAC00 \uD280\uC5B4\uB098\uC654\uB2E4`;
@@ -17405,12 +18171,19 @@ button.corner.mute.off { opacity: 0.5; }
           regen: "\uC7A0\uC2DC\uB77C\uB3C4 \uC548 \uB54C\uB9AC\uBA74 \uCCB4\uB825\uC774 \uB3C4\uB85C \uCC28\uC624\uB978\uB2E4 \u2014 \uB05D\uAE4C\uC9C0 \uBAB0\uC544\uCCD0\uB77C",
           ward: "\uD0C0\uC6CC\uAC00 \uC870\uC900\uD558\uC9C0 \uBABB\uD55C\uB2E4 \u2014 \uC9C1\uC811 \uB2EC\uB824\uAC00\uC11C \uADFC\uC811\uC774\uB098 \uC2A4\uD0AC\uB85C \uCC98\uCE58\uD574\uC57C \uD55C\uB2E4",
           thorn: "\uADFC\uC811\uC73C\uB85C \uB54C\uB9AC\uBA74 \uC900 \uD53C\uD574\uC758 \uC77C\uBD80\uB97C \uADF8\uB300\uB85C \uB3CC\uB824\uBC1B\uB294\uB2E4 \u2014 \uBB34\uAE30 \uAC15\uD654\uAC00 \uC798 \uB410\uC744\uC218\uB85D \uBC18\uC0AC\uB3C4 \uC138\uC9C4\uB2E4",
-          vampire: "\uD06C\uB9AC\uC2A4\uD0C8\xB7\uAC74\uBB3C\xB7\uD50C\uB808\uC774\uC5B4\uB97C \uB54C\uB9B4 \uB54C\uB9C8\uB2E4 \uADF8 \uD53C\uD574\uC758 \uC77C\uBD80\uB97C \uCCB4\uB825\uC73C\uB85C \uB418\uB3CC\uB9B0\uB2E4 \u2014 \uB194\uB450\uBA74 \uACC4\uC18D \uD68C\uBCF5\uD558\uB2C8 \uCD5C\uC6B0\uC120\uC73C\uB85C \uB04A\uC5B4\uC57C \uD55C\uB2E4"
+          vampire: "\uD06C\uB9AC\uC2A4\uD0C8\xB7\uAC74\uBB3C\xB7\uD50C\uB808\uC774\uC5B4\uB97C \uB54C\uB9B4 \uB54C\uB9C8\uB2E4 \uADF8 \uD53C\uD574\uC758 \uC77C\uBD80\uB97C \uCCB4\uB825\uC73C\uB85C \uB418\uB3CC\uB9B0\uB2E4 \u2014 \uB194\uB450\uBA74 \uACC4\uC18D \uD68C\uBCF5\uD558\uB2C8 \uCD5C\uC6B0\uC120\uC73C\uB85C \uB04A\uC5B4\uC57C \uD55C\uB2E4",
+          resist: "\uB454\uD654\xB7\uC18D\uBC15\xB7\uC911\uB3C5\uC744 \uC804\uBD80 \uBB34\uC2DC\uD55C\uB2E4 \u2014 \uC11C\uB9AC\uD0D1\xB7\uB36B\uD0D1\xB7\uB3C5\uD0D1\xB7\uC5BC\uC74C\uB3C4\uB07C\uAC00 \uC548 \uD1B5\uD558\uB2C8 \uC21C\uC218 \uB300\uBBF8\uC9C0\uB85C \uBC00\uC5B4\uBD99\uC5EC\uC57C \uD55C\uB2E4"
         };
         const hint = HINTS[e.variant] || "";
         this.ui?.toast(`${v.icon} ${v.name} \uBCC0\uC885 \uB4F1\uC7A5! ${hint}`, "warn");
       };
       this.buildMgr.onSynergy = (kind) => {
+        if (kind === "sniperVenom") {
+          if (this._seenSniperSynergy) return;
+          this._seenSniperSynergy = true;
+          this.ui?.toast("\u{1F3AF}\u2620\uFE0F \uC2DC\uB108\uC9C0 \uBC1C\uB3D9! \uB3C5\uD0D1 \uADFC\uCC98 \uC800\uACA9\uD0D1\uC774 \uC911\uB3C5\uB41C \uC801\uC5D0\uAC8C \uCD94\uAC00 \uD53C\uD574\uB97C \uC900\uB2E4", "good");
+          return;
+        }
         if (this._seenSynergy) return;
         this._seenSynergy = true;
         const msg = kind === "frostArrow" ? "\u{1F9CA}\u{1F3F9} \uC2DC\uB108\uC9C0 \uBC1C\uB3D9! \uC11C\uB9AC\uD0D1 \uADFC\uCC98 \uD654\uC0B4\uD0D1\uC774 \uB454\uD654\uB41C \uC801\uC5D0\uAC8C \uCD94\uAC00 \uD53C\uD574\uB97C \uC900\uB2E4" : "\u2620\uFE0F\u2620\uFE0F \uC2DC\uB108\uC9C0 \uBC1C\uB3D9! \uAC00\uAE4C\uC774 \uBAA8\uC778 \uB3C5\uD0D1\uB07C\uB9AC \uB3C5 \uD53C\uD574\uAC00 \uAC15\uD574\uC9C4\uB2E4";
@@ -17459,10 +18232,21 @@ button.corner.mute.off { opacity: 0.5; }
         this.sfx.harvestDone(node.type);
       };
       this.enemyMgr.onPlayerHit = (e, p2) => {
-        const dmg = p2.blocking ? Math.round(e.st.dmg * (1 - p2.blockStats.mitigation)) : e.st.dmg;
+        const base = p2.blocking ? e.st.dmg * (1 - p2.blockStats.mitigation) : e.st.dmg;
+        const dmg = Math.round(base * this.feastArmorMult);
         if (p2.id === this.local.id) this._hurtLocal(dmg);
         else this.net.send("hurt", { to: p2.id, dmg });
         this._variantLeech(e, dmg);
+        if (this.feastGuardPct > 0 && !e.dead) {
+          const reflectDmg = Math.round(dmg * this.feastGuardPct);
+          if (reflectDmg > 0) {
+            this._hurtEnemy(e, reflectDmg, "player", p2.x, p2.z);
+            if (!this._seenFoxGuard) {
+              this._seenFoxGuard = true;
+              this.ui?.toast("\u{1F372} \uC5EC\uC6B0 \uC2A4\uD29C \uD6A8\uACFC\uB85C \uACF5\uACA9\uC790\uC5D0\uAC8C \uD53C\uD574\uB97C \uBC18\uC0AC\uD588\uB2E4!", "good");
+            }
+          }
+        }
         if (p2.blocking) {
           if (p2.id === this.local.id && !this._seenBlock) {
             this._seenBlock = true;
@@ -17570,6 +18354,7 @@ button.corner.mute.off { opacity: 0.5; }
       const t2 = this.tempBoon;
       if (t2.atkWavesLeft > 0 && --t2.atkWavesLeft <= 0) t2.atk = 1;
       if (t2.towerWavesLeft > 0 && --t2.towerWavesLeft <= 0) t2.towerDmg = 1;
+      if (t2.speedWavesLeft > 0 && --t2.speedWavesLeft <= 0) t2.speed = 1;
       this._decayFeast();
     }
     // 떠돌이 상인: 웨이브 클리어 직후(호스트에서만) 확률적으로 등장해, 이번 준비 시간에만
@@ -17606,35 +18391,75 @@ button.corner.mute.off { opacity: 0.5; }
       payCost(pool, o.cost);
       this._trackSpend(o.cost, "merchant");
       bought.push(key);
-      this._applyMerchantEffect(playerId, o);
-      this._notify(playerId, `${o.icon} ${o.name} \uAD6C\uB9E4! ${o.desc}`, "good");
+      const customMsg = this._applyMerchantEffect(playerId, o);
+      this._notify(playerId, customMsg || `${o.icon} ${o.name} \uAD6C\uB9E4! ${o.desc}`, "good");
       if (playerId === this.local.id) this.sfx.upgrade();
     }
     _applyMerchantEffect(playerId, o) {
       if (o.kind === "heal") {
         this.world.healCrystal(o.value);
       } else if (o.kind === "tempAtk") {
-        this.tempBoon.atk = o.value;
+        this.tempBoon.atk = Math.max(this.tempBoon.atk, o.value);
         this.tempBoon.atkWavesLeft = 1;
       } else if (o.kind === "tempTower") {
-        this.tempBoon.towerDmg = o.value;
+        this.tempBoon.towerDmg = Math.max(this.tempBoon.towerDmg, o.value);
         this.tempBoon.towerWavesLeft = 1;
+      } else if (o.kind === "tempSpeed") {
+        this.tempBoon.speed = Math.max(this.tempBoon.speed, o.value);
+        this.tempBoon.speedWavesLeft = 1;
       } else if (o.kind === "shard" || o.kind === "iron") {
         const pool = this._poolOf(playerId);
         pool[o.kind] = (pool[o.kind] || 0) + o.value;
+      } else if (o.kind === "repairAll") {
+        for (const b of this.buildMgr.buildings.values()) {
+          if (b.hp >= b.maxHp) continue;
+          b.hp = b.maxHp;
+          b.refreshBar();
+        }
+      } else if (o.kind === "mystery") {
+        return this._applyMysteryBox(playerId);
       }
+    }
+    // 다른 7개 품목과 달리 결과를 미리 알 수 없다 — 세 결과지 중 하나를 그 자리에서 굴려서
+    // 적용하고, 실제로 무엇이 나왔는지는 반환하는 메시지로만 알려준다(구매 버튼의 desc는
+    // 일부러 결과를 밝히지 않는다).
+    _applyMysteryBox(playerId) {
+      const r = Math.random();
+      if (r < 0.4) {
+        this.world.healCrystal(20);
+        return "\u{1F381} \uAF5D... \uADF8\uB798\uB3C4 \uD06C\uB9AC\uC2A4\uD0C8 \uCCB4\uB825\uC744 20 \uD68C\uBCF5\uD588\uB2E4";
+      }
+      if (r < 0.75) {
+        const pool = this._poolOf(playerId);
+        pool.wood = (pool.wood || 0) + 80;
+        pool.stone = (pool.stone || 0) + 80;
+        return "\u{1F381} \uD589\uC6B4! \uBAA9\uC7AC 80 \xB7 \uAD11\uBB3C 80\uC744 \uB450\uB451\uD558\uAC8C \uCC59\uACBC\uB2E4";
+      }
+      this.tempBoon.atk = Math.max(this.tempBoon.atk, 1.5);
+      this.tempBoon.atkWavesLeft = 1;
+      this.tempBoon.towerDmg = Math.max(this.tempBoon.towerDmg, 1.5);
+      this.tempBoon.towerWavesLeft = 1;
+      return "\u{1F381} \uB300\uBC15!! \uB2E4\uC74C \uC6E8\uC774\uBE0C \uB3D9\uC548 \uADFC\uC811\xB7\uD0C0\uC6CC \uACF5\uACA9\uB825\uC774 \uBAA8\uB450 +50%!";
     }
     // playerId 를 넘기면 그 사람의 개인 행동에 대한 업적이라는 뜻 — 호스트가 참가자 대신 처리하는
     // 액션(스킬 사용 등)에서 이걸 안 넘기면, 실제로는 참가자가 한 행동인데 호스트 자신의 브라우저에
     // 업적이 잘못 붙는 사고가 난다(호스트만 _unlockAchievement 를 실행하기 때문). 팀 단위 업적(보스
     // 처치, 웨이브 클리어 조건 등)은 그대로 playerId 없이 호출한다.
+    // playerId 가 자기 자신이 아니면(호스트가 참가자를 대신 처리한 경우) 여기서 끝내지 않고
+    // "unlockAch" 로 그 참가자에게 전달한다 — 원래는 조용히 return만 해서 아무도(호스트도
+    // 참가자도) 실제로 업적을 못 받았다(weaponMaster·skillUser가 참가자 쪽에서는 절대 안 뜨는
+    // 버그였다). _notify 와 정확히 같은 "본인이면 로컬 처리, 아니면 net.send" 배관을 재사용했다.
     _unlockAchievement(key, playerId) {
-      if (playerId !== void 0 && playerId !== this.local.id) return;
+      if (playerId !== void 0 && playerId !== this.local.id) {
+        this.net.send("unlockAch", { to: playerId, key });
+        return;
+      }
       if (!unlock(key)) return;
       const a = ACHIEVEMENTS[key];
       this.stats.newAchievements.push(key);
       this.ui?.toast(`\u{1F3C6} \uC5C5\uC801 \uB2EC\uC131! ${a.icon} ${a.name} \u2014 ${a.desc}`, "good");
       this.sfx.upgrade();
+      if (this.net.online) this.net.send("achAnnounce", { name: this.local.name, icon: a.icon, title: a.name });
     }
     // 함정: 길을 막지 않고 적이 밟기를 기다린다 (호스트에서만 판정 — 결과는 스냅샷으로 퍼진다)
     _updateTraps() {
@@ -17757,9 +18582,10 @@ button.corner.mute.off { opacity: 0.5; }
       this._huntTimer -= dt2;
       if (this._huntTimer > 0) return;
       this._huntTimer = c2.spawnGap;
-      const total = Object.values(c2.weights).reduce((a2, b2) => a2 + b2, 0);
+      const weights = this.wave.wave >= (c2.wolfMinWave ?? 0) ? c2.weights : Object.fromEntries(Object.entries(c2.weights).filter(([k2]) => k2 !== "wolf"));
+      const total = Object.values(weights).reduce((a2, b2) => a2 + b2, 0);
       let roll = Math.random() * total, type = "rabbit";
-      for (const [k2, w2] of Object.entries(c2.weights)) {
+      for (const [k2, w2] of Object.entries(weights)) {
         roll -= w2;
         if (roll <= 0) {
           type = k2;
@@ -17772,6 +18598,10 @@ button.corner.mute.off { opacity: 0.5; }
       if (e && !this._seenHunt) {
         this._seenHunt = true;
         this.ui?.toast("\u{1F98C} \uC57C\uC0DD \uB3D9\uBB3C\uC774 \uBCF4\uC778\uB2E4! \uC900\uBE44 \uC2DC\uAC04\uC5D0\uB9CC \uB098\uD0C0\uB09C\uB2E4 \u2014 \uC7A1\uC73C\uBA74 \uC0DD\uACE0\uAE30\uB97C \uC5BB\uACE0, \uD654\uB85C\uC5D0\uC11C \uAD6C\uC6CC \uBA39\uC73C\uBA74 \uB2E4\uC74C \uC6E8\uC774\uBE0C \uB3D9\uC548 \uAC15\uD574\uC9C4\uB2E4", "good");
+      }
+      if (e && type === "wolf" && !this._seenWolf) {
+        this._seenWolf = true;
+        this.ui?.toast("\u{1F43A} \uB291\uB300 \uB4F1\uC7A5! \uB2E4\uB978 \uC0AC\uB0E5\uAC10\uACFC \uB2EC\uB9AC \uBA3C\uC800 \uAC74\uB4DC\uB9AC\uC9C0 \uC54A\uC544\uB3C4 \uAC00\uAE4C\uC774 \uAC00\uBA74 \uC2A4\uC2A4\uB85C \uCAD3\uC544\uC628\uB2E4 \u2014 \uBB34\uC7A5 \uC5C6\uC774 \uBC29\uC2EC\uD558\uC9C0 \uB9D0 \uAC83", "warn");
       }
     }
     // 웨이브가 시작되면 사냥감은 전부 도망친다 — 전투 중에 섞여 있으면 표적이 헷갈리고,
@@ -17809,9 +18639,16 @@ button.corner.mute.off { opacity: 0.5; }
       meat[key] -= 1;
       pool.wood -= r.wood;
       this._trackSpend({ wood: r.wood }, "craft");
+      if (this.feast.kind && this.feast.kind !== r.kind && this.feast.wavesLeft > 0) {
+        this._notify(playerId, `\uAE30\uC874 \uC694\uB9AC \uD6A8\uACFC\uAC00 \uC0AC\uB77C\uC9C0\uACE0 ${r.name} \uD6A8\uACFC\uB85C \uBC14\uB01D\uB2C8\uB2E4 (\uD55C \uBC88\uC5D0 \uD558\uB098\uB9CC \uC720\uC9C0\uB41C\uB2E4)`, "warn");
+      }
       this.feast = { kind: r.kind, wavesLeft: 1 };
       if (r.kind === "vigor") this._applyVigor(playerId, r.value);
       this._notify(playerId, `${r.icon} ${r.name}\uC744(\uB97C) \uBA39\uC5C8\uB2E4! ${r.desc}`, "good");
+      if (!this.stats.dishesCooked.includes(key)) {
+        this.stats.dishesCooked.push(key);
+        if (this.stats.dishesCooked.length >= Object.keys(CFG.cook).length) this._unlockAchievement("gourmet", playerId);
+      }
       if (playerId === this.local.id) this.sfx.upgrade();
     }
     // 사슴 스테이크: 최대 체력을 올리고 그만큼 즉시 회복시킨다(크리스탈 강화의 armor 와 같은 방식)
@@ -17839,6 +18676,12 @@ button.corner.mute.off { opacity: 0.5; }
     }
     get feastMightMult() {
       return this.feast.kind === "might" ? CFG.cook.boar.value : 1;
+    }
+    get feastGuardPct() {
+      return this.feast.kind === "guard" ? CFG.cook.fox.value : 0;
+    }
+    get feastArmorMult() {
+      return this.feast.kind === "armor" ? CFG.cook.wolf.value : 1;
     }
     _updateTreasure(dt2) {
       const c2 = CFG.treasureEvent;
@@ -17872,6 +18715,40 @@ button.corner.mute.off { opacity: 0.5; }
       this._treasureId = e.id;
       this._treasureLifeLeft = c2.lifetime;
       this._treasureWarned = false;
+    }
+    // 정찰병 — 보물게와 같은 "호스트 전용 타이머 + enemyMgr에 실제 개체로 스폰" 패턴이지만
+    // 전투가 아니라 준비 시간에만 뜨고, 목적어가 반대다(잡아야 이득이 아니라 놓치면 손해).
+    // 포탈까지 도달하면(_scoutTick이 미리 그쪽으로 이동시켜 둔다) 다음 웨이브에 페널티를 예약한다.
+    _updateScout(dt2) {
+      const c2 = CFG.scoutEvent;
+      if (this._scoutId != null) {
+        const e2 = this.enemyMgr.list.find((x2) => x2.id === this._scoutId);
+        if (!e2) {
+          this._scoutId = null;
+          return;
+        }
+        const reachedPortal = this.world.portals.some((p2) => dist(e2.x, e2.z, p2.x, p2.z) <= c2.catchRadius);
+        this._scoutLifeLeft -= dt2;
+        if (reachedPortal || this._scoutLifeLeft <= 0) {
+          this.fx.burst(e2.x, 1, e2.z, CFG.enemies.scout.color, 10, 4);
+          this.enemyMgr.kill(e2);
+          this._scoutId = null;
+          this.wave._scoutPenalty = true;
+          this.ui?.toast("\u{1F575}\uFE0F \uC815\uCC30\uBCD1\uC744 \uB193\uCCE4\uB2E4! \uB2E4\uC74C \uC6E8\uC774\uBE0C\uAC00 \uB354 \uAC15\uD574\uC9C4\uB2E4", "bad");
+        }
+        return;
+      }
+      if (this.wave.phase !== PHASE.PREP || this.wave.wave + 1 < c2.minWave) return;
+      this._scoutTimer -= dt2;
+      if (this._scoutTimer > 0) return;
+      this._scoutTimer = c2.minGap + Math.random() * (c2.maxGap - c2.minGap);
+      const a = Math.random() * Math.PI * 2;
+      const r = c2.spawnRadius[0] + Math.random() * (c2.spawnRadius[1] - c2.spawnRadius[0]);
+      const e = this.enemyMgr.spawn("scout", this.wave.wave + 1, Math.cos(a) * r, Math.sin(a) * r);
+      if (!e) return;
+      this._scoutId = e.id;
+      this._scoutLifeLeft = c2.lifetime;
+      this.ui?.toast("\u{1F575}\uFE0F \uC815\uCC30\uBCD1\uC774 \uB098\uD0C0\uB0AC\uB2E4! \uD3EC\uD0C8\uC5D0 \uB2FF\uAE30 \uC804\uC5D0 \uC7A1\uC544\uC57C \uB2E4\uC74C \uC6E8\uC774\uBE0C\uAC00 \uC548 \uAC15\uD574\uC9C4\uB2E4", "warn");
     }
     // 웨이브가 시작되면(전투 진입) 상인은 즉시 자리를 뜬다 — 준비 시간에만 파는 한정 품목이라는
     // 뜻이다. 호스트에서만 지운다(스냅샷의 mc 필드가 null이 되면 참가자 화면도 그대로 따라온다).
@@ -17967,6 +18844,9 @@ button.corner.mute.off { opacity: 0.5; }
           if (["boss", "frostlord", "warden", "looter"].every((t2) => this.stats.bossKillsSeen.includes(t2))) {
             this._unlockAchievement("fourKings");
           }
+          if (["boss", "frostlord", "warden", "looter", "colossus"].every((t2) => this.stats.bossKillsSeen.includes(t2))) {
+            this._unlockAchievement("fiveGuardians");
+          }
         } else {
           this.sfx.enemyDeath();
         }
@@ -17987,6 +18867,12 @@ button.corner.mute.off { opacity: 0.5; }
           this.ui?.toast(`${e.st.icon} ${e.st.name} \uC0AC\uB0E5! \uC0DD\uACE0\uAE30\uB97C \uC5BB\uC5C8\uB2E4 \u2014 \uD654\uB85C\uC5D0\uC11C \uAD6C\uC6CC \uBA39\uC5B4\uB77C`, "good");
           this.stats.animalsHunted = (this.stats.animalsHunted || 0) + 1;
           if (this.stats.animalsHunted >= 10) this._unlockAchievement("hunter");
+        }
+        if (e.st.scout) {
+          this._scoutId = null;
+          this.stats.scoutsIntercepted = (this.stats.scoutsIntercepted || 0) + 1;
+          this.ui?.toast("\u{1F575}\uFE0F \uC815\uCC30\uBCD1 \uCC98\uCE58! \uB2E4\uC74C \uC6E8\uC774\uBE0C \uD398\uB110\uD2F0\uB97C \uB9C9\uC558\uB2E4", "good");
+          if (this.stats.scoutsIntercepted >= 3) this._unlockAchievement("interceptor");
         }
         const b = e.st.bounty;
         const nightMult = (this.wave.wave + 1) % CFG.wave.nightEvery === 0 ? CFG.wave.nightBountyMult : 1;
@@ -18066,6 +18952,16 @@ button.corner.mute.off { opacity: 0.5; }
       }
     }
     _hurtLocal(dmg) {
+      if (this._lastStandReady && this.local.alive && this.local.hp - dmg <= 0) {
+        this._lastStandReady = false;
+        this.local.hp = Math.max(1, Math.round(this.local.maxHp * 0.15));
+        this.local.lastStandUntil = performance.now() / 1e3 + 3;
+        this.fx.float("\uCD5C\uD6C4\uC758 \uC800\uD56D!", this.local.x, 2.4, this.local.z, "good");
+        this.ui?.shake();
+        this.ui?.toast("\u{1F525} \uCD5C\uD6C4\uC758 \uC800\uD56D \uBC1C\uB3D9! \uC4F0\uB7EC\uC9C0\uAE30 \uC9C1\uC804 \uAC04\uC2E0\uD788 \uBC84\uD17C\uB2E4 \u2014 3\uCD08\uAC04 \uBB34\uC801", "good");
+        this.sfx.shard();
+        return;
+      }
       const down = this.local.damage(dmg);
       this.fx.float(`-${dmg}`, this.local.x, 2.2, this.local.z, "hurt");
       this.ui?.shake();
@@ -18091,6 +18987,7 @@ button.corner.mute.off { opacity: 0.5; }
       }
     }
     _win() {
+      if (this.result) return;
       this.wave.phase = PHASE.WON;
       this.result = "win";
       this.sfx.win();
@@ -18101,6 +18998,7 @@ button.corner.mute.off { opacity: 0.5; }
       this.ui?.showResult(true, this.stats, this.wave.wave);
     }
     _lose() {
+      if (this.result) return;
       this.wave.lose();
       this.result = "lose";
       this.sfx.lose();
@@ -18161,6 +19059,10 @@ button.corner.mute.off { opacity: 0.5; }
       payCost(pool, def.cost);
       this._trackSpend(def.cost, "build");
       this.stats.built++;
+      if (key === "sniper" && !this._seenSniper) {
+        this._seenSniper = true;
+        this._notify(playerId, "\u{1F3AF} \uC800\uACA9\uD0D1 \uAC74\uC124! \uC0AC\uAC70\uB9AC \uC548\uC5D0\uC11C \uB0A8\uC740 \uCCB4\uB825\uC774 \uAC00\uC7A5 \uB9CE\uC740 \uC801\uC744 \uC800\uACA9\uD569\uB2C8\uB2E4 \u2014 \uB2E4\uB978 \uD0C0\uC6CC\uBCF4\uB2E4 \uC0AC\uAC70\uB9AC\uAC00 \uD6E8\uC52C \uAE41\uB2C8\uB2E4", "good");
+      }
     }
     _trackSpend(cost, kind) {
       this.stats.spentWood += cost.wood || 0;
@@ -18499,6 +19401,13 @@ button.corner.mute.off { opacity: 0.5; }
         if (!e.dead && this.boonMult.venomChance && Math.random() < this.boonMult.venomChance) {
           e.applyPoison(CFG.boons.venom.dps, CFG.boons.venom.duration, performance.now() / 1e3);
         }
+        if (a.slow && !e.dead) {
+          e.applySlow(a.slow, a.slowTime, performance.now() / 1e3);
+          if (!this._seenFrostaxe) {
+            this._seenFrostaxe = true;
+            this.ui?.toast("\u2744\uFE0F \uC5BC\uC74C\uB3C4\uB07C\uAC00 \uC801\uC744 \uB454\uD654\uC2DC\uCF30\uB2E4! \uC11C\uB9AC\uD0D1 \uC5C6\uC774\uB3C4 \uC9C1\uC811 \uB2A6\uCDB0\uC11C \uBD99\uC7A1\uC544 \uB458 \uC218 \uC788\uB2E4", "good");
+          }
+        }
         if (e.variant === "thorn") thornDmg += Math.round(dmg * CFG.variants.thorn.reflectPct);
         if (a.knockback && !e.dead) {
           const kd = Math.max(d2, 0.4);
@@ -18670,43 +19579,6 @@ button.corner.mute.off { opacity: 0.5; }
       if (this.isHost) this.hostSmelt(this.local.id);
       else this.net.send("smelt", {});
     }
-    // 화살탑이 한 발 쏠 때마다 호출된다(호스트 전용 경로). 팀 자원 풀에서 화살을 한 발 꺼내고,
-    // 없으면 false 를 돌려 그 타워는 이번 발사를 건너뛴다.
-    _takeAmmo(kind) {
-      const pool = this.shared ? this.pools.team : this._poolOf(this.local.id);
-      if ((pool[kind] || 0) < 1) {
-        if (!this._ammoWarned) {
-          this._ammoWarned = true;
-          this.ui?.toast("\u{1F3F9} \uD654\uC0B4\uC774 \uB5A8\uC5B4\uC84C\uB2E4! \uD654\uC0B4\uD0D1\uC774 \uBA48\uCD98\uB2E4 \u2014 \uC81C\uC791\uB300\uC5D0\uC11C \uD654\uC0B4\uC744 \uB9CC\uB4E4\uC5B4\uB77C (\uBAA9\uC7AC\xB7\uAD6C\uB9AC)", "bad");
-        }
-        return false;
-      }
-      pool[kind] -= 1;
-      this._ammoWarned = false;
-      return true;
-    }
-    requestFletch() {
-      if (this.isHost) this.hostFletch(this.local.id);
-      else this.net.send("fletch", {});
-    }
-    hostFletch(playerId) {
-      if (!this.players.get(playerId)) return;
-      if (!this.hasStation("workbench")) {
-        this._notify(playerId, "\uC81C\uC791\uB300\uAC00 \uC788\uC5B4\uC57C \uD654\uC0B4\uC744 \uB9CC\uB4E4 \uC218 \uC788\uC2B5\uB2C8\uB2E4", "bad");
-        return;
-      }
-      const c2 = CFG.fletch;
-      const pool = this._poolOf(playerId);
-      if (!canAfford(pool, c2.cost)) {
-        this._notify(playerId, "\uC7AC\uB8CC\uAC00 \uBD80\uC871\uD569\uB2C8\uB2E4 (\uBAA9\uC7AC\xB7\uAD6C\uB9AC)", "bad");
-        return;
-      }
-      payCost(pool, c2.cost);
-      this._trackSpend(c2.cost, "craft");
-      pool.arrow = (pool.arrow || 0) + c2.yield;
-      this._notify(playerId, `\u{1F3F9} \uD654\uC0B4 ${c2.yield}\uBC1C\uC744 \uB9CC\uB4E4\uC5C8\uB2E4`, "good");
-      if (playerId === this.local.id) this.sfx.upgrade();
-    }
     hostSmelt(playerId) {
       if (!this.players.get(playerId)) return;
       if (!this.hasStation("furnace")) {
@@ -18725,6 +19597,104 @@ button.corner.mute.off { opacity: 0.5; }
       this._notify(playerId, `\uCCA0 ${CFG.smelt.yield}\uAC1C\uB97C \uC5BB\uC5C8\uB2E4`, "good");
       if (playerId === this.local.id) this.sfx.upgrade();
       else this.net.send("smeltOk", { to: playerId });
+    }
+    // ---------------------------------------------------------------- 탄약
+    requestCraftAmmo(type) {
+      if (this.isHost) this.hostCraftAmmo(this.local.id, type);
+      else this.net.send("craftAmmo", { type });
+    }
+    // 제련(hostSmelt)과 완전히 같은 구조 — 시설 확인 → 비용 확인 → 지불 → 재고 증가.
+    // 종류마다 필요한 시설이 다른 게 유일한 차이다(화살은 제작대에서 깎고, 포탄·원소액은 화로에서 녹인다).
+    hostCraftAmmo(playerId, type) {
+      if (!this.players.get(playerId)) return;
+      const a2 = CFG.ammo.types[type];
+      if (!a2) return;
+      const stationName = a2.station === "workbench" ? "\uC81C\uC791\uB300" : "\uD654\uB85C";
+      if (!this.hasStation(a2.station)) {
+        this._notify(playerId, `${stationName}\uAC00 \uC788\uC5B4\uC57C ${a2.name}\uC744(\uB97C) \uB9CC\uB4E4 \uC218 \uC788\uC2B5\uB2C8\uB2E4`, "bad");
+        return;
+      }
+      const pool = this._poolOf(playerId);
+      if (!canAfford(pool, a2.cost)) {
+        this._notify(playerId, `${a2.icon} ${a2.name} \uC7AC\uB8CC\uAC00 \uBD80\uC871\uD569\uB2C8\uB2E4 (${costText(a2.cost)})`, "bad");
+        return;
+      }
+      payCost(pool, a2.cost);
+      this._trackSpend(a2.cost, "craft");
+      const stock = this._ammoOf(pool);
+      stock[type] = (stock[type] || 0) + a2.yield;
+      this._notify(playerId, `${a2.icon} ${a2.name} ${a2.yield}\uBC1C\uC744 \uB9CC\uB4E4\uC5C8\uB2E4 (\uC7AC\uACE0 ${stock[type]})`, "good");
+      if (playerId === this.local.id) this.sfx.upgrade();
+      else this.net.send("smeltOk", { to: playerId });
+    }
+    requestReload() {
+      if (this.isHost) this.hostReload(this.local.id);
+      else this.net.send("reload", {});
+    }
+    // 손으로 재장전 — 병기창이 없거나 그 반경 밖에 있는 타워를 위한 수동 수단.
+    // 가장 가까운 "탄약이 덜 찬" 타워 하나만 채운다(이미 가득 찬 타워는 아예 후보에서 뺀다 —
+    // 안 그러면 가득 찬 타워가 바로 옆에 있을 때 정작 빈 타워를 영영 못 채운다).
+    hostReload(playerId) {
+      const p2 = this.players.get(playerId);
+      if (!p2) return;
+      let target = null, bestD = CFG.ammo.reloadRange;
+      for (const b of this.buildMgr.buildings.values()) {
+        if (!b.ammoType || b.ammo >= b.magazine) continue;
+        const d2 = dist(p2.x, p2.z, b.x, b.z);
+        if (d2 < bestD) {
+          bestD = d2;
+          target = b;
+        }
+      }
+      if (!target) {
+        this._notify(playerId, "\uADFC\uCC98\uC5D0 \uD0C4\uC57D\uC744 \uCC44\uC6B8 \uD0C0\uC6CC\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4", "bad");
+        return;
+      }
+      const a2 = CFG.ammo.types[target.ammoType];
+      const stock = this._ammoOf(this._poolOf(playerId));
+      const have = stock[target.ammoType] || 0;
+      if (have <= 0) {
+        this._notify(playerId, `${a2.icon} ${a2.name} \uC7AC\uACE0\uAC00 \uC5C6\uB2E4 \u2014 ${a2.station === "workbench" ? "\uC81C\uC791\uB300" : "\uD654\uB85C"}\uC5D0\uC11C \uBA3C\uC800 \uB9CC\uB4E4\uC5B4\uC57C \uD55C\uB2E4`, "bad");
+        return;
+      }
+      const moved = Math.min(have, target.magazine - target.ammo);
+      stock[target.ammoType] = have - moved;
+      target.ammo += moved;
+      target.refreshAmmoBar();
+      this.fx.ring(target.x, target.z, a2.color, 2);
+      this._notify(playerId, `${a2.icon} ${target.def.name} \uC7AC\uC7A5\uC804 ${target.ammo}/${target.magazine} (\uB0A8\uC740 \uC7AC\uACE0 ${stock[target.ammoType]})`, "good");
+      if (playerId === this.local.id) this.sfx.upgrade();
+    }
+    // 병기창 — 정비소(_updateRepairPosts)와 정확히 같은 호스트 전용 반경 순회. 차이는 채우는
+    // 대상이 체력이 아니라 탄창이고, 공짜가 아니라 팀 탄약 재고에서 실제로 꺼내 쓴다는 것이다.
+    _updateArmories(dt2) {
+      if (!this.isHost) return;
+      for (const b of this.buildMgr.buildings.values()) {
+        if (b.key !== "armory") continue;
+        const st = b.stats;
+        const stock = this._ammoOf(this._poolOf(b.ownerId || this.local.id));
+        b._supplyAccum = (b._supplyAccum || 0) + st.supplyRate * dt2;
+        if (b._supplyAccum < 1) continue;
+        let budget = b._supplyAccum;
+        for (const o of this.buildMgr.buildings.values()) {
+          if (budget < 1) break;
+          if (!o.ammoType || o.ammo >= o.magazine) continue;
+          if (dist(b.x, b.z, o.x, o.z) > st.supplyRadius) continue;
+          const have = stock[o.ammoType] || 0;
+          if (have <= 0) continue;
+          const moved = Math.min(Math.floor(budget), have, o.magazine - o.ammo);
+          if (moved <= 0) continue;
+          stock[o.ammoType] = have - moved;
+          o.ammo += moved;
+          o.refreshAmmoBar();
+          budget -= moved;
+          if (!this._seenArmory) {
+            this._seenArmory = true;
+            this.ui?.toast("\u{1F3ED} \uBCD1\uAE30\uCC3D\uC774 \uC8FC\uBCC0 \uD0C0\uC6CC\uC5D0 \uD0C4\uC57D\uC744 \uBCF4\uAE09\uD558\uAE30 \uC2DC\uC791\uD588\uB2E4! \uC7AC\uACE0\uB9CC \uCC44\uC6CC \uB450\uBA74 \uC54C\uC544\uC11C \uC7A5\uC804\uB41C\uB2E4", "good");
+          }
+        }
+        b._supplyAccum = budget;
+      }
     }
     // 무기 강화 다음 레벨의 철 비용
     _weaponUpgradeCost(key) {
@@ -19130,6 +20100,160 @@ button.corner.mute.off { opacity: 0.5; }
       }
       this.world.setSpirit(sp2.x, sp2.z, sp2.timeLeft);
     }
+    requestTame() {
+      if (this.isHost) this.hostTame(this.local.id);
+      else this.net.send("tame", {});
+    }
+    // 여우·늑대만 길들일 수 있다(둘 다 wild:true). 초식동물(토끼·사슴·멧돼지) 생고기를 미끼로
+    // 쓰며, 성공/실패 모두 미끼를 소모한다 — 도망 다니는 걸 잡아 쓰다듬는 흉내라 몇 번이고
+    // 다시 시도할 수 있지만, 그때마다 실제 자원이 든다. 팀 전체 동료 1마리 제한은 정령 소환과
+    // 같은 원칙 — 나눠서 여러 마리를 부리며 화력을 불리지 못하게 막는다.
+    hostTame(playerId) {
+      const p2 = this.players.get(playerId);
+      if (!p2) return;
+      if (this._pet) {
+        this.hostFeedPet(playerId);
+        return;
+      }
+      let target = null, bestD = 3;
+      for (const e of this.enemyMgr.list) {
+        if (e.dead || !e.st.wild || !CFG.tame[e.type]) continue;
+        const d2 = dist(p2.x, p2.z, e.x, e.z);
+        if (d2 < bestD) {
+          bestD = d2;
+          target = e;
+        }
+      }
+      if (!target) {
+        this._notify(playerId, "\uADFC\uCC98\uC5D0 \uAE38\uB4E4\uC77C \uC218 \uC788\uB294 \uC5EC\uC6B0\uB098 \uB291\uB300\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4", "bad");
+        return;
+      }
+      const pool = this._poolOf(playerId);
+      const meat = pool.meat || (pool.meat = { rabbit: 0, deer: 0, boar: 0 });
+      let need = CFG.tame.baitCost;
+      const have = (meat.rabbit || 0) + (meat.deer || 0) + (meat.boar || 0);
+      if (have < need) {
+        this._notify(playerId, `\uCD08\uC2DD\uB3D9\uBB3C \uC0DD\uACE0\uAE30\uAC00 ${need}\uAC1C \uD544\uC694\uD569\uB2C8\uB2E4 (\uD1A0\uB07C\xB7\uC0AC\uC2B4\xB7\uBA67\uB3FC\uC9C0)`, "bad");
+        return;
+      }
+      for (const k2 of ["rabbit", "deer", "boar"]) {
+        if (need <= 0) break;
+        const take = Math.min(meat[k2] || 0, need);
+        meat[k2] -= take;
+        need -= take;
+      }
+      const tc2 = CFG.tame[target.type];
+      if (Math.random() < tc2.chance) {
+        this.enemyMgr.kill(target);
+        this._pet = { type: target.type, x: target.x, z: target.z, rot: 0, lv: 0, ownerId: playerId, cd: 0 };
+        this.world.setPet(target.x, target.z, target.type, 0);
+        this._unlockAchievement("tamer", playerId);
+        this.fx.burst(target.x, 1, target.z, tc2.color, 14, 5);
+        this._notify(playerId, `${tc2.icon} ${tc2.name}\uC744(\uB97C) \uAE38\uB4E4\uC600\uB2E4! \uC774\uC81C\uBD80\uD130 \uB098\uB97C \uB530\uB77C\uB2E4\uB2C8\uBA70 \uC801\uC744 \uACF5\uACA9\uD55C\uB2E4`, "good");
+      } else {
+        this.fx.ring(target.x, target.z, tc2.color, 1.6);
+        this._notify(playerId, `${tc2.icon} ${tc2.name}\uC774(\uAC00) \uACBD\uACC4\uD558\uBA70 \uBB3C\uB7EC\uB0AC\uB2E4 \u2014 \uBBF8\uB07C\uB294 \uC18C\uBAA8\uB410\uB2E4`, "warn");
+      }
+    }
+    // 이미 동료가 있는 상태에서 Z를 누르면 새로 길들이는 대신 먹이를 줘서 키운다 — 같은 키를
+    // 상황에 따라 다르게 쓰는 기존 패턴(F키의 채집/공격 겸용)과 같은 방식. 요리에 쓸 수도 있는
+    // 생고기를 대신 여기 태우게 해서, 남는 고기를 어디에 쓸지 계속 저울질하게 만든다.
+    hostFeedPet(playerId) {
+      const pet = this._pet;
+      if (!pet) return;
+      const tc2 = CFG.tame[pet.type];
+      if ((pet.lv || 0) >= CFG.tame.maxLevel) {
+        this._notify(playerId, `${tc2.icon} ${tc2.name}\uC740(\uB294) \uC774\uBBF8 \uCD5C\uB300\uB85C \uC131\uC7A5\uD588\uC2B5\uB2C8\uB2E4`, "bad");
+        return;
+      }
+      const pool = this._poolOf(playerId);
+      const meat = pool.meat || (pool.meat = { rabbit: 0, deer: 0, boar: 0 });
+      let need = CFG.tame.feedCost;
+      const have = (meat.rabbit || 0) + (meat.deer || 0) + (meat.boar || 0);
+      if (have < need) {
+        this._notify(playerId, `${tc2.icon} \uBA39\uC774\uB97C \uC8FC\uB824\uBA74 \uC0DD\uACE0\uAE30\uAC00 ${need}\uAC1C \uD544\uC694\uD569\uB2C8\uB2E4`, "bad");
+        return;
+      }
+      for (const k2 of ["rabbit", "deer", "boar"]) {
+        if (need <= 0) break;
+        const take = Math.min(meat[k2] || 0, need);
+        meat[k2] -= take;
+        need -= take;
+      }
+      pet.lv = (pet.lv || 0) + 1;
+      this.world.setPet(pet.x, pet.z, pet.type, pet.rot, pet.lv);
+      this.fx.burst(pet.x, 1, pet.z, tc2.color, 10 + pet.lv * 4, 4);
+      if (pet.lv >= CFG.tame.maxLevel) {
+        this._unlockAchievement("loyalCompanion", playerId);
+        this._notify(playerId, `${tc2.icon} ${tc2.name}\uC774(\uAC00) \uCD5C\uB300 \uB808\uBCA8(${pet.lv})\uAE4C\uC9C0 \uC131\uC7A5\uD588\uB2E4!`, "good");
+      } else {
+        this._notify(playerId, `${tc2.icon} ${tc2.name}\uC5D0\uAC8C \uBA39\uC774\uB97C \uC92C\uB2E4 \u2014 \uB808\uBCA8 ${pet.lv} (\uACF5\uACA9\uB825\xB7\uACF5\uACA9\uC18D\uB3C4 \uC0C1\uC2B9)`, "good");
+      }
+    }
+    requestReleasePet() {
+      if (this.isHost) this.hostReleasePet(this.local.id);
+      else this.net.send("releasePet", {});
+    }
+    // 여우·늑대 중 하나를 길들이고 나면 팀 전체 1마리 한도 때문에 다른 동물로 영영 못 바꾸는
+    // 문제가 있었다 — 처음 마주친 동물이 하필 약한 쪽이어도 되돌릴 방법이 없었다. 놓아주면
+    // 그 자리에서 사라지고(레벨도 함께 사라진다) 다시 빈 슬롯이 되어 새로 길들일 수 있다.
+    // world.clearPet()과 스냅샷의 pt:null 처리는 먹이주기를 만들 때 이미 갖춰져 있었다.
+    hostReleasePet(playerId) {
+      const pet = this._pet;
+      if (!pet) {
+        this._notify(playerId, "\uB193\uC544\uC904 \uB3D9\uB8CC\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4", "bad");
+        return;
+      }
+      const tc2 = CFG.tame[pet.type];
+      this.fx.burst(pet.x, 1, pet.z, tc2.color, 10, 4);
+      this._pet = null;
+      this.world.clearPet();
+      this._notify(playerId, `${tc2.icon} ${tc2.name}\uC744(\uB97C) \uB193\uC544\uC92C\uB2E4 \u2014 \uB2E4\uB978 \uB3D9\uBB3C\uC744 \uB2E4\uC2DC \uAE38\uB4E4\uC77C \uC218 \uC788\uB2E4`, "warn");
+    }
+    // 정령과 같은 패턴(호스트 전용 이동·공격, 위치만 스냅샷)이지만 시간제한이 없다 — 죽지 않는 한
+    // 영구히 남는다(현재 몬스터 AI는 크리스탈·건물·플레이어만 노려서 정령처럼 실전에서 맞을 일이 없다).
+    _updatePet(dt2) {
+      if (!this.isHost || !this._pet) return;
+      const pt2 = this._pet;
+      const type = pt2.type;
+      const tc2 = CFG.tame[type];
+      const lv = pt2.lv || 0;
+      const petDmg = tc2.dmg * Math.pow(CFG.tame.lvDmgMult, lv);
+      const petRate = tc2.rate * Math.pow(CFG.tame.lvRateMult, lv);
+      let target = null, bestD = tc2.range;
+      for (const e of this.enemyMgr.list) {
+        if (e.dead) continue;
+        if (e.variant === "ward") continue;
+        if (e.st.burrows && e.diving) continue;
+        const d2 = dist(pt2.x, pt2.z, e.x, e.z);
+        if (d2 < bestD) {
+          bestD = d2;
+          target = e;
+        }
+      }
+      pt2.cd -= dt2;
+      if (target && bestD <= tc2.atkRange) {
+        pt2.rot = Math.atan2(target.x - pt2.x, target.z - pt2.z);
+        if (pt2.cd <= 0) {
+          pt2.cd = 1 / petRate;
+          this._hurtEnemy(target, Math.round(petDmg), "player", pt2.x, pt2.z);
+          this.fx.burst(target.x, 0.6, target.z, tc2.color, 5, 2.5);
+        }
+      } else {
+        const owner = this.players.get(pt2.ownerId);
+        const tx = target ? target.x : owner ? owner.x : pt2.x;
+        const tz = target ? target.z : owner ? owner.z : pt2.z;
+        const dx = tx - pt2.x, dz = tz - pt2.z;
+        const len = Math.hypot(dx, dz);
+        if (len > 0.6) {
+          pt2.rot = Math.atan2(dx, dz);
+          const step = Math.min(len, tc2.speed * dt2);
+          pt2.x += dx / len * step;
+          pt2.z += dz / len * step;
+        }
+      }
+      this.world.setPet(pt2.x, pt2.z, type, pt2.rot, pt2.lv || 0);
+    }
     requestGive(toId, wood, stone) {
       this.sfx.click();
       if (this.isHost) this.hostGive(this.local.id, toId, wood, stone);
@@ -19285,6 +20409,9 @@ button.corner.mute.off { opacity: 0.5; }
       net.on("craft", (d2, from) => {
         if (this.isHost) this.hostCraft(from, d2.key);
       });
+      net.on("metaPerks", (d2, from) => {
+        if (this.isHost) this._applyMetaPerks(from, d2);
+      });
       net.on("smelt", (d2, from) => {
         if (this.isHost) this.hostSmelt(from);
       });
@@ -19303,9 +20430,6 @@ button.corner.mute.off { opacity: 0.5; }
       net.on("skillChill", (d2, from) => {
         if (this.isHost) this.hostSkillChill(from);
       });
-      net.on("fletch", (d2, from) => {
-        if (this.isHost) this.hostFletch(from);
-      });
       net.on("cook", (d2, from) => {
         if (this.isHost) this.hostCook(from, d2.key);
       });
@@ -19318,6 +20442,18 @@ button.corner.mute.off { opacity: 0.5; }
       net.on("skillSummon", (d2, from) => {
         if (this.isHost) this.hostSkillSummon(from);
       });
+      net.on("tame", (d2, from) => {
+        if (this.isHost) this.hostTame(from);
+      });
+      net.on("releasePet", (d2, from) => {
+        if (this.isHost) this.hostReleasePet(from);
+      });
+      net.on("craftAmmo", (d2, from) => {
+        if (this.isHost) this.hostCraftAmmo(from, d2.type);
+      });
+      net.on("reload", (d2, from) => {
+        if (this.isHost) this.hostReload(from);
+      });
       net.on("give", (d2, from) => {
         if (this.isHost) this.hostGive(from, d2.to, d2.wood, d2.stone);
       });
@@ -19326,6 +20462,12 @@ button.corner.mute.off { opacity: 0.5; }
       });
       net.on("hurt", (d2) => {
         if (d2.to === net.selfId) this._hurtLocal(d2.dmg);
+      });
+      net.on("unlockAch", (d2) => {
+        if (d2.to === net.selfId) this._unlockAchievement(d2.key);
+      });
+      net.on("achAnnounce", (d2) => {
+        this.ui?.toast(`\u{1F3C6} ${d2.name}\uB2D8\uC774 \uC5C5\uC801\uC744 \uB2EC\uC131\uD588\uC2B5\uB2C8\uB2E4: ${d2.icon} ${d2.title}`, "good");
       });
       net.on("toast", (d2) => {
         if (d2.to !== net.selfId) return;
@@ -19382,7 +20524,7 @@ button.corner.mute.off { opacity: 0.5; }
     _snapshot() {
       const players = {};
       for (const p2 of this.players.values()) {
-        players[p2.id] = { hv: p2.harvestLv, tl: Object.keys(p2.tools).filter((k2) => p2.tools[k2]), eq: p2.equipped || null, wl: p2.weaponLv, ws: p2.weaponSpec };
+        players[p2.id] = { hv: p2.harvestLv, tl: Object.keys(p2.tools).filter((k2) => p2.tools[k2]), eq: p2.equipped || null, wl: p2.weaponLv, ws: p2.weaponSpec, mh: p2.maxHp };
       }
       return {
         e: this.enemyMgr.snapshot(),
@@ -19398,9 +20540,17 @@ button.corner.mute.off { opacity: 0.5; }
         crf: this.world.crystal.reflectLv,
         rf: this._rift ? [Math.round(this._rift.x * 10) / 10, Math.round(this._rift.z * 10) / 10, Math.round(this._rift.timeLeft * 10) / 10] : null,
         sp: this._spirit ? [Math.round(this._spirit.x * 10) / 10, Math.round(this._spirit.z * 10) / 10, Math.round(this._spirit.timeLeft * 10) / 10] : null,
+        pt: this._pet ? [Math.round(this._pet.x * 10) / 10, Math.round(this._pet.z * 10) / 10, this._pet.type, Math.round(this._pet.rot * 100) / 100, this._pet.lv || 0] : null,
         mt: this._meteorPending ? [Math.round(this._meteorPending.x * 10) / 10, Math.round(this._meteorPending.z * 10) / 10, Math.round(this._meteorPending.timeLeft * 10) / 10] : null,
         mc: this._merchant ? { offers: this._merchant.offers, boughtBy: this._merchant.boughtBy } : null,
-        tb: { atk: this.tempBoon.atk, towerDmg: this.tempBoon.towerDmg },
+        tb: { atk: this.tempBoon.atk, towerDmg: this.tempBoon.towerDmg, speed: this.tempBoon.speed },
+        // 잔치 효과(요리)는 상인 물약(tb)과 똑같이 팀 전체가 함께 받는 "누가 먹었든 파티 전원에게
+        // 적용" 설계인데, 이 필드가 그동안 스냅샷에 실리지 않았다 — 호스트 자신이 먹었을 때는
+        // this.local이 곧 호스트라 우연히 정상 동작했지만, 참가자가 먹으면 호스트의 this.feast는
+        // 정확히 갱신되는데(전투 피해 계산은 호스트 전용이라 문제없음) 참가자 자신의 클라이언트는
+        // 그 사실을 전혀 몰라 자기 이동 속도(feastSpeedMult, this.local.update 에서 매 클라이언트가
+        // 로컬로 계산)에 전혀 반영이 안 되는 조용한 버그였다. tb 와 동일하게 실어 보낸다.
+        fs: { kind: this.feast.kind, wavesLeft: this.feast.wavesLeft },
         // 엔드리스 축복(영구 배율·할인)은 호스트만 고르고 이 필드로만 전파된다 — 없으면 참가자
         // 화면의 강화·특화 비용 미리보기가 호스트가 이미 적용한 할인을 못 보고 "자원 부족"으로
         // 잘못 비활성화되고, 솔로 저장·재개 시에도 그동안 고른 축복이 전부 초기화된다.
@@ -19428,7 +20578,12 @@ button.corner.mute.off { opacity: 0.5; }
           treasuresCaught: this.stats.treasuresCaught,
           animalsHunted: this.stats.animalsHunted,
           comboCount: this.stats.comboCount,
-          repairPostHealed: this.stats.repairPostHealed
+          repairPostHealed: this.stats.repairPostHealed,
+          mimicsKilled: this.stats.mimicsKilled,
+          blocksCount: this.stats.blocksCount,
+          relicsPicked: this.stats.relicsPicked,
+          dishesCooked: this.stats.dishesCooked,
+          scoutsIntercepted: this.stats.scoutsIntercepted
         }
       };
     }
@@ -19474,9 +20629,12 @@ button.corner.mute.off { opacity: 0.5; }
       else this.world.clearRift();
       if (s2.sp) this.world.setSpirit(s2.sp[0], s2.sp[1], s2.sp[2]);
       else this.world.clearSpirit();
+      if (s2.pt) this.world.setPet(s2.pt[0], s2.pt[1], s2.pt[2], s2.pt[3], s2.pt[4] || 0);
+      else this.world.clearPet();
       if (!this._merchant && s2.mc) this.ui?.toast("\u{1F9F3} \uB5A0\uB3CC\uC774 \uC0C1\uC778\uC774 \uC654\uB2E4! \uC774\uBC88 \uC900\uBE44 \uC2DC\uAC04\uC5D0\uB9CC \uBB3C\uAC74\uC744 \uD310\uB2E4", "good");
       this._merchant = s2.mc ? { offers: s2.mc.offers, boughtBy: s2.mc.boughtBy || {} } : null;
       if (s2.tb) Object.assign(this.tempBoon, s2.tb);
+      if (s2.fs) Object.assign(this.feast, s2.fs);
       if (s2.bm) {
         Object.assign(this.boonMult, s2.bm);
         this.wave.prepBonus = this.boonMult.prepDelta || 0;
@@ -19493,6 +20651,11 @@ button.corner.mute.off { opacity: 0.5; }
           p2.weaponLv = pd2.wl || {};
           p2.weaponSpec = pd2.ws || {};
           if (p2 !== this.local) p2.equipped = pd2.eq || null;
+          if (pd2.mh !== void 0 && pd2.mh !== p2.maxHp) {
+            const delta = pd2.mh - p2.maxHp;
+            p2.maxHp = pd2.mh;
+            p2.hp = delta > 0 ? Math.min(p2.maxHp, p2.hp + delta) : Math.min(p2.hp, p2.maxHp);
+          }
         }
       }
       if (s2.st) {
@@ -19504,6 +20667,9 @@ button.corner.mute.off { opacity: 0.5; }
         if (this.stats.mimicsKilled >= 3) this._unlockAchievement("mimicHunter");
         if (this.stats.blocksCount >= 10) this._unlockAchievement("blockMaster");
         if (this.stats.repairPostHealed >= 500) this._unlockAchievement("medic");
+        if (this.stats.relicsPicked >= 3) this._unlockAchievement("relicCollector");
+        if (this.stats.dishesCooked.length >= Object.keys(CFG.cook).length) this._unlockAchievement("gourmet");
+        if (this.stats.scoutsIntercepted >= 3) this._unlockAchievement("interceptor");
         if (this.stats.bossKillsSeen.includes("boss") && this.stats.bossKillsSeen.includes("frostlord")) {
           this._unlockAchievement("bothBosses");
         }
@@ -19512,6 +20678,9 @@ button.corner.mute.off { opacity: 0.5; }
         }
         if (["boss", "frostlord", "warden", "looter"].every((t2) => this.stats.bossKillsSeen.includes(t2))) {
           this._unlockAchievement("fourKings");
+        }
+        if (["boss", "frostlord", "warden", "looter", "colossus"].every((t2) => this.stats.bossKillsSeen.includes(t2))) {
+          this._unlockAchievement("fiveGuardians");
         }
       }
       if (this.wave.phase === PHASE.LOST && !this.result) {
@@ -19545,7 +20714,7 @@ button.corner.mute.off { opacity: 0.5; }
       if (!over) this.stats.time += dt2;
       if (this._pingCd > 0) this._pingCd -= dt2;
       this._handleInput(dt2, over);
-      if (!over) this.local.update(dt2, this.input, this.sm, this.grid, this.world, [...this.players.values()], this.feastSpeedMult);
+      if (!over) this.local.update(dt2, this.input, this.sm, this.grid, this.world, [...this.players.values()], this.feastSpeedMult * this.boonMult.moveSpeedMult * this.tempBoon.speed);
       for (const p2 of this.players.values()) {
         if (p2 !== this.local && p2.update) p2.update(dt2);
       }
@@ -19556,13 +20725,16 @@ button.corner.mute.off { opacity: 0.5; }
         this._updateSupplyDrops(dt2);
         this._updateMeteor(dt2);
         this._updateTreasure(dt2);
+        this._updateScout(dt2);
         this._updateRift(dt2);
         this._updateHunt(dt2);
         this._updateSpirit(dt2);
+        this._updatePet(dt2);
         this._updateMerchant();
         this._updateCrystalUpgrades(dt2);
         this._updateHarvesters(dt2);
         this._updateRepairPosts(dt2);
+        this._updateArmories(dt2);
         this._updateShardTrickle(dt2);
       } else {
         this.enemyMgr.interpolate(dt2);
@@ -19613,6 +20785,9 @@ button.corner.mute.off { opacity: 0.5; }
       if (inp.hit(km.get("skillBarrier"))) this.requestSkillBarrier();
       if (inp.hit(km.get("skillRift"))) this.requestSkillRift();
       if (inp.hit(km.get("skillSummon"))) this.requestSkillSummon();
+      if (inp.hit(km.get("tame"))) this.requestTame();
+      if (inp.hit(km.get("releasePet"))) this.requestReleasePet();
+      if (inp.hit(km.get("reload"))) this.requestReload();
       if (inp.hit(km.get("startWave")) && this.wave.phase === PHASE.PREP) this.requestStartWave();
       const pointer = this.sm.updatePointerWorld();
       this.buildMgr.updateGhost(pointer, this.myPool);
@@ -19767,6 +20942,10 @@ button.corner.mute.off { opacity: 0.5; }
         this.wave.prepBonus = this.boonMult.prepDelta || 0;
       }
       if (s2.sr) this._shardTrickleStacks = s2.sr;
+      if (s2.pt) {
+        this._pet = { type: s2.pt[2], x: s2.pt[0], z: s2.pt[1], rot: s2.pt[3] || 0, lv: s2.pt[4] || 0, ownerId: this.local.id, cd: 0 };
+        this.world.setPet(s2.pt[0], s2.pt[1], s2.pt[2], s2.pt[3], s2.pt[4] || 0);
+      }
       this.world.crystal.hp = s2.c;
       if (s2.r.team) this.pools.team = s2.r.team;
       if (s2.r.byId) this.pools.byId = s2.r.byId;
@@ -19782,12 +20961,14 @@ button.corner.mute.off { opacity: 0.5; }
       if (save.stats) this.stats = save.stats;
       if (!this.stats.newAchievements) this.stats.newAchievements = [];
       if (!this.stats.bossKillsSeen) this.stats.bossKillsSeen = [];
+      if (!this.stats.dishesCooked) this.stats.dishesCooked = [];
       if (!this.stats.trapsTriggered) this.stats.trapsTriggered = 0;
       if (this.stats.spentBy && !this.stats.spentBy.merchant) this.stats.spentBy.merchant = { wood: 0, stone: 0, iron: 0 };
       if (!this.stats.elitesKilled) this.stats.elitesKilled = 0;
       if (!this.stats.treasuresCaught) this.stats.treasuresCaught = 0;
       if (!this.stats.comboCount) this.stats.comboCount = 0;
       if (!this.stats.repairPostHealed) this.stats.repairPostHealed = 0;
+      if (!this.stats.scoutsIntercepted) this.stats.scoutsIntercepted = 0;
       this.ui?.toast(`\uC774\uC5B4\uD558\uAE30 \u2014 \uC6E8\uC774\uBE0C ${this.wave.displayWave}`, "good");
     }
     render() {

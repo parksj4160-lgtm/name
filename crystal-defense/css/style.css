@@ -60,6 +60,8 @@ button.mini:disabled { opacity: 0.45; cursor: not-allowed; }
   margin-top: 2px; font-size: 11px; color: var(--cyan);
   background: rgba(95,212,255,0.1); border-radius: 6px; padding: 2px 6px; align-self: flex-start;
 }
+/* 탄약 재고가 0인 종류 — 숫자만 빨갛게 띄워 "지금 이게 비었다"를 한눈에 보이게 한다 */
+.tag .out { color: var(--bad); font-weight: 700; }
 
 /* ---------- 웨이브 / 크리스탈 ---------- */
 #wave-panel { left: 50%; top: 14px; transform: translateX(-50%); width: min(460px, 60vw); }
@@ -307,6 +309,25 @@ button.ghost { background: transparent; color: var(--dim); }
   display: flex; flex-wrap: wrap; gap: 4px 10px; margin-top: 3px;
   font-size: 11px; color: var(--dim);
 }
+
+/* ---------- 원정 준비(메타 진행) ---------- */
+.meta-upgrades {
+  list-style: none; padding: 8px 10px; margin: 6px 0 0; border-radius: 8px;
+  background: rgba(255,255,255,0.05); font-size: 12px; display: flex; flex-direction: column; gap: 8px; text-align: left;
+}
+.meta-upgrades li { display: flex; align-items: center; gap: 8px; color: var(--dim); }
+.meta-upgrades li.on { color: var(--text); }
+.meta-upgrades .mi-icon { font-size: 16px; width: 20px; text-align: center; flex: none; }
+.meta-upgrades .mi-body { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }
+.meta-upgrades .mi-name { font-weight: 700; color: var(--text); }
+.meta-upgrades .mi-lv { font-weight: 400; color: var(--cyan); font-size: 11px; }
+.meta-upgrades .mi-desc { font-size: 11px; opacity: 0.85; }
+.meta-upgrades .mi-buy {
+  flex: none; background: rgba(95,212,255,0.14); border: 1px solid var(--line); color: var(--cyan);
+  border-radius: 6px; padding: 5px 8px; font-size: 11px; font-weight: 700; cursor: pointer;
+}
+.meta-upgrades .mi-buy:disabled { opacity: 0.5; cursor: default; color: var(--dim); }
+.meta-upgrades .mi-buy.poor { color: var(--bad); border-color: rgba(255,106,125,0.4); }
 
 /* ---------- 업적 ---------- */
 .achievements {
