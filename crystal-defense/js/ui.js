@@ -382,7 +382,7 @@ export var UI = class {
       build: "지을 것을 고르면 배치 모드가 된다. 벽·타워는 제작대를 먼저 지어야 열린다.",
       craft: "제작대를 지으면 도구와 무기를, 화로를 지으면 철을 만들 수 있다.",
       skill: "정수(💠)를 회복 대신 전투에 쓴다. 회복과 경쟁하니 상황에 맞게 고를 것.",
-      gear: "손에 들 것을 고른다. 든 것의 효과만 적용되고, 정수석은 곡괭이를 쥐어야 캔다.",
+      gear: "손에 들 것을 고른다. 든 것의 효과만 적용되고, 바위·광맥은 곡괭이를 쥐어야 캔다.",
       crystal: "정수(💠)로 크리스탈 자체를 영구히 강화한다. 각 트랙 5레벨까지, 레벨이 오를수록 비용도 오른다."
     };
     this.el.invDesc.textContent = DESC[this._invTab];
@@ -1308,10 +1308,10 @@ export var UI = class {
     if (near && !g2.buildMgr.mode) {
       this.el.prompt.classList.remove("hidden");
       if (needsPickaxe(near.type) && !p2.holdingPickaxe) {
-        const nm = near.type === "gem" ? "💠 정수석" : "🪨 바위";
+        const nm = near.type === "copper" ? "🟠 구리 광맥" : near.type === "coal" ? "⚫ 석탄층" : "🪨 바위";
         this.el.prompt.innerHTML = p2.tools.pickaxe ? `${nm} — 곡괭이를 <b>손에 쥐어야</b> 캘 수 있습니다 (좌상단 도구 아이콘)` : `${nm} — 곡괭이가 있어야 캘 수 있습니다 (제작대에서 제작)`;
       } else {
-        const label = near.type === "tree" ? "🌳 나무" : near.type === "gem" ? "💠 정수석" : "🪨 바위";
+        const label = near.type === "tree" ? "🌳 나무" : near.type === "copper" ? "🟠 구리 광맥" : near.type === "coal" ? "⚫ 석탄층" : "🪨 바위";
         this.el.prompt.innerHTML = `${label} — <b>눌러서 채집</b> (남은 ${near.charges})`;
       }
     } else {
@@ -1524,7 +1524,7 @@ export var UI = class {
     ctx.stroke();
     for (const n of g2.world.nodes) {
       if (n.depleted) continue;
-      ctx.fillStyle = n.type === "tree" ? "#3e8b47" : n.type === "gem" ? "#d68eff" : "#9aa3b5";
+      ctx.fillStyle = n.type === "tree" ? "#3e8b47" : n.type === "copper" ? "#c87137" : n.type === "coal" ? "#3a3a42" : "#9aa3b5";
       ctx.fillRect(tx(n.x) - 1, tz(n.z) - 1, 2.5, 2.5);
     }
     const pulse = 0.4 + Math.sin(performance.now() / 200) * 0.35;

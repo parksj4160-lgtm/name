@@ -165,7 +165,6 @@ export var World = class {
     const mult = CFG.biomes[this.biome].nodeMult;
     place("tree", Math.round(46 * mult));
     place("rock", Math.round(30 * mult));
-    place("gem", Math.max(3, Math.round(5 * mult)));
     place("copper", Math.max(4, Math.round(9 * mult)));
     place("coal", Math.max(4, Math.round(8 * mult)));
   }
@@ -188,23 +187,6 @@ export var World = class {
       body = leaf;
       stump = new THREE.Mesh(GEO.stump, MAT.trunk);
       stump.position.y = 0.25;
-      stump.visible = false;
-      g2.add(stump);
-    } else if (type === "gem") {
-      const cluster = new THREE.Group();
-      const n = 2 + Math.floor(rng() * 2);
-      for (let i = 0; i < n; i++) {
-        const m2 = new THREE.Mesh(GEO.gem, MAT.gem);
-        m2.position.set((rng() - 0.5) * 0.7, 0.35 + rng() * 0.35, (rng() - 0.5) * 0.7);
-        m2.scale.setScalar(0.6 + rng() * 0.7);
-        m2.rotation.set(rng() * 3, rng() * 3, rng() * 3);
-        m2.castShadow = true;
-        cluster.add(m2);
-      }
-      g2.add(cluster);
-      body = cluster;
-      stump = new THREE.Mesh(GEO.gemStump, MAT.gemStump);
-      stump.position.y = 0.08;
       stump.visible = false;
       g2.add(stump);
     } else {
@@ -231,7 +213,7 @@ export var World = class {
       g2.add(stump);
     }
     this.scene.add(g2);
-    const mimic = type !== "gem" && rng() < CFG.mimic.chance;
+    const mimic = rng() < CFG.mimic.chance;
     return {
       id,
       type,
@@ -244,7 +226,7 @@ export var World = class {
       group: g2,
       body,
       stump,
-      radius: type === "tree" ? 1 : type === "gem" ? 0.8 : 1.3,
+      radius: type === "tree" ? 1 : 1.3,
       mimic
     };
   }

@@ -489,7 +489,7 @@ export var Game = class {
       this.world.consumeNode(node);
       e._loot = e._loot || {};
       e._loot[node.type] = (e._loot[node.type] || 0) + y;
-      const color = node.type === "tree" ? 5979428 : node.type === "gem" ? 14063103 : 9146266;
+      const color = node.type === "tree" ? 5979428 : 9146266;
       this.fx.burst(node.x, 1, node.z, color, 10, 4);
       this.sfx.harvestDone(node.type);
     };
@@ -532,7 +532,7 @@ export var Game = class {
     };
     this.wave.onWaveClear = (w2, reward, won) => {
       if (this.isHost) this._grantReward(reward);
-      this.ui?.toast(won ? "마지막 웨이브 격퇴!" : `웨이브 ${w2} 클리어! 보상 🪵${reward.wood} 🪨${reward.stone}${reward.shard ? " 💠1" : ""}`, "good");
+      this.ui?.toast(won ? "마지막 웨이브 격퇴!" : `웨이브 ${w2} 클리어! 보상 🪵${reward.wood} 🪨${reward.stone}${reward.shard ? ` 💠${reward.shard}` : ""}`, "good");
       this.stats.waveLog.push({
         wave: w2,
         time: this.stats.time - this._waveMark.time,
@@ -1466,16 +1466,12 @@ export var Game = class {
     const pool = this._poolOf(playerId);
     const amount = cfg.yield;
     if (node.type === "tree") pool.wood += amount;
-    else if (node.type === "gem") pool.shard = (pool.shard || 0) + amount;
     else if (node.type === "copper") pool.copper = (pool.copper || 0) + amount;
     else if (node.type === "coal") pool.coal = (pool.coal || 0) + amount;
     else pool.stone += amount;
     this.world.consumeNode(node);
     this.stats.harvested += amount;
     this._notifyGain(playerId, node.type, amount, node);
-    if (node.type === "gem" && pool.shard === amount) {
-      this._notify(playerId, "💠 정수 획득! 인벤토리 스킬 탭에서 회복 외에 폭발·시간 왜곡·방벽도 쓸 수 있다", "good");
-    }
   }
   // 미믹 노드였음이 드러났을 때: 자원 대신 그 자리에서 몬스터를 소환한다. 소환된 개체는 곧바로
   // 캐던 플레이어의 공격 사거리 안이라 다음 프레임 자동으로 교전이 시작된다(_nearestPlayer 로직
@@ -2105,7 +2101,7 @@ export var Game = class {
     this.fx.float(`💧+${amount}`, 0, 4.5, 0, "good");
   }
   // 채집기(harvester)는 반경 안 나무·바위를 손으로 캐는 것과 똑같은 경로(consumeNode)로 천천히
-  // 스스로 캔다 — 정수석(gem)은 제외한다. 여러 채집기가 같은 노드를 두고 경쟁할 수 있는데(각자
+  // 스스로 캔다. 여러 채집기가 같은 노드를 두고 경쟁할 수 있는데(각자
   // 독립적으로 가장 가까운 대상을 고르므로), 그 자체는 버그가 아니라 배치를 고민하게 만드는 요소다.
   _updateHarvesters(dt2) {
     if (!this.isHost) return;
@@ -2114,7 +2110,7 @@ export var Game = class {
       const st = b.stats;
       let target = null, bestD = st.detectRadius;
       for (const n of this.world.nodes) {
-        if (n.depleted || n.type === "gem" || n.mimic) continue;
+        if (n.depleted || n.mimic) continue;
         const d2 = dist(b.x, b.z, n.x, n.z);
         if (d2 < bestD) {
           bestD = d2;
@@ -2569,14 +2565,13 @@ export var Game = class {
     } else this.net.send("toast", { to: playerId, text, kind });
   }
   _notifyGain(playerId, type, amount, node) {
-    const label = type === "tree" ? `+${amount} 🪵` : type === "gem" ? `+${amount} 💠` : `+${amount} 🪨`;
+    const label = type === "tree" ? `+${amount} 🪵` : type === "copper" ? `+${amount} 🟠` : type === "coal" ? `+${amount} ⚫` : `+${amount} 🪨`;
     if (playerId === this.local.id) {
       this.fx.float(label, node.x, 2.2, node.z, "good");
-      if (type === "gem") this.sfx.shard();
     } else {
       this.net.send("gain", { to: playerId, label, x: node.x, z: node.z });
     }
-    this.fx.burst(node.x, 1.4, node.z, type === "tree" ? 8046415 : type === "gem" ? 14061311 : 11581122, 6, 3);
+    this.fx.burst(node.x, 1.4, node.z, type === "tree" ? 8046415 : type === "copper" ? 13136695 : type === "coal" ? 4342338 : 11581122, 6, 3);
   }
   // ---------------------------------------------------------------- 네트워크
   _bindNet() {
@@ -2861,7 +2856,7 @@ export var Game = class {
     if (this.wave.wave === prevWave + 1 && this.wave.phase !== PHASE.LOST) {
       const reward = waveReward(this.wave.wave);
       const wonNow = this.wave.phase === PHASE.WON;
-      this.ui?.toast(wonNow ? "마지막 웨이브 격퇴!" : `웨이브 ${this.wave.wave} 클리어! 보상 🪵${reward.wood} 🪨${reward.stone}${reward.shard ? " 💠1" : ""}`, "good");
+      this.ui?.toast(wonNow ? "마지막 웨이브 격퇴!" : `웨이브 ${this.wave.wave} 클리어! 보상 🪵${reward.wood} 🪨${reward.stone}${reward.shard ? ` 💠${reward.shard}` : ""}`, "good");
       if (!wonNow) this.sfx.waveClear();
       const clearedWave = this.wave.wave;
       const buildings = [...this.buildMgr.buildings.values()];

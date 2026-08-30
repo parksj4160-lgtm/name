@@ -81,9 +81,7 @@ export var CFG = {
     // 바위·정수석은 맨손으로 못 캔다 — 곡괭이를 손에 쥐고 있어야 한다.
     // (나무는 맨손으로 캘 수 있어야 첫 곡괭이를 만들 수 있으므로 조건이 없다)
     rock: { time: 2.1, yield: 5, charges: 3, respawn: 28, needsPickaxe: true },
-    // 정수석: 아주 드물게 있는 채집물. 캐면 수정 정수(크리스탈 회복용)를 바로 얻는다.
-    // 곡괭이가 필요하고, 캐는 데 오래 걸리며, 한 번 캐면 오래 리스폰되지 않는다.
-    gem: { time: 3, yield: 1, charges: 1, respawn: 90, needsPickaxe: true },
+    // (정수석은 없앴다 — 💠 정수는 이제 채굴이 아니라 웨이브 클리어 보상으로만 들어온다)
     // 구리 광맥 — 바위보다 드물다. 구리는 화살·활시위·보루처럼 "정밀한" 쪽에 들어간다.
     copper: { time: 2.4, yield: 3, charges: 3, respawn: 40, needsPickaxe: true },
     // 석탄층 — 태우는 재료. 철을 제련할 때와 화약(대포탑)에 들어간다.
@@ -974,8 +972,13 @@ export var CFG = {
     // 웨이브당 체력 배율
     dmgScale: 1.09,
     reward: { wood: 20, stone: 15, perWave: { wood: 8, stone: 6 } },
-    shardEvery: 3,
-    // n웨이브마다 수정 정수 1개 (크리스탈 25% 회복)
+    // 💠 정수는 캐서 얻는 자원이 아니라 **웨이브를 넘긴 대가**다. 매 웨이브 클리어마다 확실히
+    // 들어오고(shardBase), 몇 웨이브마다 한 번씩 더 얹히며(shardBonusEvery), 보스를 넘긴 판은
+    // 크게 준다(shardBoss). 채굴로 벌 수 없으니 "정수가 부족하면 더 캐러 간다"가 성립하지 않고,
+    // 스킬·크리스탈 강화·서리탑을 얼마나 굴릴 수 있느냐가 곧 "몇 웨이브를 버텼느냐"가 된다.
+    shardBase: 1,
+    shardBonusEvery: 3,
+    shardBoss: 3,
     nightEvery: 7,
     // n웨이브마다 밤 웨이브 — 조명이 어두워지고 시야(안개)가 좁아진다. 엔드리스에서도 계속 반복된다.
     // 지금까진 순전히 시각 효과라 "귀찮지만 아무 의미 없는 웨이브"였다 — 야간 처치 보상을 올려서
@@ -1200,10 +1203,14 @@ export function applyDifficulty(key) {
   return d2;
 }
 export function waveReward(w2) {
-  const r = CFG.wave.reward;
+  const c2 = CFG.wave;
+  const r = c2.reward;
+  // 보스 웨이브(5의 배수)를 넘기면 크게, 그 외에는 기본 + 주기 보너스
+  const isBoss = w2 % 5 === 0;
+  const shard = isBoss ? c2.shardBoss : c2.shardBase + (w2 % c2.shardBonusEvery === 0 ? 1 : 0);
   return {
     wood: r.wood + r.perWave.wood * w2,
     stone: r.stone + r.perWave.stone * w2,
-    shard: w2 % CFG.wave.shardEvery === 0 ? 1 : 0
+    shard
   };
 }
