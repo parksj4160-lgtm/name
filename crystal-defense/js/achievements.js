@@ -15,12 +15,17 @@ export var ACHIEVEMENTS = {
   treasureHunter: { name: "보물 사냥꾼", icon: "🦀", desc: "보물게를 5마리 잡았다" },
   nightmareConqueror: { name: "악몽 정복", icon: "😱", desc: "악몽 난이도로 10웨이브를 막아냈다" },
   fourKings: { name: "사천왕", icon: "🐉", desc: "한 판에서 네 보스(파괴자·서리 군주·침묵의 군주·갈취자)를 전부 처치했다" },
+  fiveGuardians: { name: "오방신장", icon: "🌟", desc: "한 판에서 다섯 보스(파괴자·서리 군주·침묵의 군주·갈취자·강철 수호자)를 전부 처치했다" },
   duoStrike: { name: "호흡 척척", icon: "🤝", desc: "협공 콤보를 10번 발동시켰다" },
   mimicHunter: { name: "정체 발각", icon: "🎭", desc: "위장한 미믹을 3마리 처치했다" },
   blockMaster: { name: "인내의 방패", icon: "🛡️", desc: "막기로 몬스터의 근접 공격을 10회 흘려냈다" },
   relicCollector: { name: "유물 수집가", icon: "🏺", desc: "보스를 처치하고 유물을 3개 모았다" },
   medic: { name: "정비병", icon: "🔧", desc: "정비소로 손상된 건물을 누적 500 이상 고쳤다" },
-  hunter: { name: "사냥꾼", icon: "🍖", desc: "야생 동물을 10마리 사냥했다" }
+  hunter: { name: "사냥꾼", icon: "🍖", desc: "야생 동물을 10마리 사냥했다" },
+  gourmet: { name: "미식가", icon: "🍽️", desc: "다섯 가지 사냥감 요리를 전부 만들어봤다" },
+  tamer: { name: "조련사", icon: "🐾", desc: "여우나 늑대를 길들여 동료로 삼았다" },
+  interceptor: { name: "차단자", icon: "🕵️", desc: "정찰병을 포탈에 닿기 전에 3번 처치했다" },
+  loyalCompanion: { name: "충직한 동료", icon: "🦴", desc: "길들인 동료에게 먹이를 줘서 최대 레벨까지 키웠다" }
 };
 var STORE_KEY = "cd.achievements";
 export function loadUnlocked() {

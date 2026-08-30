@@ -96,6 +96,7 @@ var Enemy = class {
       this.chargeCd = CFG.bossPattern.chargeCd * 0.6;
       this.chargeDir = { x: 0, z: 0 };
       this.silenceUntil = 0;
+      this.fortifyUntil = 0;
     }
   }
   get isCasting() {
@@ -132,8 +133,10 @@ var Enemy = class {
     }
     const barG = new THREE.Group();
     const bg = new THREE.Mesh(GEO3.bar, MAT_BAR_BG);
-    const fg = new THREE.Mesh(GEO3.bar, new THREE.MeshBasicMaterial({ color: 16738922, depthTest: false }));
+    const fg = new THREE.Mesh(GEO3.bar, new THREE.MeshBasicMaterial({ color: 16738922, depthTest: false, transparent: true }));
     fg.position.z = 0.01;
+    bg.renderOrder = 5;
+    fg.renderOrder = 6;
     barG.add(bg, fg);
     barG.position.y = 1.9;
     barG.renderOrder = 5;
@@ -150,7 +153,12 @@ var Enemy = class {
     this.barFg.scale.x = Math.max(1e-3, r);
     this.barFg.position.x = -(1 - r) * 0.6;
   }
+  // 저항 변종은 셋 다(둔화·속박·중독) 그냥 무시한다 — 서리탑·덫탑·독탑·얼음도끼가 전부 이 세
+  // 메서드 하나씩을 거쳐가므로, 여기서 조용히 리턴하는 것만으로 새 배관 없이 모든 상태이상
+  // 소스에 동시에 면역이 적용된다(반대로 기존 필드는 손대지 않으니 slowUntil 등 기본값 0이
+  // 그대로 유지돼 "항상 안 걸린 상태"와 동일하게 처리된다).
   applySlow(factor, duration, now) {
+    if (this.variant === "resist") return;
     this.slowFactor = Math.min(this.slowFactor, 1 - factor);
     this.slowUntil = Math.max(this.slowUntil, now + duration);
     if (this.bodyMat) {
@@ -161,6 +169,7 @@ var Enemy = class {
   // 덫탑 전용 — 둔화(비율 감소)와 달리 이동 속도를 완전히 0으로 묶는다. 슬로우와는 별개 상태라
   // 둘 다 걸려도 root 가 우선한다(simulate() 의 speed 계산에서 처리)
   applyRoot(duration, now) {
+    if (this.variant === "resist") return;
     this.rootUntil = Math.max(this.rootUntil, now + duration);
     if (this.bodyMat) {
       this.bodyMat.emissive?.setHex(13215862);
@@ -168,6 +177,7 @@ var Enemy = class {
     }
   }
   applyPoison(dps, duration, now) {
+    if (this.variant === "resist") return;
     this.poisonDps = Math.max(this.poisonDps, dps);
     this.poisonUntil = Math.max(this.poisonUntil, now + duration);
   }
@@ -175,6 +185,9 @@ var Enemy = class {
   // 방패 변종: 정면(진행 방향 기준 앞쪽 144˚)에서 맞으면 피해가 크게 줄어든다 — 등 뒤로 돌아가야 제대로 들어간다
   damage(amount, fromX, fromZ) {
     let applied = amount;
+    if (this.fortifyUntil && performance.now() / 1e3 < this.fortifyUntil) {
+      applied = amount * (1 - CFG.bossPattern.fortifyMitigation);
+    }
     if (this.variant === "shield" && typeof fromX === "number") {
       const v = CFG.variants.shield;
       const angToAttacker = Math.atan2(fromX - this.x, fromZ - this.z);
@@ -339,9 +352,12 @@ export var EnemyManager = class {
           if (healedAny) this.onHealPulse?.(e);
         }
       }
-      // 야생 동물은 크리스탈 길찾기·건물 공격을 아예 타지 않는다 — 전용 분기로 빠진다
       if (e.st.wild) {
         this._wildTick(e, dt2, now, players);
+        continue;
+      }
+      if (e.st.scout) {
+        this._scoutTick(e, dt2, now);
         continue;
       }
       if (e.st.rallyAura) {
@@ -537,6 +553,7 @@ export var EnemyManager = class {
       if (kind === "summon") this._bossSummon(e);
       else if (kind === "silence") this._bossSilence(e);
       else if (kind === "drain") this._bossDrain(e);
+      else if (kind === "fortify") this._bossFortify(e);
       else this._bossBeginCharge(e);
       return true;
     }
@@ -554,10 +571,11 @@ export var EnemyManager = class {
       e.summonsDone++;
       const silence = !!e.st.silenceBoss;
       const drain = !!e.st.drainBoss;
-      const kind2 = silence ? "silence" : drain ? "drain" : "summon";
+      const fortify = !!e.st.fortifyBoss;
+      const kind2 = silence ? "silence" : drain ? "drain" : fortify ? "fortify" : "summon";
       e.castKind = kind2;
-      e.castUntil = silence ? P2.silenceCast : drain ? P2.drainCast : P2.summonCast;
-      const color = silence ? 8011711 : drain ? 16766720 : 16733525;
+      e.castUntil = silence ? P2.silenceCast : drain ? P2.drainCast : fortify ? P2.fortifyCast : P2.summonCast;
+      const color = silence ? 8011711 : drain ? 16766720 : fortify ? 8945076 : 16733525;
       this.fx.ring(e.x, e.z, color, 5);
       this.onBossTelegraph?.(e, kind2);
       return true;
@@ -595,6 +613,14 @@ export var EnemyManager = class {
   _bossDrain(e) {
     this.fx.ring(e.x, e.z, 16766720, 6);
     this.onBossDrain?.(e);
+  }
+  // 강철 수호자 전용 — 자기 자신에게 방벽을 두른다 (실제 피해 감소 판정은 damage() 가
+  // fortifyUntil 을 직접 읽어서 한다)
+  _bossFortify(e) {
+    const P2 = CFG.bossPattern;
+    e.fortifyUntil = performance.now() / 1e3 + P2.fortifyTime;
+    this.fx.ring(e.x, e.z, 8945076, 5);
+    this.onBossTelegraph?.(e, "fortifyGo");
   }
   _bossBeginCharge(e) {
     const P2 = CFG.bossPattern;
@@ -644,6 +670,16 @@ export var EnemyManager = class {
         e.aggroUntil = 0;
       }
     }
+    if (!chasing && st.hunts) {
+      const near2 = this._nearestPlayer(players, e.x, e.z, st.huntRange || 10);
+      if (near2) {
+        e.aggroTarget = near2.id;
+        e.aggroUntil = now + 1;
+        tx = near2.x;
+        tz = near2.z;
+        chasing = true;
+      }
+    }
     if (!chasing) {
       const near = st.flees ? this._nearestPlayer(players, e.x, e.z, st.fleeRange || 12) : null;
       if (near) {
@@ -661,7 +697,6 @@ export var EnemyManager = class {
     }
     const dx = tx - e.x, dz = tz - e.z;
     const len = Math.hypot(dx, dz) || 1;
-    // 쫓기거나 달아날 땐 전력으로, 그냥 배회할 땐 느긋하게
     const mult = chasing ? 1 : this._nearestPlayer(players, e.x, e.z, st.fleeRange || 12) ? 1 : 0.35;
     let mx = dx / len * speed * mult, mz = dz / len * speed * mult;
     const sep = this._separation(e);
@@ -669,7 +704,6 @@ export var EnemyManager = class {
     mz += sep.z * speed * 0.5;
     e.x += mx * dt2;
     e.z += mz * dt2;
-    // 맵 밖으로 도망가 버리지 않게 가둔다
     const lim = CFG.world.size / 2 - 2;
     e.x = clamp(e.x, -lim, lim);
     e.z = clamp(e.z, -lim, lim);
@@ -681,6 +715,27 @@ export var EnemyManager = class {
         this.onPlayerHit?.(e, p2);
       }
     }
+    this._face(e, e.x + mx, e.z + mz, dt2);
+    this._applyPosition(e, dt2, now);
+  }
+  // 가장 가까운 포탈을 향해 직선으로 달린다 — 도착 여부(포탈까지 거리) 판정은 game.js 의
+  // _updateScout 가 한다(이 메서드는 순수 이동만 담당)
+  _scoutTick(e, dt2, now) {
+    const portals = this.world.portals;
+    if (!portals || !portals.length) return;
+    let target = portals[0], bestD = Infinity;
+    for (const p2 of portals) {
+      const d2 = (p2.x - e.x) ** 2 + (p2.z - e.z) ** 2;
+      if (d2 < bestD) {
+        bestD = d2;
+        target = p2;
+      }
+    }
+    const dx = target.x - e.x, dz = target.z - e.z;
+    const len = Math.hypot(dx, dz) || 1;
+    const mx = dx / len * e.st.speed, mz = dz / len * e.st.speed;
+    e.x += mx * dt2;
+    e.z += mz * dt2;
     this._face(e, e.x + mx, e.z + mz, dt2);
     this._applyPosition(e, dt2, now);
   }
@@ -840,6 +895,9 @@ export var EnemyManager = class {
         } else if (boss === 0 && prevBoss === 1 && e.st.silenceBoss) {
           e.silenceUntil = performance.now() / 1e3 + CFG.bossPattern.silenceTime;
           this.fx.ring(x2, z2, 8011711, CFG.bossPattern.silenceRadius);
+        } else if (boss === 0 && prevBoss === 1 && e.st.fortifyBoss) {
+          e.fortifyUntil = performance.now() / 1e3 + CFG.bossPattern.fortifyTime;
+          this.fx.ring(x2, z2, 8945076, 5);
         }
       }
     }

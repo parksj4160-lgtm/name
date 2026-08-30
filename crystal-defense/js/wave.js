@@ -22,6 +22,8 @@ export var WaveDirector = class {
     this._specialKind = null;
     this._siegePortal = null;
     this.prepBonus = 0;
+    this._scoutPenalty = false;
+    this._thisWavePenalty = false;
   }
   get displayWave() {
     return Math.min(CFG.wave.goal, this.wave + 1);
@@ -47,6 +49,8 @@ export var WaveDirector = class {
     this._eliteSpawnedThisWave = false;
     this._specialKind = specialWaveKind(w2);
     this._siegePortal = this._specialKind === "siege" ? pick(this.world.portals) : null;
+    this._thisWavePenalty = this._scoutPenalty;
+    this._scoutPenalty = false;
     this.onWaveStart?.(w2, this.totalThisWave);
     return true;
   }
@@ -72,7 +76,11 @@ export var WaveDirector = class {
           const ec = CFG.elite;
           statMult = { hp: ec.hpMult, scale: ec.scaleMult, dmg: ec.dmgMult, bounty: ec.bountyMult, elite: true };
         } else if (!isBossType) {
-          variant = this._specialKind === "ward" ? "ward" : rollVariant(this.wave + 1);
+          variant = this._specialKind === "ward" ? "ward" : this._specialKind === "frenzy" ? "vampire" : rollVariant(this.wave + 1);
+        }
+        if (this._thisWavePenalty && !isBossType) {
+          const sc = CFG.scoutEvent;
+          statMult = statMult ? { ...statMult, hp: (statMult.hp ?? 1) * sc.penaltyHpMult, dmg: (statMult.dmg ?? 1) * sc.penaltyDmgMult } : { hp: sc.penaltyHpMult, dmg: sc.penaltyDmgMult };
         }
         const spawned = this.enemies.spawn(
           type,
