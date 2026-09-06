@@ -1,3 +1,5 @@
+import { safeGetItem, safeSetItem } from './utils.js';
+
 var MUTE_KEY = "cd.muted";
 var VOL_KEY = "cd.volume";
 var DEFAULT_VOL = 0.55;
@@ -59,7 +61,7 @@ var MusicDirector = class {
   constructor(sfx) {
     this.sfx = sfx;
     this.gain = null;
-    const saved = parseFloat(localStorage.getItem(MUSIC_VOL_KEY));
+    const saved = parseFloat(safeGetItem(MUSIC_VOL_KEY));
     this.volume = Number.isFinite(saved) ? Math.min(1, Math.max(0, saved)) : DEFAULT_MUSIC_VOL;
     this.phase = null;
     this._desired = null;
@@ -84,7 +86,7 @@ var MusicDirector = class {
   }
   setVolume(v2) {
     this.volume = Math.min(1, Math.max(0, v2));
-    localStorage.setItem(MUSIC_VOL_KEY, String(this.volume));
+    safeSetItem(MUSIC_VOL_KEY, String(this.volume));
     const ctx = this.sfx.ctx;
     if (this.gain && ctx) this.gain.gain.setTargetAtTime(this._effVol(), ctx.currentTime, 0.05);
   }
@@ -222,8 +224,8 @@ var MusicDirector = class {
 export var SoundManager = class {
   constructor() {
     this.ctx = null;
-    this.muted = localStorage.getItem(MUTE_KEY) === "1";
-    const saved = parseFloat(localStorage.getItem(VOL_KEY));
+    this.muted = safeGetItem(MUTE_KEY) === "1";
+    const saved = parseFloat(safeGetItem(VOL_KEY));
     this.volume = Number.isFinite(saved) ? Math.min(1, Math.max(0, saved)) : DEFAULT_VOL;
     this._noiseBuf = null;
     this._lastAt = {};
@@ -237,7 +239,8 @@ export var SoundManager = class {
   }
   _ensureCtx() {
     if (this.ctx) {
-      if (this.ctx.state === "suspended") this.ctx.resume();
+      if (this.ctx.state === "suspended") this.ctx.resume().catch(() => {
+      });
       return this.ctx;
     }
     const AC = window.AudioContext || window.webkitAudioContext;
@@ -256,7 +259,7 @@ export var SoundManager = class {
   }
   toggleMute() {
     this.muted = !this.muted;
-    localStorage.setItem(MUTE_KEY, this.muted ? "1" : "0");
+    safeSetItem(MUTE_KEY, this.muted ? "1" : "0");
     this._applyGain();
     this.music.applyMute();
     return this.muted;
@@ -264,7 +267,7 @@ export var SoundManager = class {
   // 0..1 음량. 0 으로 내리면 음소거와 같은 효과라 음소거 표시도 함께 맞춰 준다.
   setVolume(v2) {
     this.volume = Math.min(1, Math.max(0, v2));
-    localStorage.setItem(VOL_KEY, String(this.volume));
+    safeSetItem(VOL_KEY, String(this.volume));
     this._applyGain();
     return this.volume;
   }
@@ -385,6 +388,11 @@ export var SoundManager = class {
   buildingHit() {
     if (!this._throttle("bhit", 90)) return;
     this._burstNoise({ dur: 0.07, peak: 0.16, filterFreq: 1100 });
+  }
+  // 뇌우 날씨의 벼락이 적을 내리칠 때
+  lightning() {
+    this._burstNoise({ dur: 0.06, peak: 0.3, filterFreq: 6e3, filterType: "highpass" });
+    this._tone({ freq: 2200, endFreq: 300, type: "sawtooth", dur: 0.13, peak: 0.22 });
   }
   crystalHit() {
     if (!this._throttle("crystal", 120)) return;

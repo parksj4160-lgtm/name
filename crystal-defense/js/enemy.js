@@ -24,6 +24,7 @@ var _slowColor = new THREE.Color(2781088);
 var _poisonColor = new THREE.Color(3064149);
 var _regenColor = new THREE.Color(3390720);
 var _rootColor = new THREE.Color(13215862);
+var _berserkColor = new THREE.Color(16729156);
 var _eliteTintColor = new THREE.Color();
 function eliteColor(baseColor) {
   const v = CFG.elite;
@@ -97,6 +98,7 @@ var Enemy = class {
       this.chargeDir = { x: 0, z: 0 };
       this.silenceUntil = 0;
       this.fortifyUntil = 0;
+      this._enraged = false;
     }
   }
   get isCasting() {
@@ -387,10 +389,17 @@ export var EnemyManager = class {
           e.dashUntil = now + CFG.variants.dash.duration;
         }
       }
+      if (e.variant === "berserk" && !e._berserk && e.hp <= e.maxHp * CFG.variants.berserk.triggerPct) {
+        e._berserk = true;
+        e.st.dmg = Math.round(e.st.dmg * CFG.variants.berserk.dmgMult);
+        this.onBerserk?.(e);
+      }
       const dashMult = e.variant === "dash" && now < e.dashUntil ? CFG.variants.dash.speedMult : 1;
+      const berserkMult = e.variant === "berserk" && e._berserk ? CFG.variants.berserk.speedMult : 1;
+      const enrageMult = e._enraged ? CFG.bossPattern.enrageSpeedMult : 1;
       const rootMult = now < e.rootUntil ? 0 : 1;
       const rallyMult = now < (e.rallyUntil || 0) ? e.rallyMult : 1;
-      const speed = e.st.speed * e.slowFactor * dashMult * rootMult * rallyMult * (e.isCharging ? CFG.bossPattern.chargeSpeed / e.st.speed : 1);
+      const speed = e.st.speed * e.slowFactor * dashMult * berserkMult * enrageMult * rootMult * rallyMult * (e.isCharging ? CFG.bossPattern.chargeSpeed / e.st.speed : 1);
       if (e.st.flees) {
         const p22 = this._nearestPlayer(players, e.x, e.z, 16);
         const fx2 = p22 ? e.x - p22.x : e.x, fz2 = p22 ? e.z - p22.z : e.z;
@@ -554,6 +563,11 @@ export var EnemyManager = class {
       else if (kind === "silence") this._bossSilence(e);
       else if (kind === "drain") this._bossDrain(e);
       else if (kind === "fortify") this._bossFortify(e);
+      else if (kind === "siphon") this._bossSiphon(e);
+      else if (kind === "blink") this._bossBlink(e);
+      else if (kind === "curse") this._bossCurse(e);
+      else if (kind === "pull") this._bossPull(e);
+      else if (kind === "blind") this._bossBlind(e);
       else this._bossBeginCharge(e);
       return true;
     }
@@ -567,15 +581,26 @@ export var EnemyManager = class {
       return true;
     }
     const ratio = e.hp / e.maxHp;
+    if (!e._enraged && ratio <= P2.enrageAt) {
+      e._enraged = true;
+      e.st.dmg = Math.round(e.st.dmg * P2.enrageDmgMult);
+      this.fx.ring(e.x, e.z, 16729156, 6);
+      this.onBossEnrage?.(e);
+    }
     if (e.summonsDone < P2.summonAt.length && ratio <= P2.summonAt[e.summonsDone]) {
       e.summonsDone++;
       const silence = !!e.st.silenceBoss;
       const drain = !!e.st.drainBoss;
       const fortify = !!e.st.fortifyBoss;
-      const kind2 = silence ? "silence" : drain ? "drain" : fortify ? "fortify" : "summon";
+      const siphon = !!e.st.siphonBoss;
+      const blink = !!e.st.blinkBoss;
+      const curse = !!e.st.curseBoss;
+      const pull = !!e.st.pullBoss;
+      const blind = !!e.st.blindBoss;
+      const kind2 = silence ? "silence" : drain ? "drain" : fortify ? "fortify" : siphon ? "siphon" : blink ? "blink" : curse ? "curse" : pull ? "pull" : blind ? "blind" : "summon";
       e.castKind = kind2;
-      e.castUntil = silence ? P2.silenceCast : drain ? P2.drainCast : fortify ? P2.fortifyCast : P2.summonCast;
-      const color = silence ? 8011711 : drain ? 16766720 : fortify ? 8945076 : 16733525;
+      e.castUntil = silence ? P2.silenceCast : drain ? P2.drainCast : fortify ? P2.fortifyCast : siphon ? P2.siphonCast : blink ? P2.blinkCast : curse ? P2.curseCast : pull ? P2.pullCast : blind ? P2.blindCast : P2.summonCast;
+      const color = silence ? 8011711 : drain ? 16766720 : fortify ? 8945076 : siphon ? 9321645 : blink ? 10217727 : curse ? 10181046 : pull ? 12592851 : blind ? 3355443 : 16733525;
       this.fx.ring(e.x, e.z, color, 5);
       this.onBossTelegraph?.(e, kind2);
       return true;
@@ -621,6 +646,42 @@ export var EnemyManager = class {
     e.fortifyUntil = performance.now() / 1e3 + P2.fortifyTime;
     this.fx.ring(e.x, e.z, 8945076, 5);
     this.onBossTelegraph?.(e, "fortifyGo");
+  }
+  // 정수 포식자 전용 — 갈취자(_bossDrain)와 같은 이유로 팀 자원 풀 접근이 필요해 game.js 콜백이 처리한다.
+  _bossSiphon(e) {
+    this.fx.ring(e.x, e.z, 9321645, 6);
+    this.onBossSiphon?.(e);
+  }
+  // 질풍 군주 전용 — 자기 자신을 크리스탈 코앞 무작위 지점으로 옮긴다. 실제 플레이어 충격파
+  // 판정은 갈취자·정수 포식자와 같은 이유(팀 전체 접근 필요)로 game.js 콜백이 처리한다.
+  _bossBlink(e) {
+    const P2 = CFG.bossPattern;
+    this.fx.ring(e.x, e.z, 10217727, P2.blinkRadius);
+    const a = Math.random() * Math.PI * 2;
+    const r = P2.blinkLandMin + Math.random() * (P2.blinkLandMax - P2.blinkLandMin);
+    e.x = Math.cos(a) * r;
+    e.z = Math.sin(a) * r;
+    this.fx.ring(e.x, e.z, 10217727, P2.blinkRadius);
+    this.onBossTelegraph?.(e, "blinkGo");
+    this.onBossBlink?.(e);
+  }
+  // 저주의 군주 전용 — 갈취자·정수 포식자·질풍 군주와 같은 이유(팀 전체 건물 목록 접근 필요)로
+  // 실제 대상 선정과 curseUntil 설정은 game.js 콜백이 처리한다.
+  _bossCurse(e) {
+    this.fx.ring(e.x, e.z, 10181046, 6);
+    this.onBossCurse?.(e);
+  }
+  // 자성 군주 전용 — 갈취자·정수 포식자·질풍 군주·저주의 군주와 같은 이유(팀 전체 플레이어
+  // 목록 접근 필요)로 실제 위치 이동은 game.js 콜백이 처리한다.
+  _bossPull(e) {
+    this.fx.ring(e.x, e.z, 12592851, CFG.bossPattern.pullRadius);
+    this.onBossPull?.(e);
+  }
+  // 칠흑 군주 전용 — 갈취자·정수 포식자·질풍 군주·저주의 군주·자성 군주와 같은 이유(팀 전체
+  // 플레이어 목록 접근 필요)로 실제 대상 판정과 blindUntil 설정은 game.js 콜백이 처리한다.
+  _bossBlind(e) {
+    this.fx.ring(e.x, e.z, 3355443, CFG.bossPattern.blindRadius);
+    this.onBossBlind?.(e);
   }
   _bossBeginCharge(e) {
     const P2 = CFG.bossPattern;
@@ -819,7 +880,10 @@ export var EnemyManager = class {
     else if (now !== void 0 && now < e.poisonUntil) color = _tmpColor.set(e.tintColor).lerp(_poisonColor, 0.6);
     else if (now !== void 0 && now < e.slowUntil) color = _tmpColor.set(e.tintColor).lerp(_slowColor, 0.6);
     else if (now !== void 0 && this._isRegenActive(e, now)) color = _tmpColor.set(e.tintColor).lerp(_regenColor, 0.55);
-    else color = _tmpColor.set(e.tintColor);
+    else if (e.variant === "berserk" && e._berserk) {
+      const pulseT = now ?? performance.now() / 1e3;
+      color = _tmpColor.set(e.tintColor).lerp(_berserkColor, 0.5 + Math.sin(pulseT * 6) * 0.15);
+    } else color = _tmpColor.set(e.tintColor);
     this.bodyInst.setColorAt(e.bodyIdx, color);
     this.bodyInst.instanceColor.needsUpdate = true;
   }
@@ -839,8 +903,17 @@ export var EnemyManager = class {
   }
   // 카메라를 향하도록 체력바 회전 (모든 클라이언트 공통)
   updateVisual(dt2, camera) {
+    const now = performance.now() / 1e3;
     for (const e of this.list) {
       if (e.bar.visible) e.bar.quaternion.copy(camera.quaternion);
+      if (e.variant === "berserk" && e._berserk && e.bodyMat) {
+        e.bodyMat.emissive?.setHex(16729156);
+        e.bodyMat.emissiveIntensity = 0.5 + Math.sin(now * 6) * 0.15;
+      }
+      if (e.st.boss && e._enraged && e.bodyMat) {
+        e.bodyMat.emissive?.setHex(16729156);
+        e.bodyMat.emissiveIntensity = 0.45 + Math.sin(now * 7) * 0.2;
+      }
     }
   }
   // --- 네트워크 ---
@@ -859,14 +932,21 @@ export var EnemyManager = class {
         e.castKind ? 1 : e.isCharging ? 2 : 0,
         e.variant || "",
         e.elite ? 1 : 0,
-        e.diving ? 1 : 0
+        e.diving ? 1 : 0,
+        // 광폭이 이미 각성했는지 — 위치·체력처럼 매 틱 갱신되는 값이 아니라 한 번 켜지면 그
+        // 판 내내 유지되는 상태라, 참가자가 도중에 합류하거나 스냅샷을 한 번 놓쳐도 다음
+        // 스냅샷에서 다시 정확히 복구된다(호스트의 e._berserk를 그대로 미러링).
+        e._berserk ? 1 : 0,
+        // 최후의 발악(_enraged)도 berserk와 완전히 같은 이유로 같은 방식(한 번 켜지면 유지,
+        // 참가자는 미러링만)으로 싣는다 — 참가자 화면에서도 몸이 붉게 물드는 걸 봐야 한다.
+        e._enraged ? 1 : 0
       ]);
     }
     return out;
   }
   applySnapshot(list, wave) {
     const seen = /* @__PURE__ */ new Set();
-    for (const [id, type, x2, z2, hp, rot, boss, variant, elite, diving] of list) {
+    for (const [id, type, x2, z2, hp, rot, boss, variant, elite, diving, berserk, enraged] of list) {
       seen.add(id);
       let e = this.byId(id);
       if (!e) {
@@ -878,6 +958,14 @@ export var EnemyManager = class {
       e.netTarget = { x: x2, z: z2, rot };
       e.hp = hp;
       e.refreshBar();
+      if (berserk === 1 && !e._berserk) {
+        e._berserk = true;
+        this.onBerserk?.(e);
+      }
+      if (enraged === 1 && !e._enraged) {
+        e._enraged = true;
+        this.onBossEnrage?.(e);
+      }
       if (e.st.burrows && e.diving && !diving) {
         e.diving = false;
         this.fx.ring(e.x, e.z, 9127187, 2.4);

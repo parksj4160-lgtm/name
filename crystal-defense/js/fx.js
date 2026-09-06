@@ -48,7 +48,7 @@ export var Fx = class {
   }
   // 미니맵 핑 — 일반 ring()보다 훨씬 오래(3.5초) 남고, 땅 위 고리뿐 아니라 하늘로 뻗는 기둥도
   // 같이 세워서 나무·건물에 가려도 멀리서부터 눈에 띈다. 협동 플레이에서 "여기로 와" 신호로 쓴다.
-  pingMarker(x2, z2, color = 16763904) {
+  pingMarker(x2, z2, color = 16763904, css = "#ffcc55") {
     const ring = new THREE.Mesh(
       new THREE.RingGeometry(0.15, 0.24, 28),
       new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.95, side: THREE.DoubleSide })
@@ -62,7 +62,7 @@ export var Fx = class {
     );
     beam.position.set(x2, 3, z2);
     this.sm.scene.add(beam);
-    this.pings.push({ ring, beam, t: 0, life: 3.5 });
+    this.pings.push({ ring, beam, t: 0, life: 3.5, css });
   }
   // 3D 좌표 위에 뜨는 데미지/획득 텍스트
   float(text, x2, y2, z2, cls = "") {
@@ -101,6 +101,7 @@ export var Fx = class {
       if (k2 >= 1) {
         this.sm.scene.remove(r.mesh);
         r.mesh.geometry.dispose();
+        r.mesh.material.dispose();
         this.rings.splice(i, 1);
         continue;
       }
@@ -115,7 +116,9 @@ export var Fx = class {
         this.sm.scene.remove(p2.ring);
         this.sm.scene.remove(p2.beam);
         p2.ring.geometry.dispose();
+        p2.ring.material.dispose();
         p2.beam.geometry.dispose();
+        p2.beam.material.dispose();
         this.pings.splice(i, 1);
         continue;
       }

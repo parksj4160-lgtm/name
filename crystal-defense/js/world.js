@@ -45,6 +45,7 @@ var MAT = {
     opacity: 0.92
   }),
   portal: new THREE.MeshStandardMaterial({ color: 16734834, emissive: 16722762, emissiveIntensity: 1.1, roughness: 0.4 }),
+  portalSealed: new THREE.MeshStandardMaterial({ color: 4407619, emissive: 0, emissiveIntensity: 0, roughness: 0.95, metalness: 0.05 }),
   gem: new THREE.MeshStandardMaterial({
     color: 14063103,
     emissive: 6959840,
@@ -58,6 +59,14 @@ var MAT = {
   crate: new THREE.MeshStandardMaterial({ color: 9127211, roughness: 0.85 }),
   dropGlow: new THREE.MeshBasicMaterial({ color: 16759043, transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false }),
   meteorWarn: new THREE.MeshBasicMaterial({ color: 16729139, transparent: true, opacity: 0.6, side: THREE.DoubleSide, depthWrite: false }),
+  // 화산지대에서 운석이 남기는 용암 웅덩이 — 경고 링(주황)보다 더 붉고 진하게 타는 색으로 구분한다
+  lavaCrater: new THREE.MeshBasicMaterial({ color: 15013889, transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false }),
+  // 늪지대 독가스 구덩이 — 색만으로도 단계가 읽히게 phase마다 material.color를 직접 바꿔 쓴다
+  // (dormant: 탁한 청록, warn: 노란 초록, active: 밝은 독성 초록)
+  swampPit: new THREE.MeshBasicMaterial({ color: 3163600, transparent: true, opacity: 0.28, side: THREE.DoubleSide, depthWrite: false }),
+  // 설원 얼음판 — 늪지대와 같은 3단계 색 전환이지만 독성 초록 대신 얼음 계열
+  // (dormant: 옅은 얼음빛 청백, warn: 밝은 흰색 깜빡임, active: 진한 얼음 파랑)
+  icePit: new THREE.MeshBasicMaterial({ color: 11393254, transparent: true, opacity: 0.3, side: THREE.DoubleSide, depthWrite: false }),
   riftRing: new THREE.MeshBasicMaterial({ color: 11239935, transparent: true, opacity: 0.75, side: THREE.DoubleSide, depthWrite: false }),
   riftCore: new THREE.MeshBasicMaterial({ color: 4530126, transparent: true, opacity: 0.4, side: THREE.DoubleSide, depthWrite: false }),
   spiritCore: new THREE.MeshStandardMaterial({ color: 9430015, emissive: 6736127, emissiveIntensity: 1.6, roughness: 0.2, transparent: true, opacity: 0.92 }),
@@ -76,7 +85,7 @@ export var World = class {
     this.portals = [];
     this.drops = [];
     this.biome = biomeOf(seed);
-    this.crystal = { hp: CFG.crystal.hp, maxHp: CFG.crystal.hp, shieldUntil: 0, armorLv: 0, regenLv: 0, auraLv: 0, reflectLv: 0, _regenAccum: 0, _auraTimer: 0 };
+    this.crystal = { hp: CFG.crystal.hp, maxHp: CFG.crystal.hp, shieldUntil: 0, armorLv: 0, regenLv: 0, auraLv: 0, reflectLv: 0, judgeLv: 0, shockLv: 0, graceLv: 0, resonanceLv: 0, materielLv: 0, _regenAccum: 0, _auraTimer: 0, _judgeTimer: 0, _shockTimer: 0, _resonanceTimer: 0 };
     this.meteor = null;
     this._build();
     this._buildMeteorRing();
@@ -89,6 +98,101 @@ export var World = class {
     this._buildPortals();
     this._buildNodes();
     this._buildScenery();
+    this.swampPits = [];
+    if (this.biome === "swamp") this._buildSwampPits();
+    this.icePits = [];
+    if (this.biome === "tundra") this._buildIcePits();
+  }
+  // 늪지대 전용 — 독가스 구덩이를 시드에서 결정론적으로 고정된 자리에 배치한다(운석처럼 매번
+  // 무작위 위치가 아니라 판마다 항상 같은 자리라, 두 번째부터는 플레이어가 외워서 피할 수 있다).
+  // 자원 노드 배치(_buildNodes)와 완전히 별개인 시드로 굴려서, 이 기능이 나무·바위 개수/위치를
+  // 하나도 바꾸지 않는다(기존 저장 호환에 영향 없음).
+  _buildSwampPits() {
+    const cfg = CFG.swampPit;
+    const rng = mulberry32(this.seed * 17 + 29);
+    const inner = CFG.world.coreRadius + 4, outer = CFG.world.buildRadius - 2.5;
+    let tries = 0;
+    while (this.swampPits.length < cfg.count && tries < cfg.count * 80) {
+      tries++;
+      const a = rng() * Math.PI * 2;
+      const r = inner + rng() * (outer - inner);
+      const x2 = Math.cos(a) * r, z2 = Math.sin(a) * r;
+      if (this.swampPits.some((s2) => dist(s2.x, s2.z, x2, z2) < cfg.minGap)) continue;
+      if (this.portals.some((p2) => dist(p2.x, p2.z, x2, z2) < 6)) continue;
+      if (this.nodes.some((n) => dist(n.x, n.z, x2, z2) < 2.6)) continue;
+      const ring = new THREE.Mesh(GEO.meteorRing, MAT.swampPit.clone());
+      ring.rotation.x = -Math.PI / 2;
+      ring.position.set(x2, 0.05, z2);
+      ring.scale.setScalar(cfg.radius);
+      this.scene.add(ring);
+      this.swampPits.push({ x: x2, z: z2, ring, phase: "dormant" });
+    }
+  }
+  // 구덩이 단계 자체의 진행(dormant→warn→active→dormant...)과 시간 누적은 game.js가 호스트에서만
+  // 계산하고(운석·용암 웅덩이와 완전히 같은 원칙 — 참가자 화면이 각자 dt로 따로 진행시키면 배경
+  // 탭 스로틀링(문서에 기록된 2fps 함정)으로 호스트·참가자의 단계가 어긋난다), 그 결과만 스냅샷의
+  // `sw` 필드로 참가자에게 전파돼 이 setter로 반영된다. 여기서는 현재 phase를 색·투명도로만
+  // 그린다 — 시간 계산은 전혀 하지 않는다.
+  setSwampPitPhase(i, phase) {
+    const s2 = this.swampPits[i];
+    if (s2) s2.phase = phase;
+  }
+  updateSwampPitVisual(now) {
+    for (const s2 of this.swampPits) {
+      const m2 = s2.ring.material;
+      if (s2.phase === "warn") {
+        m2.color.setHex(11987456);
+        m2.opacity = 0.35 + Math.abs(Math.sin(now * 9)) * 0.4;
+      } else if (s2.phase === "active") {
+        m2.color.setHex(3407462);
+        m2.opacity = 0.55 + Math.abs(Math.sin(now * 4)) * 0.3;
+      } else {
+        m2.color.setHex(3163600);
+        m2.opacity = 0.16 + Math.sin(now * 0.8 + s2.x) * 0.06;
+      }
+    }
+  }
+  // 설원 전용 — 위 늪지대 배치와 완전히 같은 시드 파생 방식(자원·포탈과 겹치지 않게),
+  // 별도 오프셋(*23+41)을 써서 같은 시드라도 늪지대와 다른 자리가 나오게 한다.
+  _buildIcePits() {
+    const cfg = CFG.icePit;
+    const rng = mulberry32(this.seed * 23 + 41);
+    const inner = CFG.world.coreRadius + 4, outer = CFG.world.buildRadius - 2.5;
+    let tries = 0;
+    while (this.icePits.length < cfg.count && tries < cfg.count * 80) {
+      tries++;
+      const a = rng() * Math.PI * 2;
+      const r = inner + rng() * (outer - inner);
+      const x2 = Math.cos(a) * r, z2 = Math.sin(a) * r;
+      if (this.icePits.some((s2) => dist(s2.x, s2.z, x2, z2) < cfg.minGap)) continue;
+      if (this.portals.some((p2) => dist(p2.x, p2.z, x2, z2) < 6)) continue;
+      if (this.nodes.some((n) => dist(n.x, n.z, x2, z2) < 2.6)) continue;
+      const ring = new THREE.Mesh(GEO.meteorRing, MAT.icePit.clone());
+      ring.rotation.x = -Math.PI / 2;
+      ring.position.set(x2, 0.05, z2);
+      ring.scale.setScalar(cfg.radius);
+      this.scene.add(ring);
+      this.icePits.push({ x: x2, z: z2, ring, phase: "dormant" });
+    }
+  }
+  setIcePitPhase(i, phase) {
+    const s2 = this.icePits[i];
+    if (s2) s2.phase = phase;
+  }
+  updateIcePitVisual(now) {
+    for (const s2 of this.icePits) {
+      const m2 = s2.ring.material;
+      if (s2.phase === "warn") {
+        m2.color.setHex(16777215);
+        m2.opacity = 0.4 + Math.abs(Math.sin(now * 9)) * 0.4;
+      } else if (s2.phase === "active") {
+        m2.color.setHex(6737151);
+        m2.opacity = 0.55 + Math.abs(Math.sin(now * 3)) * 0.25;
+      } else {
+        m2.color.setHex(11393254);
+        m2.opacity = 0.18 + Math.sin(now * 0.8 + s2.x) * 0.06;
+      }
+    }
   }
   _buildCrystal() {
     const g2 = new THREE.Group();
@@ -118,8 +222,33 @@ export var World = class {
     shield.visible = false;
     g2.add(shield);
     this.crystalShield = shield;
+    const milestoneColors = [13675850, 14212848, 16766058];
+    const milestoneTilts = [0.35, -0.35, 0.9];
+    this.crystalMilestoneRings = milestoneColors.map((color, i) => {
+      const ring = new THREE.Mesh(
+        new THREE.TorusGeometry(2.7 + i * 0.35, 0.055, 8, 40),
+        new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0, side: THREE.DoubleSide })
+      );
+      ring.position.y = 3.4;
+      ring.rotation.x = Math.PI / 2 + milestoneTilts[i];
+      ring.rotation.y = i * 1.1;
+      ring.visible = false;
+      g2.add(ring);
+      return ring;
+    });
+    this.crystalMilestone = 0;
     this.scene.add(g2);
     this.crystalGroup = g2;
+  }
+  // 웨이브 수만으로 계산되는 값이라 호스트·참가자·저장 이어하기 전부 새 네트워크 필드 없이
+  // 각자 똑같은 tier를 얻는다 — game.js가 매 프레임 여기로 현재 tier를 넘겨준다.
+  setCrystalMilestone(tier) {
+    if (tier === this.crystalMilestone) return;
+    this.crystalMilestone = tier;
+    this.crystalMilestoneRings.forEach((ring, i) => {
+      ring.visible = i < tier;
+      if (!ring.visible) ring.material.opacity = 0;
+    });
   }
   _buildPortals() {
     const r = CFG.world.size * 0.44;
@@ -140,7 +269,7 @@ export var World = class {
       m2.position.set(x2, 2.2, z2);
       m2.rotation.y = -a;
       this.scene.add(m2);
-      this.portals.push({ x: x2, z: z2, mesh: m2 });
+      this.portals.push({ x: x2, z: z2, mesh: m2, sealed: false });
     }
   }
   _buildNodes() {
@@ -193,8 +322,6 @@ export var World = class {
       const rockG = new THREE.Group();
       const n = 2 + Math.floor(rng() * 2);
       for (let i = 0; i < n; i++) {
-        // 구리 광맥·석탄층은 같은 바위 실루엣이되 광석 재질이 확실히 드러나게 섞는다 —
-        // 멀리서도 "저건 구리다/석탄이다" 가 색으로 구분돼야 캐러 갈 목표를 정할 수 있다
         const oreMat = type === "copper" ? MAT.copperOre : type === "coal" ? MAT.coalOre : MAT.ore;
         const m2 = new THREE.Mesh(GEO.rock, rng() > (type === "rock" ? 0.6 : 0.25) ? oreMat : MAT.rock);
         m2.position.set((rng() - 0.5) * 1.6, 0.4 + rng() * 0.4, (rng() - 0.5) * 1.6);
@@ -270,9 +397,15 @@ export var World = class {
     }
     this._refreshNodeVisual(node);
   }
-  updateNodes(now) {
+  // respawnAt은 호스트가 consumeNode()에서만 채우는 값이라(호스트 로컬 performance.now() 기준),
+  // 참가자 쪽 값은 항상 초기값 0으로 남아 있다 — 참가자도 이 시간 기준 자동 복원 로직을 그대로
+  // 돌리면 "0 >= respawnAt(0)"이 항상 참이라 depleted가 세팅되는 바로 다음 프레임에 즉시 다시
+  // false로 풀려버린다(깜빡이며 계속 되살아나는 것처럼 보임). 그래서 실제 시간 기준 복원 판정은
+  // 호스트에서만 돌리고, 참가자는 순전히 스냅샷의 depleted 값(applyNodeSnapshot)만 믿는다 —
+  // 자라나는 애니메이션(scale 0.2→1)은 그쪽에서 상태 전환을 감지했을 때 별도로 틔운다.
+  updateNodes(now, isHost = true) {
     for (const n of this.nodes) {
-      if (n.depleted && now >= n.respawnAt) {
+      if (isHost && n.depleted && now >= n.respawnAt) {
         n.depleted = false;
         n.charges = n.maxCharges;
         this._refreshNodeVisual(n);
@@ -303,10 +436,23 @@ export var World = class {
       const v2 = arr[i];
       const dep = v2 < 0;
       if (n.depleted !== dep || n.charges !== v2) {
+        if (n.depleted && !dep) n.group.scale.setScalar(0.2);
         n.depleted = dep;
         n.charges = dep ? 0 : v2;
         this._refreshNodeVisual(n);
       }
+    }
+  }
+  // 솔로 저장/이어하기 전용 — nodeSnapshot()은 depleted 여부·charges만 담고(참가자 쪽 12Hz
+  // 스냅샷 크기를 계속 작게 유지하려는 설계) respawnAt(정확히 언제 다시 캘 수 있는지)은 안 싣는다.
+  // 그래서 이어하기 직후 depleted:true로 복원된 노드도 respawnAt은 이 인스턴스의 기본값 0에
+  // 머물러 있어, 다음 update() 한 틱만 지나면 "지금 시각이 0보다 크다"는 이유로 즉시 다시
+  // 채집 가능 상태로 풀려버린다(원래 20~40초 걸리는 재생을 새로고침 한 번으로 건너뛰는 셈).
+  // resumeLocal이 이 메서드로 depleted 노드의 타이머를 다시 정상적으로 되돌려 놓는다.
+  restartDepletedRespawns() {
+    const now = performance.now() / 1e3;
+    for (const n of this.nodes) {
+      if (n.depleted) n.respawnAt = now + CFG.harvest[n.type].respawn;
     }
   }
   // --- 운석 낙하 경고 ---
@@ -318,6 +464,11 @@ export var World = class {
     ring.visible = false;
     this.scene.add(ring);
     this.meteorRing = ring;
+    const cr2 = new THREE.Mesh(GEO.meteorRing, MAT.lavaCrater);
+    cr2.rotation.x = -Math.PI / 2;
+    cr2.visible = false;
+    this.scene.add(cr2);
+    this.craterRing = cr2;
     const rr2 = new THREE.Mesh(GEO.riftRing, MAT.riftRing.clone());
     rr2.rotation.x = -Math.PI / 2;
     rr2.visible = false;
@@ -421,7 +572,7 @@ export var World = class {
     if (this.pet?.type !== type || this.pet?.lv !== lv) {
       const tc2 = CFG.tame[type];
       this.petBodyMat.color.setHex(tc2.color);
-      const base = type === "wolf" ? 1.15 : 0.85;
+      const base = type === "wolf" ? 1.15 : type === "stagking" ? 1.05 : 0.85;
       this.petGroup.scale.setScalar(base * (1 + lv * 0.12));
       this.petRing.material.color.setHex(tc2.color);
     }
@@ -464,23 +615,60 @@ export var World = class {
     r.scale.setScalar(this.meteor.radius);
     r.material.opacity = 0.3 + Math.abs(Math.sin(now * 7)) * 0.45;
   }
+  // --- 용암 웅덩이(화산지대 운석 낙하 후) ---
+  // 경고 링과 같은 방식으로 위치·잔여시간만 들고, 실제 지속 피해는 game.js가 호스트에서 계산한다.
+  setCrater(x2, z2, timeLeft, radius) {
+    this.crater = { x: x2, z: z2, timeLeft, radius };
+  }
+  clearCrater() {
+    this.crater = null;
+    if (this.craterRing) this.craterRing.visible = false;
+  }
+  updateCraterVisual(now) {
+    if (!this.crater) {
+      if (this.craterRing) this.craterRing.visible = false;
+      return;
+    }
+    const r = this.craterRing;
+    r.visible = true;
+    r.position.set(this.crater.x, 0.055, this.crater.z);
+    r.scale.setScalar(this.crater.radius);
+    r.material.opacity = 0.35 + Math.abs(Math.sin(now * 2.4)) * 0.3;
+  }
   // --- 보급품 투하 ---
-  spawnDrop(id, x2, z2) {
+  // kind: "supply"(목재·광물, 나무 상자) | "shard"(정수, 빛나는 보석 — GEO.gem/MAT.gem은
+  // 정수석 채집 노드가 있던 시절 쓰던 자산인데 그 노드가 없어진 뒤로 완전히 안 쓰이고
+  // 있었다. 그 자산을 그대로 재사용해 "정수처럼 보이는" 드롭을 새로 안 만들고 살렸다.
+  spawnDrop(id, x2, z2, kind = "supply") {
     const g2 = new THREE.Group();
     g2.position.set(x2, 0.12, z2);
-    const crate = new THREE.Mesh(GEO.crate, MAT.crate);
-    crate.position.y = 0.45;
-    crate.castShadow = true;
-    g2.add(crate);
-    const ring = new THREE.Mesh(GEO.dropRing, MAT.dropGlow);
-    ring.rotation.x = -Math.PI / 2;
-    ring.position.y = -0.07;
-    g2.add(ring);
-    const beam = new THREE.Mesh(GEO.dropBeam, MAT.dropGlow);
-    beam.position.y = 3.4;
-    g2.add(beam);
+    if (kind === "shard") {
+      const gem = new THREE.Mesh(GEO.gem, MAT.gem);
+      gem.position.y = 0.55;
+      gem.castShadow = true;
+      g2.add(gem);
+      const ring = new THREE.Mesh(GEO.dropRing, MAT.gem);
+      ring.rotation.x = -Math.PI / 2;
+      ring.position.y = -0.07;
+      g2.add(ring);
+      const beam = new THREE.Mesh(GEO.dropBeam, MAT.gem);
+      beam.position.y = 3.4;
+      g2.add(beam);
+    } else {
+      const crate = new THREE.Mesh(GEO.crate, MAT.crate);
+      crate.position.y = 0.45;
+      crate.castShadow = true;
+      g2.add(crate);
+      const ring = new THREE.Mesh(GEO.dropRing, MAT.dropGlow);
+      ring.rotation.x = -Math.PI / 2;
+      ring.position.y = -0.07;
+      g2.add(ring);
+      const beam = new THREE.Mesh(GEO.dropBeam, MAT.dropGlow);
+      beam.position.y = 3.4;
+      g2.add(beam);
+    }
     this.scene.add(g2);
-    const drop = { id, x: x2, z: z2, group: g2, requested: false };
+    const drop = { id, x: x2, z: z2, group: g2, requested: false, kind };
     this.drops.push(drop);
     return drop;
   }
@@ -491,13 +679,13 @@ export var World = class {
     this.drops.splice(i, 1);
   }
   dropSnapshot() {
-    return this.drops.map((d2) => [d2.id, Math.round(d2.x * 10) / 10, Math.round(d2.z * 10) / 10]);
+    return this.drops.map((d2) => [d2.id, Math.round(d2.x * 10) / 10, Math.round(d2.z * 10) / 10, d2.kind]);
   }
   applyDropSnapshot(list) {
     const seen = /* @__PURE__ */ new Set();
-    for (const [id, x2, z2] of list) {
+    for (const [id, x2, z2, kind] of list) {
       seen.add(id);
-      if (!this.drops.some((d2) => d2.id === id)) this.spawnDrop(id, x2, z2);
+      if (!this.drops.some((d2) => d2.id === id)) this.spawnDrop(id, x2, z2, kind || "supply");
     }
     for (let i = this.drops.length - 1; i >= 0; i--) {
       if (!seen.has(this.drops[i].id)) this.removeDrop(this.drops[i].id);
@@ -532,7 +720,7 @@ export var World = class {
   activateShield(duration) {
     this.crystal.shieldUntil = performance.now() / 1e3 + duration;
   }
-  update(dt2, now) {
+  update(dt2, now, isHost = true) {
     this.crystalMesh.rotation.y += dt2 * 0.5;
     this.crystalMesh.position.y = 3.4 + Math.sin(now * 1.6) * 0.18;
     const ratio = this.crystal.hp / this.crystal.maxHp;
@@ -548,6 +736,12 @@ export var World = class {
       this.crystalMesh.scale.setScalar(1);
       this.crystalHalo.material.opacity = 0.35 + Math.sin(now * 2) * 0.08;
     }
+    for (let i = 0; i < this.crystalMilestoneRings.length; i++) {
+      const ring = this.crystalMilestoneRings[i];
+      if (!ring.visible) continue;
+      ring.rotation.z += dt2 * (0.25 + i * 0.12);
+      ring.material.opacity = Math.min(0.85, ring.material.opacity + dt2 * 0.8);
+    }
     const shieldLeft = this.crystal.shieldUntil - now;
     if (shieldLeft > 0) {
       this.crystalShield.visible = true;
@@ -557,12 +751,20 @@ export var World = class {
       this.crystalShield.visible = false;
     }
     for (const p2 of this.portals) {
+      if (p2.sealed) {
+        p2.mesh.material = MAT.portalSealed;
+        continue;
+      }
+      p2.mesh.material = MAT.portal;
       p2.mesh.rotation.z += dt2 * 1.2;
       p2.mesh.material.emissiveIntensity = 0.9 + Math.sin(now * 3 + p2.x) * 0.35;
     }
-    this.updateNodes(now);
+    this.updateNodes(now, isHost);
     this.updateDrops(dt2, now);
     this.updateMeteorVisual(now);
+    this.updateCraterVisual(now);
+    this.updateSwampPitVisual(now);
+    this.updateIcePitVisual(now);
     this.updateRiftVisual(now);
     this.updateSpiritVisual(now);
     this.updatePetVisual(now);

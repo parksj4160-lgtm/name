@@ -1,4 +1,4 @@
-import { shortId } from './utils.js';
+import { safeGetItem, safeRemoveItem, safeSetItem, shortId } from './utils.js';
 
 export var Net = class {
   constructor() {
@@ -16,11 +16,11 @@ export var Net = class {
     addEventListener("beforeunload", () => this.leave());
   }
   get serverUrl() {
-    return localStorage.getItem("cd.server") || "";
+    return safeGetItem("cd.server") || "";
   }
   setServerUrl(url) {
-    if (url) localStorage.setItem("cd.server", url);
-    else localStorage.removeItem("cd.server");
+    if (url) safeSetItem("cd.server", url);
+    else safeRemoveItem("cd.server");
   }
   get online() {
     return this.mode !== "off";
@@ -50,8 +50,19 @@ export var Net = class {
   on(type, fn) {
     (this._handlers[type] = this._handlers[type] || []).push(fn);
   }
+  // 핸들러 하나가 예외를 던져도(상대방이 이 판과 다른 버전이라 스냅샷 구조가 안 맞는 경우 등)
+  // 그 메시지 하나만 무시하고 다음 메시지부터는 정상적으로 계속 처리한다 — try/catch가 없으면
+  // 예외가 네트워크 수신 콜백(onmessage) 밖으로 그대로 튀어 오르는데, 특히 "snap"은 초당 여러 번
+  // 오는 메시지라 매번 똑같이 깨지면 콘솔이 도배되는 것은 물론, 예외가 난 그 프레임에서 나머지
+  // 핸들러(같은 타입에 등록된 게 여럿일 수 있다)도 전혀 안 불린다.
   _emit(type, data, from) {
-    (this._handlers[type] || []).forEach((fn) => fn(data, from));
+    for (const fn of this._handlers[type] || []) {
+      try {
+        fn(data, from);
+      } catch (err) {
+        console.error(`net handler for "${type}" failed`, err);
+      }
+    }
   }
   connect(code) {
     this.leave();
@@ -62,41 +73,50 @@ export var Net = class {
     if (url) {
       try {
         const sep = url.includes("?") ? "&" : "?";
-        this._ws = new WebSocket(`${url}${sep}room=CD-${encodeURIComponent(this.roomCode)}&id=${this.selfId}`);
-        this._ws.onmessage = (ev) => {
+        const ws2 = new WebSocket(`${url}${sep}room=CD-${encodeURIComponent(this.roomCode)}&id=${this.selfId}`);
+        this._ws = ws2;
+        let opened = false;
+        ws2.onmessage = (ev) => {
           try {
             this._receive(JSON.parse(ev.data));
           } catch (_) {
           }
         };
-        this._ws.onopen = () => {
+        ws2.onopen = () => {
+          opened = true;
           this.mode = "ws";
           this.status = `온라인 · 방 ${this.roomCode}`;
           this._post({ type: "join" });
         };
-        this._ws.onclose = () => {
-          if (this.mode === "ws") {
-            this.mode = "off";
-            this.status = "서버 연결 끊김";
-          }
+        ws2.onclose = () => {
+          if (this._ws !== ws2) return;
+          this._ws = null;
+          this._connectLocal(opened ? "서버 연결 끊김" : "서버 연결 실패 — 같은 브라우저 탭끼리만 연결됩니다");
         };
-        this._ws.onerror = () => {
-          this.status = "서버 연결 실패 — 같은 브라우저 탭끼리만 연결됩니다";
+        ws2.onerror = () => {
         };
         this.mode = "ws";
       } catch (_) {
         this._ws = null;
       }
     }
-    if (!this._ws && typeof BroadcastChannel !== "undefined") {
-      this._chan = new BroadcastChannel("crystal-defense-" + this.roomCode);
-      this._chan.onmessage = (ev) => this._receive(ev.data);
-      this.mode = "local";
-      this.status = `같은 브라우저 · 방 ${this.roomCode}`;
-      this._post({ type: "join" });
-    }
-    if (this.mode === "off") this.status = "이 브라우저는 멀티플레이를 지원하지 않습니다";
+    if (!this._ws) this._connectLocal();
     return this.mode !== "off";
+  }
+  // 로컬(BroadcastChannel) 모드로 (재)연결한다 — 서버 주소가 아예 없을 때의 기본 경로이자,
+  // 서버 연결이 끝내 안 되거나 끊겼을 때의 대체 경로다. failStatus를 넘기면 그 문구를 그대로
+  // 쓰고(왜 대체됐는지 알려줌), 없으면 평범한 로컬 연결 문구를 쓴다.
+  _connectLocal(failStatus) {
+    if (typeof BroadcastChannel === "undefined") {
+      this.mode = "off";
+      this.status = failStatus || "이 브라우저는 멀티플레이를 지원하지 않습니다";
+      return;
+    }
+    this._chan = new BroadcastChannel("crystal-defense-" + this.roomCode);
+    this._chan.onmessage = (ev) => this._receive(ev.data);
+    this.mode = "local";
+    this.status = failStatus || `같은 브라우저 · 방 ${this.roomCode}`;
+    this._post({ type: "join" });
   }
   leave() {
     if (this.online) this._post({ type: "left" });

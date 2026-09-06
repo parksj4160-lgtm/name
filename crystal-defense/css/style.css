@@ -21,7 +21,8 @@ html, body {
 }
 #scene { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
 /* 화면 가장자리를 아주 살짝 어둡게 눌러 시선을 중앙(크리스털·플레이어)으로 모은다.
-   3D 쪽에 후처리 패스를 붙이면 렌더 비용이 드는데, 이건 겹쳐 둔 div 하나라 공짜다. */
+   3D 쪽에 후처리 패스를 붙이면 렌더 비용이 드는데, 이건 겹쳐 둔 div 하나라 공짜다.
+   z-index 는 0 — 캔버스 위·HUD 아래에 정확히 끼어야 패널까지 어두워지지 않는다. */
 #vignette {
   position: fixed; inset: 0; pointer-events: none; z-index: 0;
   background:
@@ -47,22 +48,21 @@ kbd.rebind.listening { border-color: var(--warn); color: var(--warn); background
 /* ---------- 공통 패널 ---------- */
 .panel {
   position: fixed; border: 1px solid var(--line);
-  border-radius: 14px; padding: 11px 13px; backdrop-filter: blur(10px) saturate(1.15);
-  font-size: 13px;
-  /* 위쪽이 살짝 밝은 그라데이션 + 안쪽 하이라이트 한 줄로 "판때기"가 아니라 유리판처럼 보이게 한다 */
+  /* 단색 반투명이던 것을 위아래 그라데이션 + 안쪽 윗변 하이라이트로 — 평평한 사각형이 아니라
+     빛을 받는 표면처럼 읽힌다 */
   background: linear-gradient(180deg, rgba(26,36,54,0.88), rgba(12,18,30,0.9));
-  box-shadow: 0 14px 38px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.07);
+  border-radius: 12px; padding: 10px 12px; backdrop-filter: blur(8px);
+  box-shadow: 0 14px 38px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.07); font-size: 13px;
 }
 
 /* ---------- 자원 ---------- */
-#res-panel { left: 14px; top: 14px; display: flex; flex-direction: column; gap: 3px; min-width: 198px; }
-/* 아이콘 칸 폭을 고정한다 — 이모지마다 실제 글리프 폭이 제각각이라(⚫ 은 좁고 🟠 은 넓다)
-   고정하지 않으면 숫자 열이 줄마다 어긋나 보인다 */
-#res-panel .res { display: flex; align-items: center; gap: 7px; font-size: 14px; padding: 1px 0; }
+#res-panel { left: 14px; top: 14px; display: flex; flex-direction: column; gap: 6px; min-width: 190px; }
+#res-panel .res { display: flex; align-items: center; gap: 8px; font-size: 15px; }
+/* 이모지마다 글리프 폭이 달라서(⚫ 좁고 🟠 넓다) 숫자 열이 들쭉날쭉했다 — 아이콘 칸을 고정폭으로 */
 #res-panel .res .ic { width: 20px; text-align: center; flex: none; }
-#res-panel .res b { min-width: 44px; text-align: right; font-variant-numeric: tabular-nums; font-size: 15px; letter-spacing: -0.01em; }
-#res-panel .res .lbl { color: var(--dim); font-size: 11.5px; letter-spacing: -0.01em; }
-.ic { font-size: 16px; }
+#res-panel .res b { min-width: 46px; text-align: right; font-variant-numeric: tabular-nums; }
+#res-panel .res .lbl { color: var(--dim); font-size: 12px; }
+.ic { font-size: 17px; }
 button.mini {
   margin-top: 4px; background: rgba(95,212,255,0.12); color: var(--text);
   border: 1px solid var(--line); border-radius: 8px; padding: 5px 8px; cursor: pointer; font-size: 12px;
@@ -89,8 +89,7 @@ button.mini:disabled { opacity: 0.45; cursor: not-allowed; }
 .bar i {
   position: absolute; inset: 0; width: 100%; transform-origin: left center;
   background: linear-gradient(90deg, #2fb4e8 0%, #56e0ff 45%, #8affd8 100%);
-  box-shadow: 0 0 12px rgba(86,224,255,0.45);
-  transition: transform 0.15s linear;
+  box-shadow: 0 0 12px rgba(86,224,255,0.45); transition: transform 0.15s linear;
 }
 .bar span {
   position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
@@ -212,6 +211,12 @@ button.go:disabled { opacity: 0.4; cursor: not-allowed; }
   animation: crystalPulse 1.1s ease-in-out infinite;
 }
 @keyframes crystalPulse { 0%, 100% { opacity: 0.35; } 50% { opacity: 0.9; } }
+
+/* ---------- 칠흑 군주의 암흑 (미니맵 몬스터 표시가 가려지는 동안 화면 가장자리가 어두워짐) ---------- */
+#blind-overlay {
+  position: fixed; inset: 0; pointer-events: none; z-index: 3;
+  box-shadow: inset 0 0 180px 50px rgba(0, 0, 0, 0.75);
+}
 
 /* ---------- 3D 위에 뜨는 텍스트 ---------- */
 #fx-layer { position: fixed; inset: 0; pointer-events: none; overflow: hidden; z-index: 4; }

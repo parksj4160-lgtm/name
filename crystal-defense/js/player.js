@@ -16,7 +16,9 @@ var GEO4 = {
   whip: new THREE.TorusGeometry(0.16, 0.04, 6, 14),
   shield: new THREE.CylinderGeometry(0.32, 0.32, 0.1, 16),
   ring: new THREE.RingGeometry(0.62, 0.76, 20),
-  frostaxe: new THREE.ConeGeometry(0.28, 0.62, 4)
+  frostaxe: new THREE.ConeGeometry(0.28, 0.62, 4),
+  // 칼(sword)보다 짧고 얇은 날 — 손에 쥐었을 때부터 "약하지만 빠른" 무기라는 인상을 준다
+  dagger: new THREE.BoxGeometry(0.09, 0.48, 0.2)
 };
 var WEAPON_MAT = {
   default: new THREE.MeshStandardMaterial({ color: 12093775, roughness: 0.7 }),
@@ -28,7 +30,9 @@ var WEAPON_MAT = {
   bomb: new THREE.MeshStandardMaterial({ color: 2829103, roughness: 0.5, metalness: 0.2 }),
   whip: new THREE.MeshStandardMaterial({ color: 4210752, roughness: 0.4, metalness: 0.8 }),
   shield: new THREE.MeshStandardMaterial({ color: 10466760, roughness: 0.35, metalness: 0.7 }),
-  frostaxe: new THREE.MeshStandardMaterial({ color: 12577023, emissive: 2777008, emissiveIntensity: 0.55, roughness: 0.3, metalness: 0.25 })
+  frostaxe: new THREE.MeshStandardMaterial({ color: 12577023, emissive: 2777008, emissiveIntensity: 0.55, roughness: 0.3, metalness: 0.25 }),
+  // 흡혈 컨셉을 색으로도 드러내는 붉은 강철 날
+  dagger: new THREE.MeshStandardMaterial({ color: 11680328, roughness: 0.3, metalness: 0.75 })
 };
 var WEAPON_LOOK = {
   default: { geo: GEO4.tool, mat: WEAPON_MAT.default, ry: 0, rz: 0 },
@@ -40,7 +44,8 @@ var WEAPON_LOOK = {
   bomb: { geo: GEO4.bomb, mat: WEAPON_MAT.bomb, ry: 0, rz: 0 },
   whip: { geo: GEO4.whip, mat: WEAPON_MAT.whip, ry: Math.PI / 2, rz: 0 },
   shield: { geo: GEO4.shield, mat: WEAPON_MAT.shield, ry: Math.PI / 2, rz: 0 },
-  frostaxe: { geo: GEO4.frostaxe, mat: WEAPON_MAT.frostaxe, ry: 0, rz: 0.6 }
+  frostaxe: { geo: GEO4.frostaxe, mat: WEAPON_MAT.frostaxe, ry: 0, rz: 0.6 },
+  dagger: { geo: GEO4.dagger, mat: WEAPON_MAT.dagger, ry: 0, rz: 0.3 }
 };
 var PALETTE = [6280447, 10354539, 16757599, 16739286, 14065919, 7077840];
 var Player = class {
@@ -63,6 +68,9 @@ var Player = class {
     this.weaponSpec = {};
     this.equipped = null;
     this.harvestLv = 1;
+    this.outfitLv = 0;
+    this.weaponProficiencyLv = 0;
+    this.blindUntil = 0;
     this.harvesting = null;
     this.attackCd = 0;
     this.swing = 0;
@@ -70,6 +78,7 @@ var Player = class {
     this.invulnerable = false;
     this.reviveAssisted = false;
     this.blocking = false;
+    this._blockStartAt = -99;
     this.mesh = this._makeMesh();
     this.mesh.position.set(this.x, 0, this.z);
   }
@@ -117,7 +126,7 @@ var Player = class {
   // 기본 공격치에 지금 손에 든 무기의 효과만 더한다 (여러 자루를 동시에 들 수는 없다)
   get attackStats() {
     const base = CFG.player.attack;
-    const out = { dmg: base.dmg, range: base.range, arc: base.arc, cd: base.cd, knockback: 0, slow: 0, slowTime: 0 };
+    const out = { dmg: base.dmg, range: base.range, arc: base.arc, cd: base.cd, knockback: 0, slow: 0, slowTime: 0, lifesteal: 0 };
     const eff = CFG.craft[this.heldWeapon]?.effect;
     if (eff) for (const k2 of Object.keys(eff)) out[k2] += eff[k2];
     const bonus = CFG.weaponUpgrade.perLv[this.heldWeapon];
@@ -170,6 +179,11 @@ var Player = class {
   }
   // 막기(Q) 효과 — 기본값은 무기와 무관하지만, 방패를 손에 쥐고 있으면 훨씬 강해진다(대신 공격력이
   // 거의 없다). 방패가 특화(철벽/기동방패)까지 마쳤으면 그 갈래의 값으로 한 번 더 바뀐다.
+  // 방어구 — 손에 든 무기와 완전히 무관하게 항상 적용된다. 레벨 0(없음)이면 아무 효과도 없다.
+  get outfitStats() {
+    if (this.outfitLv <= 0) return { reduce: 0, speedMult: 1 };
+    return CFG.outfit.tiers[this.outfitLv - 1];
+  }
   get blockStats() {
     const base = CFG.player.block;
     if (this.heldWeapon !== "shield") return base;
@@ -177,7 +191,7 @@ var Player = class {
     const spec = specKey && CFG.weaponSpec.shield?.[specKey];
     return spec?.block || CFG.craft.shield.block;
   }
-  damage(amount) {
+  damage(amount, downTimeMult = 1) {
     if (!this.alive) return false;
     this.hp -= amount;
     this.combatUntil = performance.now() / 1e3 + 2;
@@ -185,7 +199,7 @@ var Player = class {
     if (this.hp <= 0) {
       this.hp = 0;
       this.alive = false;
-      this.downTimer = CFG.player.downTime;
+      this.downTimer = CFG.player.downTime * downTimeMult;
       this.mesh.rotation.z = Math.PI / 2;
       return true;
     }
@@ -311,7 +325,8 @@ export var LocalPlayer = class extends Player {
         const sprint = input.down("shift");
         const weatherMult = world.weatherKind === "rain" ? WEATHER.rain.playerSpeedMult : 1;
         const blockMult = this.blocking ? this.blockStats.speedMult : 1;
-        const spd = (sprint ? CFG.player.sprint : CFG.player.speed) * weatherMult * blockMult * speedMult;
+        const iceMult = world.icePits && world.icePits.some((p2) => p2.phase === "active" && dist(this.x, this.z, p2.x, p2.z) <= CFG.icePit.radius) ? CFG.icePit.playerSlowMult : 1;
+        const spd = (sprint ? CFG.player.sprint : CFG.player.speed) * weatherMult * blockMult * iceMult * this.outfitStats.speedMult * speedMult;
         const len = Math.hypot(mx, mz);
         mx /= len;
         mz /= len;
@@ -366,11 +381,12 @@ export var LocalPlayer = class extends Player {
   }
   // 채집 시도/진행. 완료 시 노드를 돌려준다.
   // 특정 자원을 콕 집어 캐기 시작한다 (클릭/탭으로 고른 것). 성공하면 true.
-  beginHarvest(node) {
+  beginHarvest(node, world) {
     if (!this.alive || !node || node.depleted) return false;
     if (needsPickaxe(node.type) && !this.holdingPickaxe) return false;
     if (dist(this.x, this.z, node.x, node.z) > CFG.harvest.range) return false;
-    this.harvesting = { node, t: 0, need: CFG.harvest[node.type].time * this.harvestMult };
+    const weatherMult = world?.weatherKind === "clear" ? WEATHER.clear.harvestTimeMult : 1;
+    this.harvesting = { node, t: 0, need: CFG.harvest[node.type].time * this.harvestMult * weatherMult };
     this.rot = Math.atan2(node.x - this.x, node.z - this.z);
     return true;
   }
@@ -383,7 +399,8 @@ export var LocalPlayer = class extends Player {
       const node = world.nearestNode(this.x, this.z, CFG.harvest.range);
       if (!node) return null;
       if (needsPickaxe(node.type) && !this.holdingPickaxe) return null;
-      this.harvesting = { node, t: 0, need: CFG.harvest[node.type].time * this.harvestMult };
+      const weatherMult = world?.weatherKind === "clear" ? WEATHER.clear.harvestTimeMult : 1;
+      this.harvesting = { node, t: 0, need: CFG.harvest[node.type].time * this.harvestMult * weatherMult };
       this.rot = Math.atan2(node.x - this.x, node.z - this.z);
     }
     const h2 = this.harvesting;
@@ -399,25 +416,27 @@ export var LocalPlayer = class extends Player {
     }
     return null;
   }
-  tryAttack() {
+  // atkSpeedMult 는 game.js 가 boonMult.atkSpeedMult(쾌속의 유물)를 넘겨준다 — moveSpeedMult 와
+  // 같은 패턴(player.js는 배율을 모르고, 소비하는 game.js가 매번 곱해서 넘긴다)
+  tryAttack(atkSpeedMult = 1) {
     if (!this.alive || this.attackCd > 0) return false;
-    this.attackCd = this.attackStats.cd;
+    this.attackCd = this.attackStats.cd / atkSpeedMult;
     this.swing = 1;
     this.cancelHarvest();
     return true;
   }
   // 폭탄가방을 들었을 때 공격 입력이 대신 이걸 부른다 — 같은 attackCd 를 공유하니 근접과 동시에 못 쓴다
-  tryThrow() {
+  tryThrow(atkSpeedMult = 1) {
     if (!this.alive || this.attackCd > 0) return false;
-    this.attackCd = this.throwStats.cd;
+    this.attackCd = this.throwStats.cd / atkSpeedMult;
     this.swing = 1;
     this.cancelHarvest();
     return true;
   }
   // 활을 들었을 때 — 폭탄과 같은 구조로 같은 attackCd 를 공유한다
-  tryShoot() {
+  tryShoot(atkSpeedMult = 1) {
     if (!this.alive || this.attackCd > 0) return false;
-    this.attackCd = this.shootStats.cd;
+    this.attackCd = this.shootStats.cd / atkSpeedMult;
     this.swing = 1;
     this.cancelHarvest();
     return true;
@@ -434,7 +453,9 @@ export var RemotePlayer = class extends Player {
     this.alive = s2.alive;
     this.invulnerable = !!s2.invulnerable;
     this.reviveAssisted = !!s2.reviveAssisted;
+    const wasBlocking = this.blocking;
     this.blocking = !!s2.blocking;
+    if (this.blocking && !wasBlocking) this._blockStartAt = performance.now() / 1e3;
     this.harvesting = s2.harvesting ? { t: 0, need: 1 } : null;
     if (s2.held) {
       this.tools[s2.held] = true;

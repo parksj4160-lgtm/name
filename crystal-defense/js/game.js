@@ -1,8 +1,9 @@
 import * as THREE from '../vendor/three.module.js';
 import { ACHIEVEMENTS, unlock } from './achievements.js';
 import { SoundManager } from './audio.js';
+import { BESTIARY_INFO, loadBestiarySeen, markBestiarySeen } from './bestiary.js';
 import { BuildManager } from './buildings.js';
-import { CFG, DIFFICULTIES, SPECIAL_WAVES, WEATHER, applyDifficulty, needsPickaxe, specialWaveKind, waveComposition, waveReward, weatherOf } from './config.js';
+import { BOSS_CYCLE, CFG, DIFFICULTIES, PING_KINDS, SPECIAL_WAVES, TARGET_PRIORITY_LABEL, WEATHER, applyDifficulty, bossEntriesOf, crystalMilestoneTier, needsPickaxe, portalSealCost, specialWaveKind, waveComposition, waveReward, weatherOf } from './config.js';
 import { EnemyManager } from './enemy.js';
 import { Fx, ProjectilePool } from './fx.js';
 import { BuildGrid } from './grid.js';
@@ -13,11 +14,13 @@ import { Net } from './net.js';
 import { LocalPlayer, RemotePlayer } from './player.js';
 import { SceneManager } from './scene.js';
 import { UI } from './ui.js';
-import { canAfford, costText, dist, payCost } from './utils.js';
+import { COST_KEYS, RES_ICON, canAfford, costText, dateSeed, dist, mulberry32, payCost } from './utils.js';
 import { PHASE, WaveDirector } from './wave.js';
 import { World } from './world.js';
 
 var SAVE_KEY = "cd.save";
+var _nativeRandom = Math.random.bind(Math);
+var BESTIARY_ANNOUNCED_ELSEWHERE = /* @__PURE__ */ new Set(["healer", "bomber", "raccoon", "burrower", "commander", "treasure", "wolf", "stagking", "golem", "boss", "frostlord", "warden", "looter", "colossus", "wraith", "galelord", "curselord", "grovelord", "magnetlord", "shadowlord"]);
 export var Game = class {
   constructor(canvas2, fxLayer2) {
     this.sm = new SceneManager(canvas2);
@@ -25,7 +28,7 @@ export var Game = class {
     this.fx = new Fx(this.sm, fxLayer2);
     this.projectiles = new ProjectilePool(this.sm);
     this.sfx = new SoundManager();
-    this.km = new KeyMap(CFG.builds);
+    this.km = new KeyMap(Object.fromEntries(Object.entries(CFG.builds).filter(([, def]) => !def.hidden)));
     this.net = new Net();
     this.ui = null;
     this.running = false;
@@ -38,6 +41,7 @@ export var Game = class {
   }
   // ---------------------------------------------------------------- 시작/정리
   begin({ seed = 20260818, shared = true, difficulty = "normal", resumed = false, daily = false } = {}) {
+    Math.random = daily ? mulberry32(seed >>> 0 ^ 3735928559) : _nativeRandom;
     this.dispose();
     this.seed = seed;
     this.daily = daily;
@@ -46,6 +50,7 @@ export var Game = class {
     this.difficultyPreset = applyDifficulty(this.difficulty);
     this.grid = new BuildGrid();
     this.world = new World(this.sm, seed);
+    this.sm.setGroundTint(CFG.biomes[this.world.biome].groundColor);
     this.buildMgr = new BuildManager(this.sm, this.grid, this.world, this.fx, this.projectiles);
     this.enemyMgr = new EnemyManager(this.sm, this.grid, this.world, this.fx);
     this.wave = new WaveDirector(this.world, this.enemyMgr);
@@ -60,31 +65,50 @@ export var Game = class {
       harvested: 0,
       built: 0,
       kills: 0,
+      shardEarned: 0,
       spentWood: 0,
       spentStone: 0,
       spentIron: 0,
+      spentCopper: 0,
+      spentCoal: 0,
+      spentShard: 0,
       spentBy: {
-        build: { wood: 0, stone: 0, iron: 0 },
-        upgrade: { wood: 0, stone: 0, iron: 0 },
-        repair: { wood: 0, stone: 0, iron: 0 },
-        harvest: { wood: 0, stone: 0, iron: 0 },
-        craft: { wood: 0, stone: 0, iron: 0 },
-        merchant: { wood: 0, stone: 0, iron: 0 }
+        build: { wood: 0, stone: 0, iron: 0, copper: 0, coal: 0, shard: 0 },
+        upgrade: { wood: 0, stone: 0, iron: 0, copper: 0, coal: 0, shard: 0 },
+        repair: { wood: 0, stone: 0, iron: 0, copper: 0, coal: 0, shard: 0 },
+        harvest: { wood: 0, stone: 0, iron: 0, copper: 0, coal: 0, shard: 0 },
+        craft: { wood: 0, stone: 0, iron: 0, copper: 0, coal: 0, shard: 0 },
+        merchant: { wood: 0, stone: 0, iron: 0, copper: 0, coal: 0, shard: 0 },
+        portalSeal: { wood: 0, stone: 0, iron: 0, copper: 0, coal: 0, shard: 0 }
       },
       time: 0,
       waveLog: [],
+      // 지금까지 결과 화면은 팀 전체 합계만 보여줬다 — 여럿이 같이 했을 때 "누가 얼마나
+      // 기여했는지"는 전혀 안 보였다. 근접·활·폭탄가방 등 직접 조준한 공격(kind==="player",
+      // 협공·치명타와 똑같이 playerId가 있을 때만)만 집계한다 — 타워는 팀 전체가 같이 지은
+      // 공용 자산이라 특정 개인 소유가 아니고, 정수 스킬도 이미 여기 안 잡힌다(플레이어를
+      // 직접 조준한 공격만 본다는 원칙을 지키기 위해 kind==="player"만 본다).
+      dmgByPlayer: {},
+      killsByPlayer: {},
       newAchievements: [],
       bossKillsSeen: [],
+      weathersSeen: [],
       trapsTriggered: 0,
       elitesKilled: 0,
+      berserkKilled: 0,
       treasuresCaught: 0,
+      golemsDefeated: 0,
       animalsHunted: 0,
       comboCount: 0,
+      critCount: 0,
+      parryCount: 0,
       repairPostHealed: 0,
+      campHealed: 0,
       mimicsKilled: 0,
       blocksCount: 0,
       dishesCooked: [],
-      scoutsIntercepted: 0
+      scoutsIntercepted: 0,
+      earlyStarts: 0
     };
     this._waveMark = { time: 0, kills: 0 };
     this._bossActive = false;
@@ -119,22 +143,38 @@ export var Game = class {
     this._seenSniperSynergy = false;
     this._seenTreasure = false;
     this._seenWolf = false;
+    this._seenBear = false;
     this._seenAmmoEmpty = false;
     this._seenArmory = false;
+    this._seenGaleBlink = false;
+    this._seenDagger = false;
+    this._seenCrit = false;
+    this._seenParry = false;
     this._lastStandReady = false;
-    this.boonMult = { atk: 1, towerDmg: 1, skillCostDelta: 0, bounty: 1, crystalUpgradeCostDelta: 0, weaponUpgradeCostDelta: 0, weaponSpecCostDelta: 0, prepDelta: 0, venomChance: 0, desperationBonus: 0, moveSpeedMult: 1 };
+    this.boonMult = { atk: 1, towerDmg: 1, skillCostDelta: 0, bounty: 1, crystalUpgradeCostDelta: 0, weaponUpgradeCostDelta: 0, weaponSpecCostDelta: 0, prepDelta: 0, venomChance: 0, desperationBonus: 0, moveSpeedMult: 1, atkSpeedMult: 1, ammoSaveChance: 0, critChanceDelta: 0, downTimeMult: 1, rangeMult: 1, petDmgMult: 1, shardBonus: 0 };
     this.pendingBoon = null;
     this._queuedEndlessBoon = false;
     this._dropTimer = CFG.supplyDrop.firstDelay;
+    this._shardDropTimer = CFG.shardDrop.firstDelay;
     this._dropIdSeq = 1;
-    this._meteorTimer = CFG.meteor.firstDelay;
+    this._meteorTimer = CFG.meteor.firstDelay * (CFG.biomes[this.world.biome].hazardMult ?? 1);
+    this._riftRaidTimer = CFG.riftRaid.firstDelay;
+    this._stormWave = -1;
+    this._stormTimer = 0;
     this._rift = null;
     this._huntTimer = 0;
     this.feast = { kind: null, wavesLeft: 0 };
     this._spirit = null;
     this._pet = null;
     this._meteorPending = null;
+    this._crater = null;
+    this._swampTimers = this.world.swampPits.map((_, i) => ({ phase: "dormant", timeLeft: CFG.swampPit.dormant * (0.3 + i * 0.3), tickTimer: 0 }));
+    this._seenSwampPit = false;
+    this._icePitTimers = this.world.icePits.map((_, i) => ({ phase: "dormant", timeLeft: CFG.icePit.dormant * (0.3 + i * 0.3), tickTimer: 0 }));
+    this._seenIcePit = false;
+    this.pickedBoons = {};
     this.world.clearMeteor();
+    this.world.clearCrater();
     this.world.clearSpirit();
     this.world.clearPet();
     this._treasureTimer = CFG.treasureEvent.firstDelay;
@@ -143,11 +183,14 @@ export var Game = class {
     this._scoutTimer = CFG.scoutEvent.firstDelay;
     this._scoutId = null;
     this._scoutLifeLeft = 0;
+    this._nestTimer = CFG.nestEvent.firstDelay;
     this._merchant = null;
     this.tempBoon = { atk: 1, towerDmg: 1, speed: 1, atkWavesLeft: 0, towerWavesLeft: 0, speedWavesLeft: 0 };
     this._pingCd = 0;
     this.buildMode = null;
     this.paused = false;
+    this.input.pressed.clear();
+    this.input.keys.clear();
     this.running = true;
     this.result = null;
     if (!resumed) this._grantMetaPerks();
@@ -161,7 +204,7 @@ export var Game = class {
   _grantMetaPerks() {
     const perks = computeMetaPerks();
     this._lastStandReady = !!perks.lastStand;
-    if (perks.harvestLv <= 1 && perks.tools.length === 0 && perks.hpBonus <= 0) return;
+    if (perks.harvestLv <= 1 && perks.tools.length === 0 && perks.hpBonus <= 0 && !perks.startShard && !perks.startWood && !perks.startStone && !perks.startIron && !perks.outfitLv && !perks.weaponProficiencyLv) return;
     if (this.isHost) this._applyMetaPerks(this.local.id, perks);
     else this.net.send("metaPerks", perks);
   }
@@ -170,10 +213,30 @@ export var Game = class {
     if (!p2) return;
     if (perks.harvestLv > p2.harvestLv) p2.harvestLv = perks.harvestLv;
     for (const k2 of perks.tools || []) p2.tools[k2] = true;
+    if (perks.weaponProficiencyLv > p2.weaponProficiencyLv) p2.weaponProficiencyLv = perks.weaponProficiencyLv;
+    if (p2.weaponProficiencyLv > 0) {
+      for (const k2 of perks.tools || []) {
+        if (CFG.weaponUpgrade.perLv[k2] && (p2.weaponLv[k2] || 0) < p2.weaponProficiencyLv) p2.weaponLv[k2] = p2.weaponProficiencyLv;
+      }
+    }
     if (perks.hpBonus > 0) {
       p2.maxHp = CFG.player.hp + perks.hpBonus;
       p2.hp = p2.maxHp;
     }
+    if (perks.startShard > 0) {
+      const pool = this._poolOf(playerId);
+      pool.shard = Math.max(pool.shard || 0, perks.startShard);
+    }
+    if (perks.startWood > 0 || perks.startStone > 0) {
+      const pool = this._poolOf(playerId);
+      if (perks.startWood > 0) pool.wood = Math.max(pool.wood || 0, perks.startWood);
+      if (perks.startStone > 0) pool.stone = Math.max(pool.stone || 0, perks.startStone);
+    }
+    if (perks.startIron > 0) {
+      const pool = this._poolOf(playerId);
+      pool.iron = Math.max(pool.iron || 0, perks.startIron);
+    }
+    if (perks.outfitLv > p2.outfitLv) p2.outfitLv = perks.outfitLv;
   }
   dispose() {
     if (!this.grid) return;
@@ -225,6 +288,8 @@ export var Game = class {
       if (!targets.length) return;
       const now = performance.now() / 1e3;
       const sniperSynergy = b.key === "sniper" && this.buildMgr.hasNearbyPoison(b);
+      const mu2 = CFG.crystalUpgrade.materiel;
+      const materielMult = this.world.crystal.materielLv > 0 && dist(b.x, b.z, 0, 0) <= mu2.radius ? 1 + mu2.dmgMultPerLv * this.world.crystal.materielLv : 1;
       if (st.chain) {
         let candidates = this.enemyMgr.list.filter((e) => !e.dead);
         let last2 = pos;
@@ -253,16 +318,16 @@ export var Game = class {
             base *= 1 + CFG.synergy.rootSnare.dmgMult;
             if (!this._seenRootSynergy) {
               this._seenRootSynergy = true;
-              this.ui?.toast("🕸️⚔️ 시너지 발동! 덫탑에 묶인 적을 다른 타워가 맞추면 추가 피해", "good");
+              this.ui?.toast("🕸️⚔️ 시너지 발동! 묶인 적을 다른 타워가 맞추면 추가 피해", "good");
             }
           }
           const from = i === 0 ? pos : hitChain[i - 1];
-          this._hurtEnemy(e, Math.round(base * this.boonMult.towerDmg * this.tempBoon.towerDmg), "tower", from.x, from.z);
+          this._hurtEnemy(e, Math.round(base * this.boonMult.towerDmg * this.tempBoon.towerDmg * materielMult), "tower", from.x, from.z);
           if (i > 0) this.fx.burst(e.x, 1, e.z, 16769126, 8, 3);
         });
         if (hitChain.length > 1 && !this._seenChain) {
           this._seenChain = true;
-          this.ui?.toast("🌩️ 번개탑! 명중한 적에서 가까운 다른 적으로 튀어 옮겨붙는다 — 뭉친 무리에 특히 강하다", "good");
+          this.ui?.toast("🌩️ 연쇄 적중! 명중한 적에서 가까운 다른 적으로 튀어 옮겨붙는다 — 뭉친 무리에 특히 강하다", "good");
         }
         this.sfx.towerHit(b.key);
         return;
@@ -280,10 +345,10 @@ export var Game = class {
           base *= 1 + CFG.synergy.rootSnare.dmgMult;
           if (!this._seenRootSynergy) {
             this._seenRootSynergy = true;
-            this.ui?.toast("🕸️⚔️ 시너지 발동! 덫탑에 묶인 적을 다른 타워가 맞추면 추가 피해", "good");
+            this.ui?.toast("🕸️⚔️ 시너지 발동! 묶인 적을 다른 타워가 맞추면 추가 피해", "good");
           }
         }
-        this._hurtEnemy(e, Math.round(base * this.boonMult.towerDmg * this.tempBoon.towerDmg), b.key === "frost" ? "frost" : "tower", b.x, b.z);
+        this._hurtEnemy(e, Math.round(base * this.boonMult.towerDmg * this.tempBoon.towerDmg * materielMult), b.key === "frost" ? "frost" : "tower", b.x, b.z);
       }
       this.sfx.towerHit(b.key);
     };
@@ -301,12 +366,30 @@ export var Game = class {
       } else if (kind === "drain") {
         this.ui?.toast(`${nm}가 자원을 훔칠 준비를 한다 — 지금 화력을 몰아 끊어라!`, "warn");
         this.sfx.bossWaveStart();
+      } else if (kind === "siphon") {
+        this.ui?.toast(`${nm}가 정수를 노린다 — 정수가 없으면 회복도 없다!`, "warn");
+        this.sfx.bossWaveStart();
       } else if (kind === "fortify") {
         this.ui?.toast(`${nm}가 방벽을 두를 준비를 한다 — 발동하면 받는 피해가 크게 줄어든다!`, "warn");
         this.sfx.bossWaveStart();
       } else if (kind === "fortifyGo") {
         this.ui?.toast(`🗿 무쇠 방벽 발동! 잠시 받는 피해가 크게 줄었다 — 무리해서 쏟아붓지 말고 다음 국면을 준비하자`, "bad");
         this.fx.ring(e.x, e.z, 8945076, 5);
+      } else if (kind === "blink") {
+        this.ui?.toast(`${nm}가 바람이 되어 흩어지려 한다 — 어디로 튈지 모른다!`, "warn");
+        this.sfx.bossWaveStart();
+      } else if (kind === "blinkGo") {
+        this.ui?.toast(`🌪️ ${nm}가 크리스탈 코앞으로 순간이동했다! 벽으로 만든 길을 그대로 건너뛰었다`, "bad");
+        this.fx.ring(e.x, e.z, 10217727, CFG.bossPattern.blinkRadius);
+      } else if (kind === "curse") {
+        this.ui?.toast(`${nm}가 저주를 준비한다 — 방어선 어딘가의 타워 하나가 봉인될 것이다!`, "warn");
+        this.sfx.bossWaveStart();
+      } else if (kind === "pull") {
+        this.ui?.toast(`${nm}가 인력을 모은다 — 근처에 있으면 끌려간다, 지금 거리를 벌리거나 회피할 준비를 하라!`, "warn");
+        this.sfx.bossWaveStart();
+      } else if (kind === "blind") {
+        this.ui?.toast(`${nm}가 어둠을 모은다 — 곧 미니맵에서 몬스터가 안 보이게 된다!`, "warn");
+        this.sfx.bossWaveStart();
       } else if (kind === "charge") {
         this.ui?.toast(`${nm}가 돌진 자세를 잡는다 — 길을 비켜라!`, "warn");
         this.sfx.bossWaveStart();
@@ -323,7 +406,7 @@ export var Game = class {
     this.buildMgr.onDetectBurrow = (e) => {
       if (this._seenDetect) return;
       this._seenDetect = true;
-      this.ui?.toast("🗼 감시탑이 파묻힌 굴착병을 찾아냈다! 반경 안 타워가 조준할 수 있다", "good");
+      this.ui?.toast("🔱 탐지 범위가 파묻힌 굴착병을 찾아냈다! 반경 안 타워가 조준할 수 있다 (보루 Lv.2 이상, 또는 감시탑)", "good");
     };
     this.buildMgr.onAmmoEmpty = (b) => {
       const a2 = CFG.ammo.types[b.ammoType];
@@ -362,6 +445,118 @@ export var Game = class {
       this.fx.burst(e.x, 1.6, e.z, 16766720, 18, 6);
       this.ui?.toast(`🦂 갈취자가 목재 ${wood}·광물 ${stone}을 훔쳐 체력을 회복했다!`, "bad");
     };
+    this.enemyMgr.onBossSiphon = (e) => {
+      if (!this.isHost) return;
+      const c2 = CFG.bossPattern;
+      let drained = 0, maxPossible = 0;
+      if (this.shared) {
+        const d2 = Math.min(this.pools.team.shard || 0, c2.siphonShard);
+        this.pools.team.shard -= d2;
+        drained = d2;
+        maxPossible = c2.siphonShard;
+      } else {
+        for (const p2 of this.players.values()) {
+          const pool = this._poolOf(p2.id);
+          const d2 = Math.min(pool.shard || 0, c2.siphonShard);
+          pool.shard -= d2;
+          drained += d2;
+          maxPossible += c2.siphonShard;
+        }
+      }
+      const heal = Math.round(e.maxHp * c2.siphonHealPct * (maxPossible ? drained / maxPossible : 0));
+      e.hp = Math.min(e.maxHp, e.hp + heal);
+      this.fx.float(drained ? `-${drained}💠` : "무효!", e.x, e.st.scale * 1.6 + 0.6, e.z, drained ? "bad" : "good");
+      this.fx.burst(e.x, 1.6, e.z, 9321645, 18, 6);
+      this.ui?.toast(drained ? `🌘 정수 포식자가 정수 ${drained}개를 삼켜 체력을 회복했다!` : "🌘 정수 포식자가 정수를 노렸지만 훔칠 게 없었다 — 회복 실패!", drained ? "bad" : "good");
+    };
+    this.enemyMgr.onBossBlink = (e) => {
+      if (!this.isHost) return;
+      const c2 = CFG.bossPattern;
+      for (const p2 of this.players.values()) {
+        if (dist(p2.x, p2.z, e.x, e.z) <= c2.blinkRadius) {
+          if (p2.id === this.local.id) this._hurtLocal(c2.blinkDmg);
+          else this.net.send("hurt", { to: p2.id, dmg: c2.blinkDmg });
+        }
+      }
+      if (!this._seenGaleBlink) {
+        this._seenGaleBlink = true;
+        this.ui?.toast("🌪️ 질풍 군주는 순간이동으로 벽 미로를 그대로 건너뛴다 — 크리스탈 바로 옆도 반드시 지켜라", "warn");
+      }
+    };
+    this.enemyMgr.onBossCurse = (e) => {
+      if (!this.isHost) return;
+      const c2 = CFG.bossPattern;
+      const towers = [...this.buildMgr.buildings.values()].filter((b) => b.isTower);
+      if (!towers.length) {
+        this.ui?.toast("🔮 저주의 군주가 저주를 걸려 했지만 봉인할 타워가 없다!", "good");
+        this.fx.burst(e.x, 1.6, e.z, 10181046, 18, 6);
+        return;
+      }
+      const target = towers[Math.floor(Math.random() * towers.length)];
+      target.curseUntil = performance.now() / 1e3 + c2.curseTime;
+      this.fx.burst(target.x, 1.4, target.z, 10181046, 18, 6);
+      this.fx.ring(target.x, target.z, 10181046, 2);
+      this.ui?.toast(`🔮 ${target.def.name}이(가) 저주에 걸렸다! ${c2.curseTime}초간 멈춘다 — 다른 타워로 그 자리를 메워야 한다`, "bad");
+      if (!this._seenCurse) {
+        this._seenCurse = true;
+        this.ui?.toast("🔮 저주의 군주는 위치와 무관하게 방어선 어딘가의 타워 하나를 직접 봉인한다 — 화력을 몰아 지으면 그만큼 한 번에 잃는다", "warn");
+      }
+    };
+    this.enemyMgr.onBossPull = (e) => {
+      if (!this.isHost) return;
+      const c2 = CFG.bossPattern;
+      let pulled = 0;
+      for (const p2 of this.players.values()) {
+        if (!p2.alive || p2.invulnerable) continue;
+        const d2 = dist(p2.x, p2.z, e.x, e.z);
+        if (d2 > c2.pullRadius || d2 <= c2.pullMinDist) continue;
+        const newDist = Math.max(c2.pullMinDist, d2 - c2.pullDist);
+        const nx = e.x + (p2.x - e.x) / d2 * newDist;
+        const nz = e.z + (p2.z - e.z) / d2 * newDist;
+        this.fx.burst(p2.x, 1.2, p2.z, 12592851, 12, 5);
+        if (p2.id === this.local.id) {
+          this.local.x = nx;
+          this.local.z = nz;
+          this.local._collide(this.grid, this.world);
+        } else {
+          this.net.send("pull", { to: p2.id, x: nx, z: nz });
+        }
+        this.fx.burst(nx, 1.2, nz, 12592851, 8, 4);
+        pulled++;
+      }
+      if (pulled) {
+        this.ui?.toast(`🧲 자성 군주의 인력에 ${pulled}명이 끌려갔다! 근접 사거리 안이니 지금 위험하다`, "bad");
+      } else {
+        this.ui?.toast("🧲 자성 군주가 인력을 터뜨렸지만 아무도 반경 안에 없었다", "good");
+      }
+      if (!this._seenPull) {
+        this._seenPull = true;
+        this.ui?.toast("🧲 자성 군주의 인력은 미리 반경 밖으로 벌어져 있거나, 발동 직전에 회피 돌진(V)으로 무적 상태면 피할 수 있다", "warn");
+      }
+    };
+    this.enemyMgr.onBossBlind = (e) => {
+      if (!this.isHost) return;
+      const c2 = CFG.bossPattern;
+      const until = performance.now() / 1e3 + c2.blindDuration;
+      let blinded = 0;
+      for (const p2 of this.players.values()) {
+        if (!p2.alive) continue;
+        if (dist(p2.x, p2.z, e.x, e.z) > c2.blindRadius) continue;
+        if (p2.id === this.local.id) this.local.blindUntil = until;
+        else this.net.send("blind", { to: p2.id, dur: c2.blindDuration });
+        blinded++;
+      }
+      this.fx.burst(e.x, 1.8, e.z, 3355443, 20, 7);
+      if (blinded) {
+        this.ui?.toast(`🌑 칠흑 군주의 어둠에 ${blinded}명이 휩싸였다! ${c2.blindDuration}초간 미니맵에서 몬스터가 안 보인다`, "bad");
+      } else {
+        this.ui?.toast("🌑 칠흑 군주가 어둠을 터뜨렸지만 아무도 반경 안에 없었다", "good");
+      }
+      if (!this._seenBlind) {
+        this._seenBlind = true;
+        this.ui?.toast("🌑 칠흑 군주는 피해도 이동 강제도 없다 — 대신 어디서 적이 오는지 잠깐 보이지 않게 된다", "warn");
+      }
+    };
     this.enemyMgr.onBossCharge = (e) => {
       const reach = e.st.radius + 1.4;
       let hit = null;
@@ -386,13 +581,29 @@ export var Game = class {
       this._hurtEnemy(e, dmg, "poison");
     };
     this.enemyMgr.onHealPulse = (e) => {
-      this.fx.ring(e.x, e.z, 3390720, CFG.enemies.healer.healAura.radius);
+      this.fx.ring(e.x, e.z, 3390720, e.st.healAura.radius);
     };
     this.enemyMgr.onRallyPulse = (e) => {
       this.fx.ring(e.x, e.z, 16751001, CFG.enemies.commander.rallyAura.radius);
       this.fx.burst(e.x, 1.4, e.z, 16751001, 10, 4);
     };
+    this.enemyMgr.onBerserk = (e) => {
+      this.fx.burst(e.x, 1.3, e.z, 16729156, 12, 5);
+      this.fx.ring(e.x, e.z, 16729156, 2);
+    };
+    this.enemyMgr.onBossEnrage = (e) => {
+      const nm = `${CFG.enemies[e.type]?.icon || "💀"} ${CFG.enemies[e.type]?.name || "보스"}`;
+      this.ui?.toast(`🔥 ${nm}가 최후의 발악에 들어갔다! 더 빠르고 세지니 지금 몰아붙여 끝내라`, "bad");
+      this.fx.burst(e.x, 1.5, e.z, 16729156, 20, 6);
+      this.sfx.bossWaveStart();
+    };
     this.enemyMgr.onSpawn = (e) => {
+      if (markBestiarySeen(e.type)) {
+        if (!BESTIARY_ANNOUNCED_ELSEWHERE.has(e.type)) {
+          this.ui?.toast(`📖 도감에 새로 기록됨: ${CFG.enemies[e.type].icon} ${CFG.enemies[e.type].name}`, "good");
+        }
+        this._checkBestiaryComplete();
+      }
       if (e.elite) {
         if (specialWaveKind(this.wave.wave + 1) !== "elite") {
           this.ui?.toast(`⭐ 정예 ${CFG.enemies[e.type].name} 등장! 체력·공격력이 훨씬 세지만 처치 보상은 3배다`, "warn");
@@ -423,7 +634,9 @@ export var Game = class {
         this.ui?.toast(this._seenTreasure ? "🦀 보물게 등장! 서둘러라 — 놓치면 사라진다" : "🦀 보물게 등장! 공격은 안 하고 도망만 다닌다 — 놔두면 곧 사라지니 지금 잡아야 한다", "good");
         this._seenTreasure = true;
       }
-      if (!e.variant || this._seenVariants.has(e.variant)) return;
+      if (!e.variant) return;
+      if (markBestiarySeen(e.variant)) this._checkBestiaryComplete();
+      if (this._seenVariants.has(e.variant)) return;
       this._seenVariants.add(e.variant);
       const v = CFG.variants[e.variant];
       const HINTS = {
@@ -434,7 +647,10 @@ export var Game = class {
         ward: "타워가 조준하지 못한다 — 직접 달려가서 근접이나 스킬로 처치해야 한다",
         thorn: "근접으로 때리면 준 피해의 일부를 그대로 돌려받는다 — 무기 강화가 잘 됐을수록 반사도 세진다",
         vampire: "크리스탈·건물·플레이어를 때릴 때마다 그 피해의 일부를 체력으로 되돌린다 — 놔두면 계속 회복하니 최우선으로 끊어야 한다",
-        resist: "둔화·속박·중독을 전부 무시한다 — 서리탑·덫탑·독탑·얼음도끼가 안 통하니 순수 대미지로 밀어붙여야 한다"
+        resist: "둔화·속박·중독을 전부 무시한다 — 서리탑·독탑·얼음도끼가 안 통하니 순수 대미지로 밀어붙여야 한다",
+        berserk: "체력이 절반 밑으로 떨어지는 순간 갑자기 훨씬 빠르고 강해진다 — 절반만 깎아놓고 다른 놈부터 잡으러 가면 위험하다, 끝까지 몰아붙이거나 처음부터 피해라",
+        armored: "타워 공격이 크게 약해진다 — 근접·활·폭탄가방·정수 스킬은 그대로 통하니 직접 뛰어들어야 한다",
+        phantom: "직접 조준한 근접·활·폭탄가방 공격이 크게 약해진다 — 타워·정수 스킬에 맡겨야 한다"
       };
       const hint = HINTS[e.variant] || "";
       this.ui?.toast(`${v.icon} ${v.name} 변종 등장! ${hint}`, "warn");
@@ -446,6 +662,12 @@ export var Game = class {
         this.ui?.toast("🎯☠️ 시너지 발동! 독탑 근처 저격탑이 중독된 적에게 추가 피해를 준다", "good");
         return;
       }
+      if (kind === "cannonCluster") {
+        if (this._seenCannonSynergy) return;
+        this._seenCannonSynergy = true;
+        this.ui?.toast("💣💣 시너지 발동! 가까이 모인 대포탑끼리 폭발 반경이 넓어진다", "good");
+        return;
+      }
       if (this._seenSynergy) return;
       this._seenSynergy = true;
       const msg = kind === "frostArrow" ? "🧊🏹 시너지 발동! 서리탑 근처 화살탑이 둔화된 적에게 추가 피해를 준다" : "☠️☠️ 시너지 발동! 가까이 모인 독탑끼리 독 피해가 강해진다";
@@ -454,15 +676,18 @@ export var Game = class {
     this.enemyMgr.onCrystalHit = (e) => {
       const hpBefore = this.world.crystal.hp;
       const dead = this.world.damageCrystal(e.st.dmg);
-      if (this.world.crystal.hp < hpBefore && this._bossActive) this._bossWaveDamaged = true;
-      this.fx.burst(0, 3.2, 0, 6545663, 10, 5);
-      this.fx.float(`-${e.st.dmg}`, 0, 4.4, 0, "crystal");
-      this.ui?.shake();
-      this.sfx.crystalHit();
-      this._variantLeech(e, e.st.dmg);
+      const appliedDmg = hpBefore - this.world.crystal.hp;
+      if (appliedDmg > 0 && this._bossActive) this._bossWaveDamaged = true;
+      if (appliedDmg > 0) {
+        this.fx.burst(0, 3.2, 0, 6545663, 10, 5);
+        this.fx.float(`-${appliedDmg}`, 0, 4.4, 0, "crystal");
+        this.ui?.shake();
+        this.sfx.crystalHit();
+      }
+      this._variantLeech(e, appliedDmg);
       const rlv = this.world.crystal.reflectLv;
       if (this.isHost && rlv > 0) {
-        const reflectDmg = Math.round(e.st.dmg * CFG.crystalUpgrade.reflect.pctPerLv * rlv);
+        const reflectDmg = Math.round(appliedDmg * CFG.crystalUpgrade.reflect.pctPerLv * rlv);
         if (reflectDmg > 0) {
           this._hurtEnemy(e, reflectDmg, "crystal", 0, 0);
           if (!this._seenReflect) {
@@ -494,8 +719,10 @@ export var Game = class {
       this.sfx.harvestDone(node.type);
     };
     this.enemyMgr.onPlayerHit = (e, p2) => {
-      const base = p2.blocking ? e.st.dmg * (1 - p2.blockStats.mitigation) : e.st.dmg;
-      const dmg = Math.round(base * this.feastArmorMult);
+      const now = performance.now() / 1e3;
+      const parried = p2.blocking && now - (p2._blockStartAt ?? -99) <= CFG.player.parryWindow;
+      const base = parried ? 0 : p2.blocking ? e.st.dmg * (1 - p2.blockStats.mitigation) : e.st.dmg;
+      const dmg = Math.round(base * this.feastArmorMult * (1 - p2.outfitStats.reduce));
       if (p2.id === this.local.id) this._hurtLocal(dmg);
       else this.net.send("hurt", { to: p2.id, dmg });
       this._variantLeech(e, dmg);
@@ -509,8 +736,19 @@ export var Game = class {
           }
         }
       }
+      if (parried && !e.dead) {
+        e.applySlow(CFG.player.parrySlow, CFG.player.parrySlowTime, now);
+        this.fx.ring(p2.x, p2.z, 16766720, 2.2);
+        this.sfx.shard();
+        this.stats.parryCount = (this.stats.parryCount || 0) + 1;
+        if (this.stats.parryCount >= 5) this._unlockAchievement("perfectParry");
+        if (p2.id === this.local.id && !this._seenParry) {
+          this._seenParry = true;
+          this.ui?.toast("✨ 완벽한 방어! 맞기 직전에 막기를 누르면 피해를 전부 막고 적을 크게 둔화시킨다", "good");
+        }
+      }
       if (p2.blocking) {
-        if (p2.id === this.local.id && !this._seenBlock) {
+        if (p2.id === this.local.id && !this._seenBlock && !parried) {
           this._seenBlock = true;
           this.ui?.toast("🛡️ 막기로 피해를 크게 줄였다 — 대신 거의 못 움직이고 공격도 못 한다", "good");
         }
@@ -521,16 +759,26 @@ export var Game = class {
     this.wave.onWaveStart = (w2, total) => {
       this._clearWildlife();
       this.ui?.toast(this._waveStartLabel(w2, total), "warn");
-      const bossEntry = waveComposition(w2).find((c2) => CFG.enemies[c2.type]?.boss);
+      const wKind = weatherOf(w2);
+      if (wKind && !this.stats.weathersSeen.includes(wKind)) {
+        this.stats.weathersSeen.push(wKind);
+        if (this.stats.weathersSeen.length >= Object.keys(WEATHER).length) this._unlockAchievement("weatherSage");
+      }
+      const bossEntries = bossEntriesOf(w2);
       this.fx.ring(0, 0, 16734834, 10);
-      if (bossEntry) this.sfx.bossWaveStart();
+      if (bossEntries.length) this.sfx.bossWaveStart();
       else this.sfx.waveStart();
+      if (bossEntries.length >= 2 && !this._seenTwinBoss) {
+        this._seenTwinBoss = true;
+        this.ui?.toast(`⚠️⚠️ ${BOSS_CYCLE.length}종 보스를 한 바퀴 다 돌았다! 이제부터 보스 웨이브에 보스가 둘씩 나온다 — 보상은 평소 보스 웨이브와 같으니, 더 위험해진 만큼 방어선을 그만큼 더 단단히 준비해야 한다`, "warn");
+      }
       if (this.isHost) {
-        this._bossActive = !!bossEntry;
+        this._bossActive = bossEntries.length > 0;
         this._bossWaveDamaged = false;
       }
     };
     this.wave.onWaveClear = (w2, reward, won) => {
+      if (this.boonMult.shardBonus && reward.shard) reward.shard += this.boonMult.shardBonus;
       if (this.isHost) this._grantReward(reward);
       this.ui?.toast(won ? "마지막 웨이브 격퇴!" : `웨이브 ${w2} 클리어! 보상 🪵${reward.wood} 🪨${reward.stone}${reward.shard ? ` 💠${reward.shard}` : ""}`, "good");
       this.stats.waveLog.push({
@@ -559,9 +807,8 @@ export var Game = class {
     if (!this.isHost) return;
     if (this._bossActive && !this._bossWaveDamaged) this._unlockAchievement("flawlessBoss");
     this._bossActive = false;
-    const buildings = [...this.buildMgr.buildings.values()];
-    if (w2 >= 5 && !buildings.some((b) => b.key === "wall" || b.key === "gate")) this._unlockAchievement("noWall");
-    if (w2 >= 3 && !buildings.some((b) => b.isTower || b.isSupport)) {
+    if (w2 >= 5 && !this.stats.everBuiltWall) this._unlockAchievement("noWall");
+    if (w2 >= 3 && !this.stats.everBuiltTower) {
       this._unlockAchievement("noTower");
     }
   }
@@ -576,9 +823,17 @@ export var Game = class {
     this.pendingBoon = [a, b];
     this.pendingBoonTrigger = trigger;
     this.ui?.showBoonChoice(this.pendingBoon, trigger);
+    if (this.net.online) this.net.send("boonOffer", { keys: this.pendingBoon, trigger });
   }
   pickBoon(key) {
     if (!this.pendingBoon || !this.pendingBoon.includes(key)) return;
+    if (!this.isHost) {
+      this.net.send("pickBoon", { key });
+      this.pendingBoon = null;
+      this.pendingBoonTrigger = null;
+      this.ui?.hideBoonChoice();
+      return;
+    }
     const b = CFG.boons[key];
     if (b.kind === "mult") this.boonMult[b.key] *= b.value;
     else if (b.kind === "delta") this.boonMult[b.key] += b.value;
@@ -588,11 +843,17 @@ export var Game = class {
       this.world.crystal.maxHp += b.value;
       this.world.crystal.hp += b.value;
     } else if (b.kind === "trickle") this._shardTrickleStacks = (this._shardTrickleStacks || 0) + b.value;
-    else if (b.kind === "prepDelta") {
+    else if (b.kind === "risky") {
+      this.boonMult[b.key] *= b.value;
+      const c2 = this.world.crystal;
+      c2.maxHp = Math.max(50, c2.maxHp - b.hpCost);
+      c2.hp = Math.min(c2.hp, c2.maxHp);
+    } else if (b.kind === "prepDelta") {
       this.boonMult.prepDelta += b.value;
       this.wave.prepBonus = this.boonMult.prepDelta;
     } else if (b.kind === "venom") this.boonMult.venomChance = Math.min(0.6, this.boonMult.venomChance + b.value);
     else if (b.kind === "desperationBonus") this.boonMult.desperationBonus += b.value;
+    this.pickedBoons[key] = (this.pickedBoons[key] || 0) + 1;
     if (b.trigger === "boss") {
       this.stats.relicsPicked = (this.stats.relicsPicked || 0) + 1;
       if (this.stats.relicsPicked >= 3) this._unlockAchievement("relicCollector");
@@ -680,6 +941,9 @@ export var Game = class {
       }
     } else if (o.kind === "mystery") {
       return this._applyMysteryBox(playerId);
+    } else if (o.kind === "ammoBox") {
+      const stock = this._ammoOf(this._poolOf(playerId));
+      for (const type of Object.keys(o.value)) stock[type] = (stock[type] || 0) + o.value[type];
     }
   }
   // 다른 7개 품목과 달리 결과를 미리 알 수 없다 — 세 결과지 중 하나를 그 자리에서 굴려서
@@ -711,6 +975,27 @@ export var Game = class {
   // "unlockAch" 로 그 참가자에게 전달한다 — 원래는 조용히 return만 해서 아무도(호스트도
   // 참가자도) 실제로 업적을 못 받았다(weaponMaster·skillUser가 참가자 쪽에서는 절대 안 뜨는
   // 버그였다). _notify 와 정확히 같은 "본인이면 로컬 처리, 아니면 net.send" 배관을 재사용했다.
+  // 도감 항목(몬스터·보스·변종·야생 동물)을 전부 기록했는지 확인한다. markBestiarySeen()이 새
+  // 항목을 기록한 직후에만 호출되므로(중복 호출 없음), 마지막 한 칸을 채운 바로 그 순간 조용히
+  // 켜진다.
+  _checkBestiaryComplete() {
+    const seen = loadBestiarySeen();
+    if (Object.keys(seen).length >= Object.keys(BESTIARY_INFO).length) {
+      this._unlockAchievement("bestiaryComplete");
+    }
+  }
+  // 승리 시점에만 의미가 있다 — 기존 업적은 전부 "누가 제일 세게 때렸나"(dmgByPlayer 1등)만
+  // 봤을 뿐, "다 같이 싸웠나"는 아무도 안 물었다. killsByPlayer(방금 추가한 결과 화면 개인별
+  // 집계와 같은 데이터)를 재사용해 참가자 전원이 최소 한 마리씩은 직접 처치했는지만 확인한다 —
+  // 한 명이 다 잡고 나머지는 채집만 해도 이기는 판이 많은데, 이건 그 반대(고르게 기여한 판)를
+  // 알아본다.
+  _checkTeamEffort() {
+    if (this.players.size < 2) return;
+    const kb = this.stats.killsByPlayer || {};
+    if ([...this.players.keys()].every((id) => (kb[id] || 0) > 0)) {
+      this._unlockAchievement("teamEffort");
+    }
+  }
   _unlockAchievement(key, playerId) {
     if (playerId !== void 0 && playerId !== this.local.id) {
       this.net.send("unlockAch", { to: playerId, key });
@@ -738,15 +1023,38 @@ export var Game = class {
     }
   }
   _triggerTrap(b, e, st) {
-    this._hurtEnemy(e, st.dmg, "tower", b.x, b.z);
-    if (st.slow) e.applySlow(st.slow, st.slowTime, performance.now() / 1e3);
-    this.fx.burst(b.x, 0.5, b.z, 14238251, 16, 5);
-    this.fx.ring(b.x, b.z, 14238251, 2.2);
+    const now = performance.now() / 1e3;
+    if (st.blastRadius) {
+      for (const e2 of this.enemyMgr.list) {
+        if (e2.dead || e2.st.flies || e2.st.wild) continue;
+        if (dist(b.x, b.z, e2.x, e2.z) <= st.blastRadius) {
+          this._hurtEnemy(e2, st.dmg, "tower", b.x, b.z);
+        }
+      }
+      this.fx.burst(b.x, 0.5, b.z, 16750899, 26, st.blastRadius);
+      this.fx.ring(b.x, b.z, 16750899, st.blastRadius);
+    } else {
+      this._hurtEnemy(e, st.dmg, "tower", b.x, b.z);
+      if (st.slow) e.applySlow(st.slow, st.slowTime, now);
+      if (st.root) e.applyRoot(st.root, now);
+      this.fx.burst(b.x, 0.5, b.z, 14238251, 16, 5);
+      this.fx.ring(b.x, b.z, 14238251, 2.2);
+    }
     this.sfx.buildingHit();
     this.buildMgr.remove(b.id);
     this.stats.trapsTriggered = (this.stats.trapsTriggered || 0) + 1;
     if (this.stats.trapsTriggered >= 3) this._unlockAchievement("trapMaster");
-    if (!this._seenTrap) {
+    if (b.key === "mire") {
+      if (!this._seenMire) {
+        this._seenMire = true;
+        this.ui?.toast("🥾 수렁 함정 발동! 피해는 적지만 완전히 묶어 세웠다 — 묶인 적을 다른 공격으로 마무리하면 추가 피해가 붙는다", "good");
+      }
+    } else if (b.key === "blast") {
+      if (!this._seenBlast) {
+        this._seenBlast = true;
+        this.ui?.toast("🧨 폭발 함정 발동! 반경 안 적 전부에게 피해를 주고 사라졌다 — 뭉쳐서 오는 무리에 강하다", "good");
+      }
+    } else if (!this._seenTrap) {
       this._seenTrap = true;
       this.ui?.toast("🪤 함정 발동! 큰 피해를 주고 사라졌다 — 다시 설치해야 한다", "good");
     }
@@ -764,7 +1072,8 @@ export var Game = class {
     }
     this._meteorTimer -= dt2;
     if (this._meteorTimer > 0) return;
-    this._meteorTimer = c2.minGap + Math.random() * (c2.maxGap - c2.minGap);
+    const hazardMult = CFG.biomes[this.world.biome].hazardMult ?? 1;
+    this._meteorTimer = (c2.minGap + Math.random() * (c2.maxGap - c2.minGap)) * hazardMult;
     const inner = CFG.world.coreRadius + 3, outer = CFG.world.buildRadius - 2;
     const a = Math.random() * Math.PI * 2, r = inner + Math.random() * (outer - inner);
     this._meteorPending = { x: Math.cos(a) * r, z: Math.sin(a) * r, timeLeft: c2.telegraphTime };
@@ -796,12 +1105,224 @@ export var Game = class {
         else this.net.send("hurt", { to: p2.id, dmg: c2.playerDmg });
       }
     }
+    if (this.world.biome === "volcano") {
+      this._crater = { x, z, timeLeft: c2.craterDuration, tickTimer: 0 };
+      this.world.setCrater(x, z, c2.craterDuration, c2.craterRadius);
+    }
+  }
+  // 🌀 균열 습격: 전투 중(6웨이브부터) 가끔 방어선 안쪽 아무 데서나 예고 없이 적 몇 마리가
+  // 바로 나타난다 — 운석과 달리 사전 경고 링이 없다(포탈 봉쇄로 아무리 방향을 관리해도 완전히
+  // 안전한 판은 없다는 게 이 이벤트의 핵심이라, 미리 피할 수 있게 하면 그 긴장이 사라진다).
+  // 웨이브 큐(waveComposition)와 무관하게 얹히는 보너스 개체라 aliveInWave가 그만큼 늘어
+  // 웨이브 클리어 판정도 이 적들까지 처치해야 넘어간다(미믹과 같은 방식 — event 플래그가 없어
+  // 정상적으로 카운트된다). 호스트 전용(다른 전투 이벤트와 동일) — 스폰된 개체 자체는 기존
+  // enemyMgr 스냅샷으로 참가자 화면에도 그대로 나타나고, 순간적인 경고 이펙트만 별도 메시지로
+  // 알린다(meteor처럼 지속되는 상태가 아니라 새 스냅샷 필드가 필요 없다).
+  _updateRiftRaid(dt2) {
+    const c2 = CFG.riftRaid;
+    if (this.wave.phase !== PHASE.COMBAT || this.wave.wave + 1 < c2.minWave) return;
+    this._riftRaidTimer -= dt2;
+    if (this._riftRaidTimer > 0) return;
+    this._riftRaidTimer = c2.minGap + Math.random() * (c2.maxGap - c2.minGap);
+    const inner = CFG.world.coreRadius + 3, outer = CFG.world.buildRadius - 2;
+    const a = Math.random() * Math.PI * 2, r = inner + Math.random() * (outer - inner);
+    const x = Math.cos(a) * r, z = Math.sin(a) * r;
+    const n = c2.countMin + Math.floor(Math.random() * (c2.countMax - c2.countMin + 1));
+    let spawned = 0;
+    for (let i = 0; i < n; i++) {
+      const jitter = 1.6;
+      if (this.enemyMgr.spawn(c2.type, this.wave.wave + 1, x + (Math.random() - 0.5) * jitter, z + (Math.random() - 0.5) * jitter)) spawned++;
+    }
+    if (spawned > 0) {
+      this._announceRiftRaid(x, z, spawned);
+      this.net.send("riftRaid", { x: Math.round(x * 10) / 10, z: Math.round(z * 10) / 10, n: spawned });
+    }
+  }
+  _announceRiftRaid(x, z, n) {
+    this.fx.ring(x, z, 12592851, 4);
+    this.fx.burst(x, 1.2, z, 12592851, 18, 6);
+    this.ui?.toast(`🌀 방어선 안쪽에서 균열이 열렸다! 낯선 방향에서 ${n}마리가 튀어나왔다`, "bad");
+    this.sfx.crystalDanger();
+  }
+  // 화산지대 운석이 남긴 용암 웅덩이 — 지속시간 동안 그 자리에 있는 적·플레이어에게 0.5초마다
+  // 피해를 준다. 경고가 없는 대신(이미 운석 경고로 한 번 예고됐다) 웅덩이 자체가 계속 이글거려서
+  // 보인다. 몰려오는 적을 그 위로 유인하면 공짜 지속딜이 되지만, 무리해서 그 안에서 싸우면
+  // 플레이어도 똑같이 깎인다 — 운석과 같은 "양날의 검" 성격을 충돌 이후까지 이어간다.
+  _updateCraters(dt2) {
+    if (!this._crater) return;
+    const c2 = CFG.meteor;
+    this._crater.timeLeft -= dt2;
+    if (this._crater.timeLeft <= 0) {
+      this._crater = null;
+      this.world.clearCrater();
+      return;
+    }
+    this.world.setCrater(this._crater.x, this._crater.z, this._crater.timeLeft, c2.craterRadius);
+    this._crater.tickTimer -= dt2;
+    if (this._crater.tickTimer > 0) return;
+    this._crater.tickTimer = 0.5;
+    const { x, z } = this._crater;
+    const tickDmg = Math.round(c2.craterDps * 0.5);
+    for (const e of this.enemyMgr.list) {
+      if (e.dead) continue;
+      if (dist(e.x, e.z, x, z) <= c2.craterRadius) this._hurtEnemy(e, tickDmg, "player", x, z);
+    }
+    for (const p2 of this.players.values()) {
+      if (dist(p2.x, p2.z, x, z) <= c2.craterRadius) {
+        if (p2.id === this.local.id) this._hurtLocal(tickDmg);
+        else this.net.send("hurt", { to: p2.id, dmg: tickDmg });
+      }
+    }
+    if (!this._seenCrater) {
+      this._seenCrater = true;
+      this.ui?.toast("🌋 운석이 용암 웅덩이를 남겼다! 잠깐 그 자리에 계속 피해를 준다 — 적을 끌어들이거나, 스스로는 피해라", "warn");
+    }
+  }
+  // 늪지대(swamp) 전용 — 고정된 자리 3곳이 각자 dormant(조용함) → warn(예고) → active(독가스,
+  // 0.5초마다 피해) → dormant 를 계속 순환한다. 운석과 달리 위치가 판마다 항상 같은 자리(시드
+  // 결정론적)라 처음 데어본 다음부터는 플레이어가 외워서 피하거나, 반대로 몬스터를 그 위로
+  // 유인하는 길막이로 쓸 수 있다. 전투 중에만 진행되고(준비 시간엔 멈춰서 안전하게 건설할 수
+  // 있다) 호스트만 시간을 진행시키며, 결과(phase)만 스냅샷 `sw` 필드로 참가자에게 전파된다.
+  _updateSwampPits(dt2) {
+    if (!this._swampTimers.length) return;
+    if (this.wave.phase !== PHASE.COMBAT) return;
+    const c2 = CFG.swampPit;
+    for (let i = 0; i < this._swampTimers.length; i++) {
+      const t2 = this._swampTimers[i];
+      t2.timeLeft -= dt2;
+      if (t2.timeLeft <= 0) {
+        if (t2.phase === "dormant") {
+          t2.phase = "warn";
+          t2.timeLeft = c2.warn;
+        } else if (t2.phase === "warn") {
+          t2.phase = "active";
+          t2.timeLeft = c2.active;
+          t2.tickTimer = 0;
+          if (!this._seenSwampPit) {
+            this._seenSwampPit = true;
+            this.ui?.toast("🐊 독가스 분출! 이 구덩이는 늘 같은 자리에서 터진다 — 위치를 외워두면 다음부터는 피할 수 있다", "warn");
+          }
+        } else {
+          t2.phase = "dormant";
+          t2.timeLeft = c2.dormant;
+        }
+        this.world.setSwampPitPhase(i, t2.phase);
+      }
+      if (t2.phase !== "active") continue;
+      t2.tickTimer -= dt2;
+      if (t2.tickTimer > 0) continue;
+      t2.tickTimer = 0.5;
+      const tickDmg = Math.round(c2.dps * 0.5);
+      const { x, z } = this.world.swampPits[i];
+      for (const e of this.enemyMgr.list) {
+        if (e.dead) continue;
+        if (dist(e.x, e.z, x, z) <= c2.radius) this._hurtEnemy(e, tickDmg, "player", x, z);
+      }
+      for (const p2 of this.players.values()) {
+        if (dist(p2.x, p2.z, x, z) <= c2.radius) {
+          if (p2.id === this.local.id) this._hurtLocal(tickDmg);
+          else this.net.send("hurt", { to: p2.id, dmg: tickDmg });
+        }
+      }
+    }
+  }
+  // 얼음판(설원 전용) — 늪지대와 완전히 같은 위상 순환·배관을 재사용하지만, active일 때
+  // 피해 대신 둔화를 준다. 플레이어 쪽 둔화는 player.js가 world.icePits를 매 프레임 직접
+  // 봐서 처리하므로(weatherMult와 같은 자리) 여기서는 적에게만 슬로우를 짧게 반복 갱신한다 —
+  // 서 있는 동안만 걸리고 나가면 자연히 slowUntil이 만료돼 풀린다(frost 타워와 같은 원리).
+  // 비행 몬스터는 얼음 바닥을 밟지 않으므로 제외한다(늪지대 독가스와 달리 지면 효과라는 차이).
+  _updateIcePits(dt2) {
+    if (!this._icePitTimers.length) return;
+    if (this.wave.phase !== PHASE.COMBAT) return;
+    const c2 = CFG.icePit;
+    const now = performance.now() / 1e3;
+    for (let i = 0; i < this._icePitTimers.length; i++) {
+      const t2 = this._icePitTimers[i];
+      t2.timeLeft -= dt2;
+      if (t2.timeLeft <= 0) {
+        if (t2.phase === "dormant") {
+          t2.phase = "warn";
+          t2.timeLeft = c2.warn;
+        } else if (t2.phase === "warn") {
+          t2.phase = "active";
+          t2.timeLeft = c2.active;
+          if (!this._seenIcePit) {
+            this._seenIcePit = true;
+            this.ui?.toast("❄️ 얼음판 활성화! 이 위에 있으면 나도 적도 똑같이 느려진다 — 몰려오는 적을 유인해 타워로 정리할 수도 있다", "warn");
+          }
+        } else {
+          t2.phase = "dormant";
+          t2.timeLeft = c2.dormant;
+        }
+        this.world.setIcePitPhase(i, t2.phase);
+      }
+      if (t2.phase !== "active") continue;
+      const { x, z } = this.world.icePits[i];
+      for (const e of this.enemyMgr.list) {
+        if (e.dead || e.st.flies) continue;
+        if (dist(e.x, e.z, x, z) <= c2.radius) e.applySlow(c2.enemySlow, c2.enemySlowTime, now);
+      }
+    }
+  }
+  // 뇌우 날씨(WEATHER.storm) 전용 — 그 웨이브 전투 내내 무작위 간격으로 살아있는 적 하나를 직접
+  // 내리친다. 텔레그래프가 없다(운석과 달리 플레이어에게 불리한 게 아니라 순전히 도와주는 효과라
+  // 피할 필요가 없다). 결과는 적 hp 변화로만 나타나므로 별도 네트워크 메시지 없이 기존 enemyMgr
+  // 스냅샷에 실려 참가자 화면에도 그대로 전파된다.
+  _updateStorm(dt2) {
+    if (this.wave.phase !== PHASE.COMBAT || weatherOf(this.wave.wave + 1) !== "storm") return;
+    if (this._stormWave !== this.wave.wave + 1) {
+      this._stormWave = this.wave.wave + 1;
+      this._stormTimer = 3 + Math.random() * 3;
+    }
+    this._stormTimer -= dt2;
+    if (this._stormTimer > 0) return;
+    const c2 = WEATHER.storm;
+    this._stormTimer = c2.strikeMinGap + Math.random() * (c2.strikeMaxGap - c2.strikeMinGap);
+    const targets = this.enemyMgr.list.filter((e2) => !e2.dead && !e2.st.event);
+    if (!targets.length) return;
+    const e = targets[Math.floor(Math.random() * targets.length)];
+    this.fx.burst(e.x, 2.4, e.z, 16777215, 16, 7);
+    this.fx.ring(e.x, e.z, 11393254, 2.2);
+    this.sfx.lightning();
+    this._hurtEnemy(e, c2.dmg, "storm", e.x, e.z);
+  }
+  // 우박 날씨(WEATHER.hail) 전용 — 뇌우와 정반대로 무작위 "건물"을 때린다(적이 아니라).
+  // 크리스탈은 buildMgr에 아예 없는 별개 객체라 자연히 대상에서 빠진다. 함정(1회용, 아직
+  // 안 밟혔는데 날씨에 그냥 사라지면 억울하다)과 제작대·화로(부서지면 그 웨이브 안엔 못
+  // 짓는데, 전투 중 갑자기 제작 자체가 막히는 건 "환경 마모"가 아니라 그냥 봉쇄라 뺐다) —
+  // 그 외 벽·성문·모든 타워·보루·채집기·정비소·병기창은 전부 대상이다. 결과는 건물 hp
+  // 변화로만 나타나므로(뇌우와 같은 이유) 별도 네트워크 메시지 없이 기존 buildMgr 스냅샷에
+  // 실려 참가자 화면에도 그대로 전파된다.
+  _updateHail(dt2) {
+    if (this.wave.phase !== PHASE.COMBAT || weatherOf(this.wave.wave + 1) !== "hail") return;
+    if (this._hailWave !== this.wave.wave + 1) {
+      this._hailWave = this.wave.wave + 1;
+      this._hailTimer = 3 + Math.random() * 3;
+    }
+    this._hailTimer -= dt2;
+    if (this._hailTimer > 0) return;
+    const c2 = WEATHER.hail;
+    this._hailTimer = c2.strikeMinGap + Math.random() * (c2.strikeMaxGap - c2.strikeMinGap);
+    const targets = [...this.buildMgr.buildings.values()].filter((b2) => b2.hp > 0 && !b2.isTrap && !b2.stationKind);
+    if (!targets.length) return;
+    const b = targets[Math.floor(Math.random() * targets.length)];
+    this.fx.burst(b.x, 2.2, b.z, 11393254, 14, 6);
+    this.fx.ring(b.x, b.z, 11393254, 1.8);
+    this.sfx.buildingHit();
+    if (!this._seenHail) {
+      this._seenHail = true;
+      this.ui?.toast("🧊 우박 날씨! 가끔 무작위 건물을 강타한다 — 정비소를 근처에 지으면 자동으로 상쇄된다", "warn");
+    }
+    if (b.damage(c2.dmg)) {
+      this.fx.burst(b.x, 1.2, b.z, 8947848, 16, 6);
+      this.buildMgr.remove(b.id);
+    }
   }
   // 보급품 투하: 전투 중 한 번에 최대 1개, 주기적으로 등장한다 (호스트 전용 — 결과는 스냅샷으로 퍼진다)
   _updateSupplyDrops(dt2) {
     const c2 = CFG.supplyDrop;
     if (this.wave.phase !== PHASE.COMBAT || this.wave.wave + 1 < c2.minWave) return;
-    const drop = this.world.drops[0];
+    const drop = this.world.drops.find((d2) => (d2.kind || "supply") === "supply");
     if (drop) {
       drop.age = (drop.age || 0) + dt2;
       if (drop.age >= c2.lifetime) this.world.removeDrop(drop.id);
@@ -813,8 +1334,29 @@ export var Game = class {
     const spot = this._findDropSpot();
     if (!spot) return;
     const id = this._dropIdSeq++;
-    this.world.spawnDrop(id, spot.x, spot.z);
+    this.world.spawnDrop(id, spot.x, spot.z, "supply");
     this.ui?.toast("📦 보급품이 떨어졌다! 미니맵을 보고 달려가서 챙겨라 — 안 챙기면 곧 사라진다", "good");
+  }
+  // 정수 상자 — 보급품 투하와 완전히 같은 패턴(호스트 전용 타이머, 같은 world.drops 배열,
+  // 같은 자동 픽업 루프)이지만 훨씬 드물고, 목재·광물 대신 정수 1개를 준다. minGap이 보급품의
+  // 3배 이상이라 같은 판에서 둘 다 뜨더라도 흔치 않게 겹친다.
+  _updateShardDrops(dt2) {
+    const c2 = CFG.shardDrop;
+    if (this.wave.phase !== PHASE.COMBAT || this.wave.wave + 1 < c2.minWave) return;
+    const drop = this.world.drops.find((d2) => d2.kind === "shard");
+    if (drop) {
+      drop.age = (drop.age || 0) + dt2;
+      if (drop.age >= c2.lifetime) this.world.removeDrop(drop.id);
+      return;
+    }
+    this._shardDropTimer -= dt2;
+    if (this._shardDropTimer > 0) return;
+    this._shardDropTimer = c2.minGap + Math.random() * (c2.maxGap - c2.minGap);
+    const spot = this._findDropSpot();
+    if (!spot) return;
+    const id = this._dropIdSeq++;
+    this.world.spawnDrop(id, spot.x, spot.z, "shard");
+    this.ui?.toast("💠 정수 상자가 떨어졌다! 미니맵을 보고 달려가서 챙겨라 — 안 챙기면 곧 사라진다", "good");
   }
   _findDropSpot() {
     const inner = CFG.world.coreRadius + 5;
@@ -844,7 +1386,7 @@ export var Game = class {
     this._huntTimer -= dt2;
     if (this._huntTimer > 0) return;
     this._huntTimer = c2.spawnGap;
-    const weights = this.wave.wave >= (c2.wolfMinWave ?? 0) ? c2.weights : Object.fromEntries(Object.entries(c2.weights).filter(([k2]) => k2 !== "wolf"));
+    const weights = Object.fromEntries(Object.entries(c2.weights).filter(([k2]) => this.wave.wave >= (c2.minWave?.[k2] ?? 0)));
     const total = Object.values(weights).reduce((a2, b2) => a2 + b2, 0);
     let roll = Math.random() * total, type = "rabbit";
     for (const [k2, w2] of Object.entries(weights)) {
@@ -864,6 +1406,34 @@ export var Game = class {
     if (e && type === "wolf" && !this._seenWolf) {
       this._seenWolf = true;
       this.ui?.toast("🐺 늑대 등장! 다른 사냥감과 달리 먼저 건드리지 않아도 가까이 가면 스스로 쫓아온다 — 무장 없이 방심하지 말 것", "warn");
+    }
+    if (e && type === "bear" && !this._seenBear) {
+      this._seenBear = true;
+      this.ui?.toast("🐻 곰 등장! 먼저 쫓아오지는 않지만 건드리면 셋 중 가장 아프게 반격한다 — 체력이 가장 높고 길들이기도 가장 어렵다", "warn");
+    }
+    if (e && type === "stagking" && !this._seenStagking) {
+      this._seenStagking = true;
+      this.ui?.toast("👑 전설의 사슴왕 등장! 사냥감 중 가장 희귀하다 — 여우처럼 빠르게 도망치다가도 맞히면 곰보다 세게 반격한다. 잡으면 특별한 요리 재료가 된다", "warn");
+    }
+  }
+  // 돌 파수꾼 — hunt.weights 풀과 별개로 훨씬 드물게, 한 번에 하나만 등장한다(_updateHunt와
+  // 달리 maxAlive 대신 살아있는 개체 유무 자체를 검사). PREP에서만, wild:true라 웨이브가
+  // 시작되면 _clearWildlife가 다른 사냥감과 함께 자동으로 정리한다.
+  _updateNest(dt2) {
+    if (!this.isHost) return;
+    if (this.wave.phase !== PHASE.PREP) return;
+    const c2 = CFG.nestEvent;
+    if (this.wave.wave < c2.minWave) return;
+    if (this.enemyMgr.list.some((e2) => !e2.dead && e2.type === "golem")) return;
+    this._nestTimer -= dt2;
+    if (this._nestTimer > 0) return;
+    this._nestTimer = c2.minGap + Math.random() * (c2.maxGap - c2.minGap);
+    const ang = Math.random() * Math.PI * 2;
+    const r = c2.minDist + Math.random() * (c2.maxDist - c2.minDist);
+    const e = this.enemyMgr.spawn("golem", 1, Math.cos(ang) * r, Math.sin(ang) * r);
+    if (e && !this._seenGolem) {
+      this._seenGolem = true;
+      this.ui?.toast("🪨 돌 파수꾼 등장! 움직이지 못하지만 다가가 때리면 사냥감 중 가장 세게 반격한다 — 쓰러뜨리면 쌓아둔 목재·광물을 통째로 얻는다", "warn");
     }
   }
   // 웨이브가 시작되면 사냥감은 전부 도망친다 — 전투 중에 섞여 있으면 표적이 헷갈리고,
@@ -944,6 +1514,14 @@ export var Game = class {
   }
   get feastArmorMult() {
     return this.feast.kind === "armor" ? CFG.cook.wolf.value : 1;
+  }
+  // 곰 훈제육 전용 — player.js 의 기본 회복은 전투 중(마지막 피격 후 2초 안)엔 멈추므로,
+  // 이 보너스는 별도로 game.js 메인 루프에서 전투 중 여부와 무관하게 매 프레임 더한다.
+  get feastRegenPerSec() {
+    return this.feast.kind === "regen" ? CFG.cook.bear.value : 0;
+  }
+  get feastCritDelta() {
+    return this.feast.kind === "crit" ? CFG.cook.stagking.value : 0;
   }
   _updateTreasure(dt2) {
     const c2 = CFG.treasureEvent;
@@ -1027,23 +1605,27 @@ export var Game = class {
     if (!drop) return;
     const player = this.players.get(playerId);
     if (!player) return;
+    const isShard = drop.kind === "shard";
+    const c2 = isShard ? CFG.shardDrop : CFG.supplyDrop;
     const x2 = typeof px === "number" ? px : player.x;
     const z2 = typeof pz === "number" ? pz : player.z;
-    if (dist(x2, z2, drop.x, drop.z) > CFG.supplyDrop.pickupRadius + 1) return;
-    const c2 = CFG.supplyDrop;
+    if (dist(x2, z2, drop.x, drop.z) > c2.pickupRadius + 1) return;
     const pool = this._poolOf(playerId);
-    pool.wood += c2.reward.wood;
-    pool.stone += c2.reward.stone;
-    let gotShard = false;
-    if (Math.random() < c2.shardChance) {
-      pool.shard = (pool.shard || 0) + 1;
-      gotShard = true;
-    }
     this.world.removeDrop(dropId);
-    this.fx.burst(drop.x, 1, drop.z, 16759043, 16, 6);
-    this.fx.ring(drop.x, drop.z, 16759043, 3);
-    this.sfx.shard();
-    this._notify(playerId, `📦 보급품 획득! 🪵+${c2.reward.wood} 🪨+${c2.reward.stone}${gotShard ? " 💠+1" : ""}`, "good");
+    if (isShard) {
+      pool.shard = (pool.shard || 0) + c2.reward.shard;
+      this.fx.burst(drop.x, 1, drop.z, 14063103, 16, 6);
+      this.fx.ring(drop.x, drop.z, 14063103, 3);
+      this.sfx.shard();
+      this._notify(playerId, `💠 정수 상자 획득! 정수+${c2.reward.shard}`, "good");
+    } else {
+      pool.wood += c2.reward.wood;
+      pool.stone += c2.reward.stone;
+      this.fx.burst(drop.x, 1, drop.z, 16759043, 16, 6);
+      this.fx.ring(drop.x, drop.z, 16759043, 3);
+      this.sfx.shard();
+      this._notify(playerId, `📦 보급품 획득! 🪵+${c2.reward.wood} 🪨+${c2.reward.stone}`, "good");
+    }
   }
   // 흡혈(vampire) 변종 전용 — 크리스탈·건물·플레이어 중 무엇을 때리든 그 피해의 일부를 체력으로
   // 되돌린다. 세 공격 경로(onCrystalHit/onBuildingHit/onPlayerHit) 모두 호스트에서만 실행되므로
@@ -1060,6 +1642,12 @@ export var Game = class {
   // 협공 콤보: 서로 다른 플레이어가 같은 적을 짧은 시간 안에 연달아 때리면 두 번째 타격에 보너스가
   // 붙는다. 각자 흩어져서 몬스터를 나눠 잡는 대신 "같이 한 놈부터 잡는" 선택을 보상한다.
   _hurtEnemy(e, dmg, kind = "tower", fromX, fromZ, playerId) {
+    if (e.variant === "armored" && (kind === "tower" || kind === "frost")) {
+      dmg = Math.max(1, Math.round(dmg * CFG.variants.armored.towerDmgMult));
+    }
+    if (e.variant === "phantom" && kind === "player" && playerId) {
+      dmg = Math.max(1, Math.round(dmg * CFG.variants.phantom.playerDmgMult));
+    }
     if (e.st.retaliates && kind === "player" && !e.dead) {
       e.aggroTarget = playerId || this.local.id;
       e.aggroUntil = performance.now() / 1e3 + (e.st.aggroTime || 5);
@@ -1075,8 +1663,27 @@ export var Game = class {
       e._comboBy = playerId;
       e._comboAt = now;
     }
+    let crit = false;
+    if (kind === "player" && playerId && Math.random() < CFG.crit.chance + this.boonMult.critChanceDelta + this.feastCritDelta) {
+      dmg = Math.round(dmg * CFG.crit.mult);
+      crit = true;
+    }
     const { died, applied } = e.damage(dmg, fromX, fromZ);
-    this.fx.float(combo ? `${Math.round(applied)} 협공!` : String(Math.round(applied)), e.x, 1.9, e.z, combo ? "combo" : kind === "player" ? "player" : "");
+    if (kind === "player" && playerId) {
+      this.stats.dmgByPlayer[playerId] = (this.stats.dmgByPlayer[playerId] || 0) + applied;
+    }
+    const label = crit && combo ? `${Math.round(applied)} 크리티컬 협공!` : crit ? `${Math.round(applied)} 크리티컬!` : combo ? `${Math.round(applied)} 협공!` : String(Math.round(applied));
+    this.fx.float(label, e.x, 1.9, e.z, crit ? "crit" : combo ? "combo" : kind === "player" ? "player" : "");
+    if (crit) {
+      this.fx.ring(e.x, e.z, 16724531, 1.4);
+      this.sfx.shard();
+      this.stats.critCount = (this.stats.critCount || 0) + 1;
+      if (this.stats.critCount >= 20) this._unlockAchievement("criticalEye");
+      if (!this._seenCrit) {
+        this._seenCrit = true;
+        this.ui?.toast("💥 치명타! 근접·활·폭탄가방 공격은 가끔 두 배 피해를 낸다 — 확률은 순전히 운이다", "good");
+      }
+    }
     if (combo) {
       this.fx.ring(e.x, e.z, 16751001, 1.6);
       this.sfx.shard();
@@ -1088,8 +1695,18 @@ export var Game = class {
       if (this.stats.comboCount >= 10) this._unlockAchievement("duoStrike");
     }
     if (kind === "player") this.sfx.meleeHit();
+    if (kind === "player" && playerId && this.world.crystal.graceLv > 0) {
+      const p2 = this.players.get(playerId);
+      if (p2 && dist(p2.x, p2.z, 0, 0) <= CFG.crystalUpgrade.grace.radius) {
+        const heal = applied * CFG.crystalUpgrade.grace.lifestealPctPerLv * this.world.crystal.graceLv;
+        if (heal > 0) this._healPlayer(playerId, heal);
+      }
+    }
     if (died) {
       this.stats.kills++;
+      if (kind === "player" && playerId) {
+        this.stats.killsByPlayer[playerId] = (this.stats.killsByPlayer[playerId] || 0) + 1;
+      }
       this.fx.burst(e.x, 1, e.z, e.tintColor, 12, 5);
       if (e.st.boss) {
         this.fx.burst(e.x, 1.4, e.z, 16777215, 20, 8);
@@ -1109,6 +1726,24 @@ export var Game = class {
         if (["boss", "frostlord", "warden", "looter", "colossus"].every((t2) => this.stats.bossKillsSeen.includes(t2))) {
           this._unlockAchievement("fiveGuardians");
         }
+        if (["boss", "frostlord", "warden", "looter", "colossus", "wraith"].every((t2) => this.stats.bossKillsSeen.includes(t2))) {
+          this._unlockAchievement("sixGuardians");
+        }
+        if (["boss", "frostlord", "warden", "looter", "colossus", "wraith", "galelord"].every((t2) => this.stats.bossKillsSeen.includes(t2))) {
+          this._unlockAchievement("sevenStars");
+        }
+        if (["boss", "frostlord", "warden", "looter", "colossus", "wraith", "galelord", "curselord"].every((t2) => this.stats.bossKillsSeen.includes(t2))) {
+          this._unlockAchievement("allEightBosses");
+        }
+        if (["boss", "frostlord", "warden", "looter", "colossus", "wraith", "galelord", "curselord", "grovelord"].every((t2) => this.stats.bossKillsSeen.includes(t2))) {
+          this._unlockAchievement("allNineBosses");
+        }
+        if (["boss", "frostlord", "warden", "looter", "colossus", "wraith", "galelord", "curselord", "grovelord", "magnetlord"].every((t2) => this.stats.bossKillsSeen.includes(t2))) {
+          this._unlockAchievement("allTenBosses");
+        }
+        if (["boss", "frostlord", "warden", "looter", "colossus", "wraith", "galelord", "curselord", "grovelord", "magnetlord", "shadowlord"].every((t2) => this.stats.bossKillsSeen.includes(t2))) {
+          this._unlockAchievement("allElevenBosses");
+        }
       } else {
         this.sfx.enemyDeath();
       }
@@ -1122,6 +1757,10 @@ export var Game = class {
         this.fx.ring(e.x, e.z, 16763904, 3);
         if (this.stats.elitesKilled >= 5) this._unlockAchievement("eliteHunter");
       }
+      if (e.variant === "berserk" && e._berserk) {
+        this.stats.berserkKilled = (this.stats.berserkKilled || 0) + 1;
+        if (this.stats.berserkKilled >= 5) this._unlockAchievement("berserkSlayer");
+      }
       if (e.st.meat) {
         const pool = this.shared ? this.pools.team : this._poolOf(this.local.id);
         if (!pool.meat) pool.meat = { rabbit: 0, deer: 0, boar: 0 };
@@ -1129,6 +1768,7 @@ export var Game = class {
         this.ui?.toast(`${e.st.icon} ${e.st.name} 사냥! 생고기를 얻었다 — 화로에서 구워 먹어라`, "good");
         this.stats.animalsHunted = (this.stats.animalsHunted || 0) + 1;
         if (this.stats.animalsHunted >= 10) this._unlockAchievement("hunter");
+        if (e.type === "stagking") this._unlockAchievement("legendaryHunter");
       }
       if (e.st.scout) {
         this._scoutId = null;
@@ -1140,17 +1780,14 @@ export var Game = class {
       const nightMult = (this.wave.wave + 1) % CFG.wave.nightEvery === 0 ? CFG.wave.nightBountyMult : 1;
       const bw = Math.round(b.wood * this.boonMult.bounty * nightMult);
       const bs2 = Math.round(b.stone * this.boonMult.bounty * nightMult);
-      const gotShard = e.st.shardChance && Math.random() < e.st.shardChance;
       if (this.shared) {
         this.pools.team.wood += bw;
         this.pools.team.stone += bs2;
-        if (gotShard) this.pools.team.shard = (this.pools.team.shard || 0) + 1;
       } else {
         for (const p2 of this.players.values()) {
           const pool = this._poolOf(p2.id);
           pool.wood += bw;
           pool.stone += bs2;
-          if (gotShard) pool.shard = (pool.shard || 0) + 1;
         }
       }
       if (e._loot) {
@@ -1173,7 +1810,7 @@ export var Game = class {
       if (e.type === "treasure") {
         this._treasureId = null;
         this.fx.burst(e.x, 1.2, e.z, 16766720, 18, 6);
-        this.ui?.toast(gotShard ? "🦀 보물게 처치! 목재·광물 두둑히 + 💠 정수 1" : "🦀 보물게 처치! 목재·광물을 두둑히 챙겼다", "good");
+        this.ui?.toast("🦀 보물게 처치! 목재·광물을 두둑히 챙겼다", "good");
         this.stats.treasuresCaught = (this.stats.treasuresCaught || 0) + 1;
         if (this.stats.treasuresCaught >= 5) this._unlockAchievement("treasureHunter");
         if (this.stats.animalsHunted >= 10) this._unlockAchievement("hunter");
@@ -1182,8 +1819,15 @@ export var Game = class {
         this.stats.mimicsKilled = (this.stats.mimicsKilled || 0) + 1;
         if (this.stats.mimicsKilled >= 3) this._unlockAchievement("mimicHunter");
       }
+      if (e.type === "golem") {
+        this.fx.burst(e.x, 1.2, e.z, 9080729, 20, 6);
+        this.ui?.toast(`🪨 돌 파수꾼 처치! 쌓아둔 자재를 통째로 얻었다 — 🪵+${bw} 🪨+${bs2}`, "good");
+        this.stats.golemsDefeated = (this.stats.golemsDefeated || 0) + 1;
+        if (this.stats.golemsDefeated >= 3) this._unlockAchievement("stoneBreaker");
+      }
       this.enemyMgr.kill(e);
     }
+    return { died, applied };
   }
   // 폭탄병이 죽는 순간(원인 불문 — 타워든 근접이든 폭탄이든) 그 자리에서 터진다.
   // 크리스탈·건물·플레이어만 맞는다(다른 몬스터는 대상이 아니다 — 순수 위협이지 파밍 수단이 아니다)
@@ -1214,6 +1858,7 @@ export var Game = class {
     }
   }
   _hurtLocal(dmg) {
+    if (this.local.invulnerable) return;
     if (this._lastStandReady && this.local.alive && this.local.hp - dmg <= 0) {
       this._lastStandReady = false;
       this.local.hp = Math.max(1, Math.round(this.local.maxHp * 0.15));
@@ -1224,7 +1869,7 @@ export var Game = class {
       this.sfx.shard();
       return;
     }
-    const down = this.local.damage(dmg);
+    const down = this.local.damage(dmg, this.boonMult.downTimeMult);
     this.fx.float(`-${dmg}`, this.local.x, 2.2, this.local.z, "hurt");
     this.ui?.shake();
     if (down) {
@@ -1235,6 +1880,7 @@ export var Game = class {
     }
   }
   _grantReward(reward) {
+    this.stats.shardEarned = (this.stats.shardEarned || 0) + reward.shard;
     if (this.shared) {
       this.pools.team.wood += reward.wood;
       this.pools.team.stone += reward.stone;
@@ -1250,17 +1896,24 @@ export var Game = class {
   }
   _win() {
     if (this.result) return;
+    Math.random = _nativeRandom;
     this.wave.phase = PHASE.WON;
     this.result = "win";
     this.sfx.win();
     this.sfx.music.stop();
     if (this.difficulty === "hard") this._unlockAchievement("ironWill");
     if (this.difficulty === "nightmare") this._unlockAchievement("nightmareConqueror");
+    if (this.difficulty === "hell") this._unlockAchievement("hellConqueror");
+    if (this.world.biome === "volcano") this._unlockAchievement("volcanoMaster");
+    if (this.world.biome === "swamp") this._unlockAchievement("swampSurvivor");
+    if (this.world.biome === "tundra") this._unlockAchievement("frostWalker");
+    this._checkTeamEffort();
     if (!this.net.online) Game.clearLocalSave();
     this.ui?.showResult(true, this.stats, this.wave.wave);
   }
   _lose() {
     if (this.result) return;
+    Math.random = _nativeRandom;
     this.wave.lose();
     this.result = "lose";
     this.sfx.lose();
@@ -1272,9 +1925,12 @@ export var Game = class {
   // specialWaveKind)만 쓰기 때문에 호스트든 참가자든 같은 값을 넣으면 항상 같은 문구가 나온다 —
   // 참가자 화면(net.on("waveStarted"))에서도 별도 동기화 없이 그대로 재사용한다.
   _waveStartLabel(w2, total) {
-    const bossEntry = waveComposition(w2).find((c2) => CFG.enemies[c2.type]?.boss);
+    const bossEntries = bossEntriesOf(w2);
     let base;
-    if (bossEntry) base = `⚠️ 웨이브 ${w2} 시작! 보스 등장! ${CFG.enemies[bossEntry.type].icon} ${CFG.enemies[bossEntry.type].name} — 몬스터 ${total}마리`;
+    if (bossEntries.length >= 2) {
+      const names = bossEntries.map((c2) => `${CFG.enemies[c2.type].icon} ${CFG.enemies[c2.type].name}`).join(" + ");
+      base = `⚠️⚠️ 웨이브 ${w2} 시작! 보스 ${bossEntries.length}마리 동시 등장! ${names} — 몬스터 ${total}마리`;
+    } else if (bossEntries.length === 1) base = `⚠️ 웨이브 ${w2} 시작! 보스 등장! ${CFG.enemies[bossEntries[0].type].icon} ${CFG.enemies[bossEntries[0].type].name} — 몬스터 ${total}마리`;
     else {
       const kind = specialWaveKind(w2);
       base = kind ? `${SPECIAL_WAVES[kind].icon} 웨이브 ${w2} 시작! ${SPECIAL_WAVES[kind].name} 웨이브 — ${SPECIAL_WAVES[kind].desc} (몬스터 ${total}마리)` : `웨이브 ${w2} 시작! 몬스터 ${total}마리`;
@@ -1293,7 +1949,7 @@ export var Game = class {
       return;
     }
     if (ph2 === PHASE.COMBAT) {
-      const isBoss = waveComposition(this.wave.wave + 1).some((c2) => CFG.enemies[c2.type]?.boss);
+      const isBoss = bossEntriesOf(this.wave.wave + 1).length > 0;
       this.sfx.music.start(isBoss ? "boss" : "combat");
       return;
     }
@@ -1308,6 +1964,10 @@ export var Game = class {
   hostBuild(playerId, key, gx, gz) {
     const def = CFG.builds[key];
     if (!def) return;
+    if (!def.station && !this.hasStation("workbench")) {
+      this._notify(playerId, "제작대가 있어야 건설할 수 있습니다", "bad");
+      return;
+    }
     const pool = this._poolOf(playerId);
     if (!canAfford(pool, def.cost)) {
       this._notify(playerId, "자원이 부족합니다", "bad");
@@ -1321,20 +1981,23 @@ export var Game = class {
     payCost(pool, def.cost);
     this._trackSpend(def.cost, "build");
     this.stats.built++;
+    if (key === "wall" || key === "gate") this.stats.everBuiltWall = true;
+    if (b.isTower || b.isSupport) this.stats.everBuiltTower = true;
     if (key === "sniper" && !this._seenSniper) {
       this._seenSniper = true;
       this._notify(playerId, "🎯 저격탑 건설! 사거리 안에서 남은 체력이 가장 많은 적을 저격합니다 — 다른 타워보다 사거리가 훨씬 깁니다", "good");
     }
   }
+  // COST_KEYS(utils.js)를 그대로 따라간다 — 새 재료가 추가돼도 여기 손댈 필요 없이
+  // 결과 화면 "소모한 자원" 합계·항목별 내역에 자동으로 잡힌다(구리·석탄이 한 번 이미
+  // 이 목록에서 빠져 있었던 적이 있다 — 철처럼 하드코딩된 필드 3개만 갱신했었기 때문).
   _trackSpend(cost, kind) {
-    this.stats.spentWood += cost.wood || 0;
-    this.stats.spentStone += cost.stone || 0;
-    this.stats.spentIron += cost.iron || 0;
     const by = this.stats.spentBy[kind];
-    if (by) {
-      by.wood += cost.wood || 0;
-      by.stone += cost.stone || 0;
-      by.iron += cost.iron || 0;
+    for (const k2 of COST_KEYS) {
+      if (!cost[k2]) continue;
+      const capKey = "spent" + k2[0].toUpperCase() + k2.slice(1);
+      this.stats[capKey] = (this.stats[capKey] || 0) + cost[k2];
+      if (by) by[k2] = (by[k2] || 0) + cost[k2];
     }
   }
   requestUpgrade(id) {
@@ -1413,15 +2076,52 @@ export var Game = class {
     if (!b) return;
     const back = this.buildMgr.refund(b);
     const pool = this._poolOf(playerId);
-    pool.wood += back.wood;
-    pool.stone += back.stone;
-    pool.iron = (pool.iron || 0) + back.iron;
+    for (const k2 of COST_KEYS) if (back[k2]) pool[k2] = (pool[k2] || 0) + back[k2];
     this.fx.burst(b.x, 1.2, b.z, 12558682, 10, 4);
     this.buildMgr.remove(id);
+  }
+  // 철거(50% 손실) 후 재건축보다 싸게 자리를 옮기는 대안 — 레벨·특화·체력·탄약은
+  // 그대로 두고 위치만 바꾼다. buildMgr.relocate가 canPlace 판정까지 함께 하므로 여기서는
+  // 비용만 확인한다(hostBuild가 buildMgr.place에 배치 판정을 위임하는 것과 같은 구조).
+  requestRelocate(id, gx, gz) {
+    if (this.isHost) this.hostRelocate(this.local.id, id, gx, gz);
+    else this.net.send("relocate", { id, gx, gz });
+  }
+  hostRelocate(playerId, id, gx, gz) {
+    const b = this.buildMgr.buildings.get(id);
+    if (!b) return;
+    const cost = this.buildMgr.relocateCost(b);
+    const pool = this._poolOf(playerId);
+    if (!canAfford(pool, cost)) {
+      this._notify(playerId, "자원이 부족합니다", "bad");
+      return;
+    }
+    const moved = this.buildMgr.relocate(b, gx, gz);
+    if (!moved) {
+      this._notify(playerId, "그 자리로는 옮길 수 없습니다", "bad");
+      return;
+    }
+    payCost(pool, cost);
+    this._trackSpend(cost, "repair");
+    this._notify(playerId, `${b.def.icon} ${b.def.name} 이동 완료`, "good");
+    if (playerId === this.local.id) this.sfx.upgrade();
   }
   requestRepair(id) {
     if (this.isHost) this.hostRepair(this.local.id, id);
     else this.net.send("repair", { id });
+  }
+  // 우선순위 모드(O)에서 타워를 클릭하면 4가지(위협적인 순·가까운 순·체력 많은 순·체력 적은 순)를
+  // 순서대로 돌린다 — sell/repair와 완전히 같은 host-authoritative 배관, 결과는 buildMgr.snapshot()의
+  // 새 필드로 자동 동기화된다
+  requestTargetPriority(id) {
+    if (this.isHost) this.hostTargetPriority(this.local.id, id);
+    else this.net.send("targetPriority", { id });
+  }
+  hostTargetPriority(playerId, id) {
+    const mode = this.buildMgr.cycleTargetPriority(id);
+    if (!mode) return;
+    const b = this.buildMgr.buildings.get(id);
+    this._notify(playerId, `${b.def.icon} ${b.def.name} 우선순위: ${TARGET_PRIORITY_LABEL[mode]}`, "good");
   }
   hostRepair(playerId, id) {
     const b = this.buildMgr.buildings.get(id);
@@ -1471,6 +2171,7 @@ export var Game = class {
     else pool.stone += amount;
     this.world.consumeNode(node);
     this.stats.harvested += amount;
+    if (this.stats.harvested >= 1e3) this._unlockAchievement("harvestKing");
     this._notifyGain(playerId, node.type, amount, node);
   }
   // 미믹 노드였음이 드러났을 때: 자원 대신 그 자리에서 몬스터를 소환한다. 소환된 개체는 곧바로
@@ -1495,7 +2196,7 @@ export var Game = class {
       this._requestShoot(aim);
       return;
     }
-    if (!this.local.tryAttack()) return;
+    if (!this.local.tryAttack(this.boonMult.atkSpeedMult)) return;
     this.sfx.meleeSwing();
     this.fx.burst(
       this.local.x + Math.sin(this.local.rot) * 1.4,
@@ -1518,7 +2219,7 @@ export var Game = class {
     }
     const pointer = aim || this.sm.updatePointerWorld();
     if (!pointer) return;
-    if (!this.local.tryThrow()) return;
+    if (!this.local.tryThrow(this.boonMult.atkSpeedMult)) return;
     const dx = pointer.x - this.local.x, dz = pointer.z - this.local.z;
     const len = Math.hypot(dx, dz) || 1;
     const clamped = Math.min(len, cfg.range);
@@ -1543,7 +2244,7 @@ export var Game = class {
     const cfg = this.local.shootStats;
     const pointer = aim || this.sm.updatePointerWorld();
     if (!pointer) return;
-    if (!this.local.tryShoot()) return;
+    if (!this.local.tryShoot(this.boonMult.atkSpeedMult)) return;
     const dx = pointer.x - this.local.x, dz = pointer.z - this.local.z;
     const len = Math.hypot(dx, dz) || 1;
     const clamped = Math.min(len, cfg.range);
@@ -1627,16 +2328,17 @@ export var Game = class {
   // 건설·공격처럼 호스트 검증이 필요 없다(자원도 안 쓰고 되돌릴 상태도 없다). 스팸을 막는
   // 쿨다운만 로컬에서 걸고, 신호 자체는 그대로 방송한다 — 찍은 사람도 자기 화면에서 똑같이 보여야
   // "제대로 찍혔는지" 확인이 되므로 로컬에도 바로 표시한다.
-  requestPing(x2, z2) {
+  requestPing(x2, z2, kind = "look") {
     if (this._pingCd > 0) return;
     this._pingCd = CFG.player.pingCooldown;
-    this._showPing(x2, z2);
-    this.net.send("ping", { x: x2, z: z2, name: this.local.name });
+    this._showPing(x2, z2, null, kind);
+    this.net.send("ping", { x: x2, z: z2, name: this.local.name, kind });
   }
-  _showPing(x2, z2, name) {
-    this.fx.pingMarker(x2, z2);
+  _showPing(x2, z2, name, kind = "look") {
+    const pk = PING_KINDS[kind] || PING_KINDS.look;
+    this.fx.pingMarker(x2, z2, pk.color, pk.css);
     this.sfx.upgrade();
-    if (name) this.ui?.toast(`📍 ${name}: 여기 봐주세요!`, "warn");
+    if (name) this.ui?.toast(`${pk.icon} ${name}: ${pk.text}`, kind === "help" ? "bad" : "warn");
   }
   // 크리스탈 체력이 위험 문턱 아래면 "필사의 반격" — 플레이어(근접·폭탄)의 대미지가 오른다.
   // 타워에는 적용하지 않는다: 위기에서 직접 뛰어들 이유를 만드는 게 목적이라 자동 화력은 제외.
@@ -1648,6 +2350,7 @@ export var Game = class {
     const a = this.players.get(playerId)?.attackStats ?? CFG.player.attack;
     const dmg = Math.round(a.dmg * this.boonMult.atk * this.tempBoon.atk * this.feastMightMult * this._desperationMult);
     let thornDmg = 0;
+    let lifestealHeal = 0;
     for (const e of this.enemyMgr.list) {
       if (e.dead) continue;
       const d2 = dist(x2, z2, e.x, e.z);
@@ -1655,7 +2358,7 @@ export var Game = class {
       const ang = Math.atan2(e.x - x2, e.z - z2);
       let diff = Math.abs((ang - rot + Math.PI) % (Math.PI * 2) - Math.PI);
       if (diff > a.arc) continue;
-      this._hurtEnemy(e, dmg, "player", x2, z2, playerId);
+      const { applied } = this._hurtEnemy(e, dmg, "player", x2, z2, playerId);
       if (!e.dead && this.boonMult.venomChance && Math.random() < this.boonMult.venomChance) {
         e.applyPoison(CFG.boons.venom.dps, CFG.boons.venom.duration, performance.now() / 1e3);
       }
@@ -1666,7 +2369,8 @@ export var Game = class {
           this.ui?.toast("❄️ 얼음도끼가 적을 둔화시켰다! 서리탑 없이도 직접 늦춰서 붙잡아 둘 수 있다", "good");
         }
       }
-      if (e.variant === "thorn") thornDmg += Math.round(dmg * CFG.variants.thorn.reflectPct);
+      if (e.variant === "thorn") thornDmg += Math.round(applied * CFG.variants.thorn.reflectPct);
+      if (a.lifesteal) lifestealHeal += applied * a.lifesteal;
       if (a.knockback && !e.dead) {
         const kd = Math.max(d2, 0.4);
         e.x += (e.x - x2) / kd * a.knockback;
@@ -1678,6 +2382,13 @@ export var Game = class {
       }
     }
     if (thornDmg > 0) this._reflectThorns(playerId, thornDmg, x2, z2);
+    if (lifestealHeal > 0) {
+      this._healPlayer(playerId, Math.round(lifestealHeal));
+      if (!this._seenDagger) {
+        this._seenDagger = true;
+        this.ui?.toast("🔪 단검이 입힌 피해의 일부를 체력으로 돌려줬다! 무리 속에서도 계속 때리며 버틸 수 있다", "good");
+      }
+    }
   }
   // 가시 변종에게 근접으로 맞힌 만큼 되돌려 받는다 — onPlayerHit(몬스터가 플레이어를 때릴 때)과
   // 같은 로컬/원격 분기를 그대로 재사용해 새 네트워크 메시지가 필요 없었다
@@ -1690,9 +2401,26 @@ export var Game = class {
     this.fx.burst(x2, 1, z2, CFG.variants.thorn.tint, 8, 3);
   }
   requestStartWave() {
-    if (this.isHost) {
-      if (this.wave.startWave()) this.net.send("waveStarted", {});
-    } else this.net.send("startWave", {});
+    if (this.isHost) this.hostStartWave();
+    else this.net.send("startWave", {});
+  }
+  // 조기 시작 보너스 계산은 wave.startWave()가 prepLeft를 건드리기 전에 먼저 읽어야 한다 —
+  // 자연 만료로 시작되는 경우(update()의 prepLeft<=0 분기)는 여기를 거치지 않으므로 애초에
+  // 보너스가 붙지 않는다.
+  hostStartWave() {
+    const prepLeft = this.wave.prepLeft;
+    const bonus = prepLeft > CFG.wave.earlyStartMinTime ? {
+      wood: Math.round(prepLeft * CFG.wave.earlyStartWoodRate),
+      stone: Math.round(prepLeft * CFG.wave.earlyStartStoneRate)
+    } : null;
+    if (!this.wave.startWave()) return;
+    if (bonus) {
+      this._grantReward({ wood: bonus.wood, stone: bonus.stone, shard: 0 });
+      this.ui?.toast(`⏩ 조기 시작 보너스! 🪵${bonus.wood} 🪨${bonus.stone} (남은 준비 시간 ${Math.ceil(prepLeft)}초를 자원으로 환산)`, "good");
+      this.stats.earlyStarts++;
+      if (this.stats.earlyStarts >= 5) this._unlockAchievement("earlyBird");
+    }
+    this.net.send("waveStarted", { bonus });
   }
   requestContinueEndless() {
     if (this.isHost) this.hostContinueEndless(this.local.id);
@@ -1728,6 +2456,35 @@ export var Game = class {
     this._notify(playerId, `채집 속도 Lv.${p2.harvestLv}`, "good");
     if (playerId === this.local.id) this.sfx.upgrade();
     else this.net.send("hupOk", { to: playerId, lv: p2.harvestLv });
+  }
+  requestOutfitUpgrade() {
+    if (this.isHost) this.hostOutfitUpgrade(this.local.id);
+    else this.net.send("outfitUp", {});
+  }
+  hostOutfitUpgrade(playerId) {
+    const p2 = this.players.get(playerId);
+    if (!p2) return;
+    const next = CFG.outfit.tiers[p2.outfitLv];
+    if (!next) {
+      this._notify(playerId, "방어구가 최고 단계입니다", "bad");
+      return;
+    }
+    if (!this.hasStation("workbench")) {
+      this._notify(playerId, "제작대가 있어야 만들 수 있습니다", "bad");
+      return;
+    }
+    const pool = this._poolOf(playerId);
+    if (!canAfford(pool, next.cost)) {
+      this._notify(playerId, "자원이 부족합니다", "bad");
+      return;
+    }
+    payCost(pool, next.cost);
+    this._trackSpend(next.cost, "craft");
+    p2.outfitLv += 1;
+    this._notify(playerId, `${next.icon} ${next.name} 착용`, "good");
+    if (p2.outfitLv >= CFG.outfit.maxLv) this._unlockAchievement("fullyArmored", playerId);
+    if (playerId === this.local.id) this.sfx.upgrade();
+    else this.net.send("outfitUpOk", { to: playerId, lv: p2.outfitLv });
   }
   // 화면을 클릭했을 때 — 가리킨 것이 몬스터면 때리고, 자원이면 캔다. 아무것도 없으면 그냥 휘두른다.
   // 채집 버튼 없이 대상을 직접 눌러 상호작용하는 게 기본 조작이다.
@@ -1766,7 +2523,7 @@ export var Game = class {
         this.ui?.toast(this.local.tools.pickaxe ? "곡괭이를 손에 쥐어야 캘 수 있습니다 (좌상단 도구 아이콘)" : "곡괭이가 있어야 캘 수 있습니다 (제작대에서 제작)", "bad");
         return;
       }
-      if (this.local.beginHarvest(node)) this.sfx.click();
+      if (this.local.beginHarvest(node, this.world)) this.sfx.click();
       return;
     }
     this.requestAttack();
@@ -1829,6 +2586,9 @@ export var Game = class {
     payCost(pool, recipe.cost);
     this._trackSpend(recipe.cost, "craft");
     p2.tools[key] = true;
+    if (p2.weaponProficiencyLv > 0 && CFG.weaponUpgrade.perLv[key] && (p2.weaponLv[key] || 0) < p2.weaponProficiencyLv) {
+      p2.weaponLv[key] = p2.weaponProficiencyLv;
+    }
     this._notify(playerId, `${recipe.name} 완성! ${recipe.desc}`, "good");
     if (playerId === this.local.id) this.sfx.upgrade();
     else this.net.send("craftOk", { to: playerId, key });
@@ -1951,7 +2711,7 @@ export var Game = class {
           this.ui?.toast("🏭 병기창이 주변 타워에 탄약을 보급하기 시작했다! 재고만 채워 두면 알아서 장전된다", "good");
         }
       }
-      b._supplyAccum = budget;
+      b._supplyAccum = Math.min(budget, 1);
     }
   }
   // 무기 강화 다음 레벨의 철 비용
@@ -2061,6 +2821,8 @@ export var Game = class {
     }
     this.fx.ring(0, 0, 16763904, 6.5);
     this.fx.float(`${def.icon} ${def.name} Lv.${c2[lvKey]}`, 0, 5, 0, "good");
+    const allMaxed = Object.keys(CFG.crystalUpgrade).filter((k2) => k2 !== "maxLv").every((k2) => c2[k2 + "Lv"] >= CFG.crystalUpgrade.maxLv);
+    if (allMaxed) this._unlockAchievement("crystalAscendant", playerId);
   }
   // 재생·오라 강화 효과를 매 프레임 적용한다 (호스트만 계산, hp 변화는 스냅샷으로 참가자에게 전파됨)
   _updateCrystalUpgrades(dt2) {
@@ -2078,6 +2840,43 @@ export var Game = class {
         const targets = this.enemyMgr.list.filter((e) => !e.dead && dist(e.x, e.z, 0, 0) <= u2.aura.radius);
         for (const e of targets) this._hurtEnemy(e, dmg, "player", 0, 0);
         if (targets.length) this.fx.ring(0, 0, 6739199, u2.aura.radius);
+      }
+    }
+    if (c2.judgeLv > 0) {
+      c2._judgeTimer -= dt2;
+      if (c2._judgeTimer <= 0) {
+        c2._judgeTimer = u2.judge.tickTime;
+        const targets = this.enemyMgr.list.filter((e) => !e.dead && !e.st.boss && e.hp / e.maxHp <= u2.judge.thresholdPct && dist(e.x, e.z, 0, 0) <= u2.judge.radius);
+        for (const e of targets) this._hurtEnemy(e, e.hp, "player", 0, 0);
+        if (targets.length) this.fx.ring(0, 0, 16763955, u2.judge.radius);
+      }
+    }
+    if (c2.shockLv > 0) {
+      c2._shockTimer -= dt2;
+      if (c2._shockTimer <= 0) {
+        c2._shockTimer = u2.shock.tickTime;
+        const force = u2.shock.forcePerLv * c2.shockLv;
+        const targets = this.enemyMgr.list.filter((e) => !e.dead && dist(e.x, e.z, 0, 0) <= u2.shock.radius);
+        for (const e of targets) {
+          const d2 = Math.max(dist(e.x, e.z, 0, 0), 0.4);
+          e.x += e.x / d2 * force;
+          e.z += e.z / d2 * force;
+        }
+        if (targets.length) {
+          this.fx.ring(0, 0, 8956927, u2.shock.radius);
+          this.sfx.buildingHit();
+        }
+      }
+    }
+    if (c2.resonanceLv > 0) {
+      c2._resonanceTimer -= dt2;
+      if (c2._resonanceTimer <= 0) {
+        c2._resonanceTimer = u2.resonance.tickTime;
+        const now = performance.now() / 1e3;
+        const dmg = u2.resonance.dmgPerLv * c2.resonanceLv;
+        const targets = this.enemyMgr.list.filter((e) => !e.dead && (now < e.slowUntil || now < e.rootUntil) && dist(e.x, e.z, 0, 0) <= u2.resonance.radius);
+        for (const e of targets) this._hurtEnemy(e, dmg, "player", 0, 0);
+        if (targets.length) this.fx.ring(0, 0, 11800063, u2.resonance.radius);
       }
     }
   }
@@ -2124,10 +2923,11 @@ export var Game = class {
       const cfg = CFG.harvest[target.type];
       const pool = this._poolOf(b.ownerId);
       const amount = cfg.yield;
-      if (target.type === "tree") pool.wood += amount;
-      else pool.stone += amount;
+      const resKey = target.type === "tree" ? "wood" : target.type === "rock" ? "stone" : target.type;
+      pool[resKey] = (pool[resKey] || 0) + amount;
       this.world.consumeNode(target);
       this.stats.harvested += amount;
+      if (this.stats.harvested >= 1e3) this._unlockAchievement("harvestKing");
       this.fx.burst(target.x, 1, target.z, target.type === "tree" ? 5979428 : 9146266, 6, 3);
       if (!this._seenHarvester) {
         this._seenHarvester = true;
@@ -2152,6 +2952,31 @@ export var Game = class {
         if (!this._seenRepairPost) {
           this._seenRepairPost = true;
           this.ui?.toast("🔧 정비소가 주변 손상된 건물을 스스로 고치기 시작했다! 수리하러 뛰어다니지 않아도 방어선이 버틴다", "good");
+        }
+      }
+    }
+  }
+  // ⛺ 치유소 — 정비소와 정확히 같은 호스트 전용 반경 순회를 쓰되, 대상이 건물이 아니라
+  // 팀 플레이어들이다. 기본 회복(CFG.player.regen)은 최근에 안 맞았을 때만 도는데, 이건 방금
+  // 맞았어도(전투 중이어도) 계속 적용된다 — 최전선 바로 뒤에 지어 두면 그 자리 자체가
+  // 안전지대가 된다. 쓰러진(alive===false) 플레이어는 hp가 0으로 고정된 채 부활 타이머만
+  // 도는 상태라 여기서 건드리면 안 된다(부활은 크리스탈 옆에서만 일어난다).
+  _updateHealCamps(dt2) {
+    if (!this.isHost) return;
+    for (const b of this.buildMgr.buildings.values()) {
+      if (!b.isHealCamp) continue;
+      const st = b.stats;
+      for (const p2 of this.players.values()) {
+        if (!p2.alive || p2.hp >= p2.maxHp) continue;
+        if (dist(b.x, b.z, p2.x, p2.z) > st.healRadius) continue;
+        const healed = Math.min(st.healRate * dt2, p2.maxHp - p2.hp);
+        if (healed <= 0) continue;
+        this._healPlayer(p2.id, healed);
+        this.stats.campHealed = (this.stats.campHealed || 0) + healed;
+        if (this.stats.campHealed >= 500) this._unlockAchievement("haven");
+        if (!this._seenHealCamp) {
+          this._seenHealCamp = true;
+          this.ui?.toast("⛺ 치유소가 반경 안 플레이어를 회복시키기 시작했다! 전투 중에도 계속 적용된다 — 최전선의 안전지대", "good");
         }
       }
     }
@@ -2358,11 +3183,41 @@ export var Game = class {
     }
     this.world.setSpirit(sp2.x, sp2.z, sp2.timeLeft);
   }
+  // 코어 폭주 — 다른 여섯 스킬과 달리 고정 비용이 없다. _skillCost 를 안 거치고 가진 정수
+  // 전부(pool.shard)를 그대로 소모량이자 위력 배율로 쓴다 — 많이 모아 둘수록 세지지만, 다른
+  // 스킬·크리스탈 강화·서리탑에 쓸 밑천도 같이 사라진다. blast 와 같은 "내 주변 원형 피해"
+  // 판정을 그대로 재사용하되 반경·피해만 압도적으로 크다.
+  requestSkillOverload() {
+    this.sfx.shard();
+    if (this.isHost) this.hostSkillOverload(this.local.id);
+    else this.net.send("skillOverload", {});
+  }
+  hostSkillOverload(playerId) {
+    const s2 = CFG.skills.overload;
+    const p2 = this.players.get(playerId);
+    const pool = this._poolOf(playerId);
+    if (!p2) return;
+    const spend = pool.shard || 0;
+    if (spend < s2.minCost) {
+      this._notify(playerId, `수정 정수가 부족합니다 (최소 ${s2.minCost} 필요)`, "bad");
+      return;
+    }
+    pool.shard = 0;
+    this._unlockAchievement("skillUser", playerId);
+    const dmg = spend * s2.dmgPerShard;
+    const targets = this.enemyMgr.list.filter((e) => !e.dead && dist(e.x, e.z, p2.x, p2.z) <= s2.radius);
+    for (const e of targets) this._hurtEnemy(e, dmg, "player", p2.x, p2.z);
+    this.fx.ring(p2.x, p2.z, 16729156, s2.radius);
+    this.fx.burst(p2.x, 1.6, p2.z, 16729156, 32, 9);
+    this.ui?.shake();
+    this._notify(playerId, `🌋 코어 폭주! 정수 ${spend}개를 태워 적 ${targets.length}마리에게 ${dmg} 피해`, "good");
+  }
   requestTame() {
     if (this.isHost) this.hostTame(this.local.id);
     else this.net.send("tame", {});
   }
-  // 여우·늑대만 길들일 수 있다(둘 다 wild:true). 초식동물(토끼·사슴·멧돼지) 생고기를 미끼로
+  // 여우·늑대·곰만 길들일 수 있다(CFG.tame 에 정의된 셋만, 전부 wild:true). 초식동물
+  // (토끼·사슴·멧돼지) 생고기를 미끼로
   // 쓰며, 성공/실패 모두 미끼를 소모한다 — 도망 다니는 걸 잡아 쓰다듬는 흉내라 몇 번이고
   // 다시 시도할 수 있지만, 그때마다 실제 자원이 든다. 팀 전체 동료 1마리 제한은 정령 소환과
   // 같은 원칙 — 나눠서 여러 마리를 부리며 화력을 불리지 못하게 막는다.
@@ -2383,7 +3238,7 @@ export var Game = class {
       }
     }
     if (!target) {
-      this._notify(playerId, "근처에 길들일 수 있는 여우나 늑대가 없습니다", "bad");
+      this._notify(playerId, "근처에 길들일 수 있는 여우·늑대·곰·전설의 사슴왕이 없습니다", "bad");
       return;
     }
     const pool = this._poolOf(playerId);
@@ -2406,6 +3261,7 @@ export var Game = class {
       this._pet = { type: target.type, x: target.x, z: target.z, rot: 0, lv: 0, ownerId: playerId, cd: 0 };
       this.world.setPet(target.x, target.z, target.type, 0);
       this._unlockAchievement("tamer", playerId);
+      if (target.type === "stagking") this._unlockAchievement("legendaryTamer", playerId);
       this.fx.burst(target.x, 1, target.z, tc2.color, 14, 5);
       this._notify(playerId, `${tc2.icon} ${tc2.name}을(를) 길들였다! 이제부터 나를 따라다니며 적을 공격한다`, "good");
     } else {
@@ -2448,6 +3304,51 @@ export var Game = class {
       this._notify(playerId, `${tc2.icon} ${tc2.name}에게 먹이를 줬다 — 레벨 ${pet.lv} (공격력·공격속도 상승)`, "good");
     }
   }
+  // 🪨 포탈 봉쇄 — 준비 시간에 열려 있는 포탈 옆에서 자원을 태워 그 포탈을 다음 전투 한 판 동안
+  // 막는다. 적 총수는 waveComposition이 그대로 정하고 스폰 지점만 나머지 포탈로 몰리므로,
+  // "이 방향은 확실히 막고 저 방향은 더 세게 받는다"는 배치 선택이 된다. tame과 같은 구조로
+  // 근접 대상(가장 가까운 열린 포탈)을 찾아 판정한다.
+  requestSealPortal() {
+    if (this.isHost) this.hostSealPortal(this.local.id);
+    else this.net.send("sealPortal", {});
+  }
+  hostSealPortal(playerId) {
+    if (this.wave.phase !== PHASE.PREP) {
+      this._notify(playerId, "전투 중에는 포탈을 봉쇄할 수 없습니다 — 준비 시간에만 가능합니다", "bad");
+      return;
+    }
+    const p2 = this.players.get(playerId);
+    if (!p2) return;
+    const open = this.world.portals.filter((po2) => !po2.sealed);
+    let target = null, bestD = CFG.portalSeal.radius;
+    for (const po2 of open) {
+      const d2 = dist(p2.x, p2.z, po2.x, po2.z);
+      if (d2 < bestD) {
+        bestD = d2;
+        target = po2;
+      }
+    }
+    if (!target) {
+      this._notify(playerId, "근처에 봉쇄할 수 있는 열린 포탈이 없습니다", "bad");
+      return;
+    }
+    if (open.length <= 1) {
+      this._notify(playerId, "마지막 남은 포탈은 봉쇄할 수 없습니다 — 적이 나올 곳이 없어집니다", "bad");
+      return;
+    }
+    const cost = portalSealCost(this.wave.wave + 1);
+    const pool = this._poolOf(playerId);
+    if (!canAfford(pool, cost)) {
+      this._notify(playerId, `자원이 부족합니다 (${costText(cost)} 필요)`, "bad");
+      return;
+    }
+    payCost(pool, cost);
+    this._trackSpend(cost, "portalSeal");
+    target.sealed = true;
+    this.fx.ring(target.x, target.z, 4407619, 3.2);
+    if (playerId === this.local.id) this.sfx.upgrade();
+    this._notify(playerId, `🪨 포탈을 봉쇄했다 — 다음 웨이브 동안 이쪽에서는 적이 나오지 않는다 (나머지 포탈에 더 몰린다)`, "good");
+  }
   requestReleasePet() {
     if (this.isHost) this.hostReleasePet(this.local.id);
     else this.net.send("releasePet", {});
@@ -2476,7 +3377,7 @@ export var Game = class {
     const type = pt2.type;
     const tc2 = CFG.tame[type];
     const lv = pt2.lv || 0;
-    const petDmg = tc2.dmg * Math.pow(CFG.tame.lvDmgMult, lv);
+    const petDmg = tc2.dmg * Math.pow(CFG.tame.lvDmgMult, lv) * this.boonMult.petDmgMult;
     const petRate = tc2.rate * Math.pow(CFG.tame.lvRateMult, lv);
     let target = null, bestD = tc2.range;
     for (const e of this.enemyMgr.list) {
@@ -2510,23 +3411,45 @@ export var Game = class {
         pt2.z += dz / len * step;
       }
     }
+    if (lv >= CFG.tame.maxLevel) {
+      const awk = CFG.tame.petAwaken;
+      if (pt2.awakenCd === void 0) pt2.awakenCd = awk.interval;
+      pt2.awakenCd -= dt2;
+      if (pt2.awakenCd <= 0) {
+        pt2.awakenCd = awk.interval;
+        let hitAny = false;
+        for (const e of this.enemyMgr.list) {
+          if (e.dead || e.variant === "ward" || e.st.burrows && e.diving) continue;
+          if (dist(pt2.x, pt2.z, e.x, e.z) > awk.radius) continue;
+          this._hurtEnemy(e, Math.round(petDmg * awk.dmgMult), "player", pt2.x, pt2.z);
+          hitAny = true;
+        }
+        this.fx.ring(pt2.x, pt2.z, tc2.color, awk.radius);
+        this.fx.burst(pt2.x, 1, pt2.z, tc2.color, 16, 5);
+        if (hitAny && !this._petAwakenNotified) {
+          this._petAwakenNotified = true;
+          this._notify(pt2.ownerId, `${tc2.icon} ${tc2.name}이(가) 포효로 주변 적을 한꺼번에 후려쳤다! (최대 레벨 전용 공격)`, "good");
+        }
+      }
+    }
     this.world.setPet(pt2.x, pt2.z, type, pt2.rot, pt2.lv || 0);
   }
-  requestGive(toId, wood, stone) {
+  // key 는 COST_KEYS(wood·stone·copper·coal·iron·shard) 아무거나 — 재료 종류가 구리·석탄·정수로
+  // 늘어난 뒤에도 이 기능은 한동안 목재·광물 두 종류만 줄 수 있었다. 타워마다 요구하는 재료가
+  // 갈린 지금은, 목재만 넘치는 사람이 구리가 급한 동료를 못 도와주는 진짜 빈틈이었다.
+  requestGive(toId, key, amount) {
     this.sfx.click();
-    if (this.isHost) this.hostGive(this.local.id, toId, wood, stone);
-    else this.net.send("give", { to: toId, wood, stone });
+    if (this.isHost) this.hostGive(this.local.id, toId, key, amount);
+    else this.net.send("give", { to: toId, key, amount });
   }
-  hostGive(fromId, toId, wood, stone) {
+  hostGive(fromId, toId, key, amount) {
     if (this.shared) return;
     const from = this._poolOf(fromId), to2 = this._poolOf(toId);
-    wood = Math.max(0, Math.min(wood | 0, from.wood));
-    stone = Math.max(0, Math.min(stone | 0, from.stone));
-    from.wood -= wood;
-    from.stone -= stone;
-    to2.wood += wood;
-    to2.stone += stone;
-    this._notify(toId, `자원을 받았다 🪵${wood} 🪨${stone}`, "good");
+    const amt = Math.max(0, Math.min(amount | 0, from[key] || 0));
+    if (amt <= 0) return;
+    from[key] = (from[key] || 0) - amt;
+    to2[key] = (to2[key] || 0) + amt;
+    this._notify(toId, `자원을 받았다 ${RES_ICON[key]}${amt}`, "good");
   }
   // 협동 전용 — 만든 도구(칼·활·창·망치·폭탄가방)를 파티원에게 그대로 넘긴다.
   // 자원과 달리 shared 여부와 무관하게 항상 개인 소유라 언제든 넘길 수 있다.
@@ -2557,6 +3480,19 @@ export var Game = class {
     const lvNote = to2.weaponLv[key] ? ` (강화 Lv.${to2.weaponLv[key]})` : "";
     const specNote = to2.weaponSpec[key] ? ` ${CFG.weaponSpec[key][to2.weaponSpec[key]].icon} ${CFG.weaponSpec[key][to2.weaponSpec[key]].name} 특화` : "";
     this._notify(toId, `${def.icon} ${def.name}을(를) 받았다${lvNote}${specNote} — 인벤토리 장비 탭에서 손에 쥘 수 있다`, "good");
+  }
+  // playerId 소유의 hp 는 그 클라이언트 자신만 권위를 가진다 — "pos" 동기화가 매 프레임 자기
+  // hp를 그대로 실어 보내 덮어쓰므로, 호스트가 players.get(playerId).hp 를 직접 고쳐봐야 그
+  // 참가자 화면에는 전혀 반영되지 않고(호스트 자신의 화면에서만 잠깐 보이다) 다음 pos 패킷이
+  // 도착하는 순간 조용히 지워진다. _notify/_unlockAchievement 와 정확히 같은 "본인이면 로컬
+  // 처리, 아니면 net.send" 배관으로 고친다 — 단검 흡혈을 만들며 실제 2탭 멀티플레이로 참가자가
+  // 단검을 써도 체력이 전혀 안 느는 것을 발견해 추가했다.
+  _healPlayer(playerId, amount) {
+    if (playerId === this.local.id) {
+      this.local.hp = Math.min(this.local.maxHp, this.local.hp + amount);
+    } else {
+      this.net.send("heal", { to: playerId, amount });
+    }
   }
   _notify(playerId, text, kind) {
     if (playerId === this.local.id) {
@@ -2596,6 +3532,26 @@ export var Game = class {
       }
       this.ui?.toast(`${p2.name} 님이 나갔다`, "bad");
       this.ui?.refreshLobby();
+      if (this.isHost && !this._pet && this.world.pet) {
+        const wp = this.world.pet;
+        this._pet = { type: wp.type, x: wp.x, z: wp.z, rot: wp.rot || 0, lv: wp.lv || 0, ownerId: this.local.id, cd: 0 };
+      }
+      if (this.isHost && !this._rift && this.world.rift) {
+        const wr2 = this.world.rift;
+        this._rift = { x: wr2.x, z: wr2.z, timeLeft: wr2.timeLeft };
+      }
+      if (this.isHost && !this._spirit && this.world.spirit) {
+        const ws2 = this.world.spirit;
+        this._spirit = { x: ws2.x, z: ws2.z, ownerId: this.local.id, timeLeft: ws2.timeLeft, cd: 0 };
+      }
+      if (this.isHost && !this._meteorPending && this.world.meteor) {
+        const wm2 = this.world.meteor;
+        this._meteorPending = { x: wm2.x, z: wm2.z, timeLeft: wm2.timeLeft };
+      }
+      if (this.isHost && !this._crater && this.world.crater) {
+        const wc2 = this.world.crater;
+        this._crater = { x: wc2.x, z: wc2.z, timeLeft: wc2.timeLeft, tickTimer: 0 };
+      }
     });
     net.on("startGame", (d2) => {
       if (this.running && !this.result) return;
@@ -2610,7 +3566,14 @@ export var Game = class {
         this.players.set(from, p2);
         this._poolOf(from);
       }
+      const wasAlive = p2.alive;
       if (p2.applyNet) p2.applyNet(d2);
+      if (wasAlive && !p2.alive) {
+        this.ui?.toast(`🆘 ${p2.name}님이 쓰러졌다! 근처로 가면 더 빨리 되살아난다`, "bad");
+        this.sfx.playerDown();
+      } else if (!wasAlive && p2.alive) {
+        this.ui?.toast(`✅ ${p2.name}님이 다시 일어났다`, "good");
+      }
     });
     net.on("build", (d2, from) => {
       if (this.isHost) this.hostBuild(from, d2.key, d2.gx, d2.gz);
@@ -2627,8 +3590,14 @@ export var Game = class {
     net.on("sell", (d2, from) => {
       if (this.isHost) this.hostSell(from, d2.id);
     });
+    net.on("relocate", (d2, from) => {
+      if (this.isHost) this.hostRelocate(from, d2.id, d2.gx, d2.gz);
+    });
     net.on("repair", (d2, from) => {
       if (this.isHost) this.hostRepair(from, d2.id);
+    });
+    net.on("targetPriority", (d2, from) => {
+      if (this.isHost) this.hostTargetPriority(from, d2.id);
     });
     net.on("harvest", (d2, from) => {
       if (this.isHost) this.hostHarvest(from, d2.id, d2.x, d2.z);
@@ -2649,19 +3618,36 @@ export var Game = class {
       if (this.isHost) this.hostShootArrow(from, d2.x, d2.z, d2.tx, d2.tz);
     });
     net.on("startWave", (d2, from) => {
-      if (this.isHost && this.wave?.startWave()) this.net.send("waveStarted", {});
+      if (this.isHost) this.hostStartWave();
     });
     net.on("continueEndless", (d2, from) => {
       if (this.isHost) this.hostContinueEndless(from);
     });
+    net.on("boonOffer", (d2) => {
+      if (this.isHost) return;
+      this.pendingBoon = d2.keys;
+      this.pendingBoonTrigger = d2.trigger;
+      this.ui?.showBoonChoice(d2.keys, d2.trigger);
+    });
+    net.on("pickBoon", (d2) => {
+      if (this.isHost) this.pickBoon(d2.key);
+    });
     net.on("boonPicked", (d2) => {
-      if (!this.isHost) this.ui?.toast(d2.text, "good");
+      if (!this.isHost) {
+        this.ui?.toast(d2.text, "good");
+        this.pendingBoon = null;
+        this.pendingBoonTrigger = null;
+        this.ui?.hideBoonChoice();
+      }
     });
     net.on("ping", (d2) => {
-      this._showPing(d2.x, d2.z, d2.name);
+      this._showPing(d2.x, d2.z, d2.name, d2.kind);
     });
     net.on("hup", (d2, from) => {
       if (this.isHost) this.hostHarvestUpgrade(from);
+    });
+    net.on("outfitUp", (d2, from) => {
+      if (this.isHost) this.hostOutfitUpgrade(from);
     });
     net.on("craft", (d2, from) => {
       if (this.isHost) this.hostCraft(from, d2.key);
@@ -2699,8 +3685,17 @@ export var Game = class {
     net.on("skillSummon", (d2, from) => {
       if (this.isHost) this.hostSkillSummon(from);
     });
+    net.on("skillOverload", (d2, from) => {
+      if (this.isHost) this.hostSkillOverload(from);
+    });
     net.on("tame", (d2, from) => {
       if (this.isHost) this.hostTame(from);
+    });
+    net.on("sealPortal", (d2, from) => {
+      if (this.isHost) this.hostSealPortal(from);
+    });
+    net.on("riftRaid", (d2) => {
+      this._announceRiftRaid(d2.x, d2.z, d2.n);
     });
     net.on("releasePet", (d2, from) => {
       if (this.isHost) this.hostReleasePet(from);
@@ -2712,13 +3707,26 @@ export var Game = class {
       if (this.isHost) this.hostReload(from);
     });
     net.on("give", (d2, from) => {
-      if (this.isHost) this.hostGive(from, d2.to, d2.wood, d2.stone);
+      if (this.isHost) this.hostGive(from, d2.to, d2.key, d2.amount);
     });
     net.on("giveWeapon", (d2, from) => {
       if (this.isHost) this.hostGiveWeapon(from, d2.to, d2.key);
     });
     net.on("hurt", (d2) => {
       if (d2.to === net.selfId) this._hurtLocal(d2.dmg);
+    });
+    net.on("heal", (d2) => {
+      if (d2.to === net.selfId) this.local.hp = Math.min(this.local.maxHp, this.local.hp + d2.amount);
+    });
+    net.on("pull", (d2) => {
+      if (d2.to !== net.selfId) return;
+      this.local.x = d2.x;
+      this.local.z = d2.z;
+      this.local._collide(this.grid, this.world);
+      this.fx.burst(d2.x, 1.2, d2.z, 12592851, 8, 4);
+    });
+    net.on("blind", (d2) => {
+      if (d2.to === net.selfId) this.local.blindUntil = performance.now() / 1e3 + d2.dur;
     });
     net.on("unlockAch", (d2) => {
       if (d2.to === net.selfId) this._unlockAchievement(d2.key);
@@ -2740,6 +3748,12 @@ export var Game = class {
         this.sfx.upgrade();
       }
     });
+    net.on("outfitUpOk", (d2) => {
+      if (d2.to === net.selfId) {
+        this.local.outfitLv = d2.lv;
+        this.sfx.upgrade();
+      }
+    });
     net.on("craftOk", (d2) => {
       if (d2.to === net.selfId) {
         this.local.tools[d2.key] = true;
@@ -2755,12 +3769,13 @@ export var Game = class {
         this.sfx.upgrade();
       }
     });
-    net.on("waveStarted", () => {
+    net.on("waveStarted", (d2) => {
       if (!this.isHost) {
         const w2 = this.wave.wave + 1;
-        const total = waveComposition(w2).reduce((s2, c2) => s2 + c2.count, 0);
+        const total = waveComposition(w2, this.players.size).reduce((s2, c2) => s2 + c2.count, 0);
         this.ui?.toast(this._waveStartLabel(w2, total), "warn");
         this.sfx.waveStart();
+        if (d2?.bonus) this.ui?.toast(`⏩ 조기 시작 보너스! 🪵${d2.bonus.wood} 🪨${d2.bonus.stone}`, "good");
       }
     });
     net.on("snap", (d2, from) => {
@@ -2781,7 +3796,7 @@ export var Game = class {
   _snapshot() {
     const players = {};
     for (const p2 of this.players.values()) {
-      players[p2.id] = { hv: p2.harvestLv, tl: Object.keys(p2.tools).filter((k2) => p2.tools[k2]), eq: p2.equipped || null, wl: p2.weaponLv, ws: p2.weaponSpec, mh: p2.maxHp };
+      players[p2.id] = { hv: p2.harvestLv, tl: Object.keys(p2.tools).filter((k2) => p2.tools[k2]), eq: p2.equipped || null, wl: p2.weaponLv, ws: p2.weaponSpec, mh: p2.maxHp, ol: p2.outfitLv, wp: p2.weaponProficiencyLv };
     }
     return {
       e: this.enemyMgr.snapshot(),
@@ -2795,12 +3810,58 @@ export var Game = class {
       cr: this.world.crystal.regenLv,
       cx: this.world.crystal.auraLv,
       crf: this.world.crystal.reflectLv,
+      cj: this.world.crystal.judgeLv,
+      csk: this.world.crystal.shockLv,
+      cg: this.world.crystal.graceLv,
+      crn: this.world.crystal.resonanceLv,
+      cml: this.world.crystal.materielLv,
+      // 긴급 방벽(shieldUntil)도 호스트 로컬 performance.now() 기준 절대 시각이라 curseLeft와
+      // 같은 이유로 그대로 보내면 참가자 쪽에서 의미가 없다 — 남은 시간만 상대값으로 실어 보낸다.
+      // (이전까지는 이 필드 자체가 스냅샷에 없어서 참가자 화면에는 방벽 이펙트·HUD 카운트다운이
+      // 아예 안 보였다 — 실제 피해 차단은 호스트 전용 damageCrystal()이 이미 정확히 처리해서
+      // 경제·체력 동기화 자체는 안 어긋났지만, 참가자 입장에서는 "왜 크리스탈이 안 깎이지?" 하는
+      // 시각적 공백이었다.)
+      cs: this.world.crystal.shieldUntil > 0 ? Math.max(0, Math.round((this.world.crystal.shieldUntil - performance.now() / 1e3) * 10) / 10) : null,
       rf: this._rift ? [Math.round(this._rift.x * 10) / 10, Math.round(this._rift.z * 10) / 10, Math.round(this._rift.timeLeft * 10) / 10] : null,
       sp: this._spirit ? [Math.round(this._spirit.x * 10) / 10, Math.round(this._spirit.z * 10) / 10, Math.round(this._spirit.timeLeft * 10) / 10] : null,
       pt: this._pet ? [Math.round(this._pet.x * 10) / 10, Math.round(this._pet.z * 10) / 10, this._pet.type, Math.round(this._pet.rot * 100) / 100, this._pet.lv || 0] : null,
+      // 🪨 봉쇄된 포탈 — 포탈은 world.portals가 시드로 결정론적으로 만드는 정적 배열이라 위치는
+      // 다시 안 보내고, 봉쇄된 인덱스만 압축해서 보낸다. 참가자는 스폰을 직접 계산하지 않으니
+      // (호스트 전용, wave.update가 isHost 분기 안에서만 돈다) 순수 표시(3D 포탈 외형)용이다.
+      psl: this.world.portals.flatMap((po2, i) => po2.sealed ? [i] : []),
       mt: this._meteorPending ? [Math.round(this._meteorPending.x * 10) / 10, Math.round(this._meteorPending.z * 10) / 10, Math.round(this._meteorPending.timeLeft * 10) / 10] : null,
+      lc: this._crater ? [Math.round(this._crater.x * 10) / 10, Math.round(this._crater.z * 10) / 10, Math.round(this._crater.timeLeft * 10) / 10] : null,
+      // 늪지대 독가스 구덩이 — 위치는 결정론적(월드 시드)이라 다시 안 보내고, 각 구덩이의 단계만
+      // 한 글자로 압축해 보낸다(d=dormant, w=warn, a=active). 피해는 호스트만 계산하고 이 필드는
+      // 참가자 화면의 링 색 표시(경고·독가스 이펙트)만 맞추는 용도다.
+      //
+      // swt(남은 시간)도 같이 보낸다 — _specialKind와 똑같은 이유다: 참가자의 _swampTimers는
+      // begin()이 게임 시작 시 전부 dormant로 한 번 만든 뒤 이 스냅샷 없이는 그대로 방치되는데,
+      // 참가자가 호스트를 승계하는 순간 _updateSwampPits가 그 방치된(위상만 맞고 남은 시간은 틀린)
+      // 값을 그대로 쓰기 시작한다 — 예를 들어 실제로는 막 active로 들어간 구덩이인데 남은 시간이
+      // begin() 때의 초기 dormant 오프셋으로 남아 있으면 위상은 active인데 몇 초 뒤 dormant를
+      // 건너뛰고 곧장 warn으로 넘어가는 식으로 주기가 어긋난다.
+      sw: this._swampTimers.length ? this._swampTimers.map((t2) => t2.phase[0]).join("") : null,
+      swt: this._swampTimers.length ? this._swampTimers.map((t2) => Math.round(t2.timeLeft * 10) / 10) : null,
+      // 얼음판(설원) — 늪지대 sw/swt와 완전히 같은 이유·같은 형식으로 위상·남은 시간을 보낸다.
+      ip: this._icePitTimers.length ? this._icePitTimers.map((t2) => t2.phase[0]).join("") : null,
+      ipt: this._icePitTimers.length ? this._icePitTimers.map((t2) => Math.round(t2.timeLeft * 10) / 10) : null,
+      pb: Object.keys(this.pickedBoons).length ? this.pickedBoons : null,
       mc: this._merchant ? { offers: this._merchant.offers, boughtBy: this._merchant.boughtBy } : null,
-      tb: { atk: this.tempBoon.atk, towerDmg: this.tempBoon.towerDmg, speed: this.tempBoon.speed },
+      // atkWavesLeft/towerWavesLeft/speedWavesLeft는 참가자 동기화(_applySnapshot)엔 필요 없다
+      // (참가자는 매 스냅샷 host가 이미 감쇠시킨 배율 값만 그대로 반영하면 되고, 스스로
+      // _decayTempBoon()을 호출하지 않는다) — 하지만 solo 저장/이어하기(resumeLocal)는 이어서도
+      // 자기 자신이 host로서 계속 _decayTempBoon()을 호출하므로, 배율만 복원하고 남은 웨이브 수를
+      // 안 실으면 카운터가 0으로 리셋된 채라 그 물약 버프가 절대 안 풀리고 영구 지속되는 반대
+      // 방향의 버그가 생긴다. 그래서 여기서 항상 실어 보낸다 — 참가자는 그냥 안 쓰고 무시한다.
+      tb: {
+        atk: this.tempBoon.atk,
+        towerDmg: this.tempBoon.towerDmg,
+        speed: this.tempBoon.speed,
+        atkWavesLeft: this.tempBoon.atkWavesLeft,
+        towerWavesLeft: this.tempBoon.towerWavesLeft,
+        speedWavesLeft: this.tempBoon.speedWavesLeft
+      },
       // 잔치 효과(요리)는 상인 물약(tb)과 똑같이 팀 전체가 함께 받는 "누가 먹었든 파티 전원에게
       // 적용" 설계인데, 이 필드가 그동안 스냅샷에 실리지 않았다 — 호스트 자신이 먹었을 때는
       // this.local이 곧 호스트라 우연히 정상 동작했지만, 참가자가 먹으면 호스트의 this.feast는
@@ -2824,23 +3885,38 @@ export var Game = class {
         harvested: this.stats.harvested,
         built: this.stats.built,
         kills: this.stats.kills,
+        shardEarned: this.stats.shardEarned,
+        dmgByPlayer: this.stats.dmgByPlayer,
+        killsByPlayer: this.stats.killsByPlayer,
         spentWood: this.stats.spentWood,
         spentStone: this.stats.spentStone,
         spentIron: this.stats.spentIron,
+        spentCopper: this.stats.spentCopper,
+        spentCoal: this.stats.spentCoal,
+        spentShard: this.stats.spentShard,
         spentBy: this.stats.spentBy,
         waveLog: this.stats.waveLog,
         bossKillsSeen: this.stats.bossKillsSeen,
+        weathersSeen: this.stats.weathersSeen,
         trapsTriggered: this.stats.trapsTriggered,
         elitesKilled: this.stats.elitesKilled,
+        berserkKilled: this.stats.berserkKilled,
         treasuresCaught: this.stats.treasuresCaught,
+        golemsDefeated: this.stats.golemsDefeated,
         animalsHunted: this.stats.animalsHunted,
         comboCount: this.stats.comboCount,
+        critCount: this.stats.critCount,
+        parryCount: this.stats.parryCount,
         repairPostHealed: this.stats.repairPostHealed,
+        campHealed: this.stats.campHealed,
         mimicsKilled: this.stats.mimicsKilled,
         blocksCount: this.stats.blocksCount,
         relicsPicked: this.stats.relicsPicked,
         dishesCooked: this.stats.dishesCooked,
-        scoutsIntercepted: this.stats.scoutsIntercepted
+        scoutsIntercepted: this.stats.scoutsIntercepted,
+        earlyStarts: this.stats.earlyStarts,
+        everBuiltWall: this.stats.everBuiltWall,
+        everBuiltTower: this.stats.everBuiltTower
       }
     };
   }
@@ -2855,15 +3931,16 @@ export var Game = class {
     this.wave.applySnapshot(s2.w);
     if (this.wave.wave === prevWave + 1 && this.wave.phase !== PHASE.LOST) {
       const reward = waveReward(this.wave.wave);
+      const shardBonus = s2.bm?.shardBonus ?? this.boonMult.shardBonus;
+      if (shardBonus && reward.shard) reward.shard += shardBonus;
       const wonNow = this.wave.phase === PHASE.WON;
       this.ui?.toast(wonNow ? "마지막 웨이브 격퇴!" : `웨이브 ${this.wave.wave} 클리어! 보상 🪵${reward.wood} 🪨${reward.stone}${reward.shard ? ` 💠${reward.shard}` : ""}`, "good");
       if (!wonNow) this.sfx.waveClear();
       const clearedWave = this.wave.wave;
-      const buildings = [...this.buildMgr.buildings.values()];
       if (clearedWave % 5 === 0 && !this._pBossWaveDamaged) this._unlockAchievement("flawlessBoss");
       this._pBossWaveDamaged = false;
-      if (clearedWave >= 5 && !buildings.some((b) => b.key === "wall" || b.key === "gate")) this._unlockAchievement("noWall");
-      if (clearedWave >= 3 && !buildings.some((b) => b.isTower || b.isSupport)) {
+      if (clearedWave >= 5 && !s2.st?.everBuiltWall) this._unlockAchievement("noWall");
+      if (clearedWave >= 3 && !s2.st?.everBuiltTower) {
         this._unlockAchievement("noTower");
       }
     }
@@ -2873,6 +3950,12 @@ export var Game = class {
     if (s2.cr !== void 0) this.world.crystal.regenLv = s2.cr;
     if (s2.cx !== void 0) this.world.crystal.auraLv = s2.cx;
     if (s2.crf !== void 0) this.world.crystal.reflectLv = s2.crf;
+    if (s2.cj !== void 0) this.world.crystal.judgeLv = s2.cj;
+    if (s2.csk !== void 0) this.world.crystal.shockLv = s2.csk;
+    if (s2.cg !== void 0) this.world.crystal.graceLv = s2.cg;
+    if (s2.crn !== void 0) this.world.crystal.resonanceLv = s2.crn;
+    if (s2.cml !== void 0) this.world.crystal.materielLv = s2.cml;
+    this.world.crystal.shieldUntil = s2.cs != null ? performance.now() / 1e3 + s2.cs : 0;
     this.world.crystal.hp = s2.c;
     if (s2.c < prevHp) {
       this.ui?.shake();
@@ -2882,12 +3965,44 @@ export var Game = class {
     }
     if (s2.mt) this.world.setMeteor(s2.mt[0], s2.mt[1], s2.mt[2], CFG.meteor.radius);
     else this.world.clearMeteor();
+    if (s2.lc) this.world.setCrater(s2.lc[0], s2.lc[1], s2.lc[2], CFG.meteor.craterRadius);
+    else this.world.clearCrater();
+    if (s2.sw) {
+      const codeToPhase = { d: "dormant", w: "warn", a: "active" };
+      for (let i = 0; i < s2.sw.length; i++) {
+        const phase = codeToPhase[s2.sw[i]] || "dormant";
+        this.world.setSwampPitPhase(i, phase);
+        const t2 = this._swampTimers[i];
+        if (t2) {
+          t2.phase = phase;
+          t2.timeLeft = s2.swt?.[i] ?? CFG.swampPit[phase];
+          t2.tickTimer = 0;
+        }
+      }
+    }
+    if (s2.ip) {
+      const codeToPhase = { d: "dormant", w: "warn", a: "active" };
+      for (let i = 0; i < s2.ip.length; i++) {
+        const phase = codeToPhase[s2.ip[i]] || "dormant";
+        this.world.setIcePitPhase(i, phase);
+        const t2 = this._icePitTimers[i];
+        if (t2) {
+          t2.phase = phase;
+          t2.timeLeft = s2.ipt?.[i] ?? CFG.icePit[phase];
+        }
+      }
+    }
+    if (s2.pb) this.pickedBoons = s2.pb;
     if (s2.rf) this.world.setRift(s2.rf[0], s2.rf[1], s2.rf[2], CFG.skills.rift.radius);
     else this.world.clearRift();
     if (s2.sp) this.world.setSpirit(s2.sp[0], s2.sp[1], s2.sp[2]);
     else this.world.clearSpirit();
     if (s2.pt) this.world.setPet(s2.pt[0], s2.pt[1], s2.pt[2], s2.pt[3], s2.pt[4] || 0);
     else this.world.clearPet();
+    if (s2.psl) {
+      const sealedSet = new Set(s2.psl);
+      this.world.portals.forEach((po2, i) => po2.sealed = sealedSet.has(i));
+    }
     if (!this._merchant && s2.mc) this.ui?.toast("🧳 떠돌이 상인이 왔다! 이번 준비 시간에만 물건을 판다", "good");
     this._merchant = s2.mc ? { offers: s2.mc.offers, boughtBy: s2.mc.boughtBy || {} } : null;
     if (s2.tb) Object.assign(this.tempBoon, s2.tb);
@@ -2903,6 +4018,8 @@ export var Game = class {
       const p2 = this.players.get(id);
       if (p2) {
         p2.harvestLv = pd2.hv;
+        p2.outfitLv = pd2.ol || 0;
+        p2.weaponProficiencyLv = pd2.wp || 0;
         p2.tools = {};
         for (const k2 of pd2.tl || []) p2.tools[k2] = true;
         p2.weaponLv = pd2.wl || {};
@@ -2919,14 +4036,21 @@ export var Game = class {
       Object.assign(this.stats, s2.st);
       if (this.stats.trapsTriggered >= 3) this._unlockAchievement("trapMaster");
       if (this.stats.elitesKilled >= 5) this._unlockAchievement("eliteHunter");
+      if (this.stats.berserkKilled >= 5) this._unlockAchievement("berserkSlayer");
       if (this.stats.treasuresCaught >= 5) this._unlockAchievement("treasureHunter");
+      if (this.stats.golemsDefeated >= 3) this._unlockAchievement("stoneBreaker");
       if (this.stats.comboCount >= 10) this._unlockAchievement("duoStrike");
+      if (this.stats.critCount >= 20) this._unlockAchievement("criticalEye");
       if (this.stats.mimicsKilled >= 3) this._unlockAchievement("mimicHunter");
       if (this.stats.blocksCount >= 10) this._unlockAchievement("blockMaster");
       if (this.stats.repairPostHealed >= 500) this._unlockAchievement("medic");
+      if (this.stats.campHealed >= 500) this._unlockAchievement("haven");
+      if (this.stats.harvested >= 1e3) this._unlockAchievement("harvestKing");
       if (this.stats.relicsPicked >= 3) this._unlockAchievement("relicCollector");
       if (this.stats.dishesCooked.length >= Object.keys(CFG.cook).length) this._unlockAchievement("gourmet");
       if (this.stats.scoutsIntercepted >= 3) this._unlockAchievement("interceptor");
+      if (this.stats.earlyStarts >= 5) this._unlockAchievement("earlyBird");
+      if (this.stats.weathersSeen.length >= Object.keys(WEATHER).length) this._unlockAchievement("weatherSage");
       if (this.stats.bossKillsSeen.includes("boss") && this.stats.bossKillsSeen.includes("frostlord")) {
         this._unlockAchievement("bothBosses");
       }
@@ -2939,6 +4063,24 @@ export var Game = class {
       if (["boss", "frostlord", "warden", "looter", "colossus"].every((t2) => this.stats.bossKillsSeen.includes(t2))) {
         this._unlockAchievement("fiveGuardians");
       }
+      if (["boss", "frostlord", "warden", "looter", "colossus", "wraith"].every((t2) => this.stats.bossKillsSeen.includes(t2))) {
+        this._unlockAchievement("sixGuardians");
+      }
+      if (["boss", "frostlord", "warden", "looter", "colossus", "wraith", "galelord"].every((t2) => this.stats.bossKillsSeen.includes(t2))) {
+        this._unlockAchievement("sevenStars");
+      }
+      if (["boss", "frostlord", "warden", "looter", "colossus", "wraith", "galelord", "curselord"].every((t2) => this.stats.bossKillsSeen.includes(t2))) {
+        this._unlockAchievement("allEightBosses");
+      }
+      if (["boss", "frostlord", "warden", "looter", "colossus", "wraith", "galelord", "curselord", "grovelord"].every((t2) => this.stats.bossKillsSeen.includes(t2))) {
+        this._unlockAchievement("allNineBosses");
+      }
+      if (["boss", "frostlord", "warden", "looter", "colossus", "wraith", "galelord", "curselord", "grovelord", "magnetlord"].every((t2) => this.stats.bossKillsSeen.includes(t2))) {
+        this._unlockAchievement("allTenBosses");
+      }
+      if (["boss", "frostlord", "warden", "looter", "colossus", "wraith", "galelord", "curselord", "grovelord", "magnetlord", "shadowlord"].every((t2) => this.stats.bossKillsSeen.includes(t2))) {
+        this._unlockAchievement("allElevenBosses");
+      }
     }
     if (this.wave.phase === PHASE.LOST && !this.result) {
       this.result = "lose";
@@ -2948,6 +4090,11 @@ export var Game = class {
       this.result = "win";
       if (this.difficulty === "hard") this._unlockAchievement("ironWill");
       if (this.difficulty === "nightmare") this._unlockAchievement("nightmareConqueror");
+      if (this.difficulty === "hell") this._unlockAchievement("hellConqueror");
+      if (this.world.biome === "volcano") this._unlockAchievement("volcanoMaster");
+      if (this.world.biome === "swamp") this._unlockAchievement("swampSurvivor");
+      if (this.world.biome === "tundra") this._unlockAchievement("frostWalker");
+      this._checkTeamEffort();
       this.ui?.showResult(true, this.stats, this.wave.wave);
     }
     if ((this.wave.phase === PHASE.PREP || this.wave.phase === PHASE.COMBAT) && this.result === "win") {
@@ -2972,34 +4119,48 @@ export var Game = class {
     if (this._pingCd > 0) this._pingCd -= dt2;
     this._handleInput(dt2, over);
     if (!over) this.local.update(dt2, this.input, this.sm, this.grid, this.world, [...this.players.values()], this.feastSpeedMult * this.boonMult.moveSpeedMult * this.tempBoon.speed);
+    if (!over && this.local.alive && this.feastRegenPerSec > 0) {
+      this.local.hp = Math.min(this.local.maxHp, this.local.hp + this.feastRegenPerSec * dt2);
+    }
     for (const p2 of this.players.values()) {
       if (p2 !== this.local && p2.update) p2.update(dt2);
     }
     if (this.isHost && !over) {
+      this.wave.partySize = this.players.size;
       if (!this.pendingBoon) this.wave.update(dt2);
       this.enemyMgr.simulate(dt2, now, [...this.players.values()], this.buildMgr);
       this._updateTraps();
       this._updateSupplyDrops(dt2);
       this._updateMeteor(dt2);
+      this._updateRiftRaid(dt2);
+      this._updateCraters(dt2);
+      this._updateSwampPits(dt2);
+      this._updateIcePits(dt2);
+      this._updateStorm(dt2);
+      this._updateHail(dt2);
       this._updateTreasure(dt2);
       this._updateScout(dt2);
       this._updateRift(dt2);
       this._updateHunt(dt2);
+      this._updateNest(dt2);
       this._updateSpirit(dt2);
       this._updatePet(dt2);
       this._updateMerchant();
       this._updateCrystalUpgrades(dt2);
       this._updateHarvesters(dt2);
       this._updateRepairPosts(dt2);
+      this._updateHealCamps(dt2);
       this._updateArmories(dt2);
       this._updateShardTrickle(dt2);
+      this._updateShardDrops(dt2);
     } else {
       this.enemyMgr.interpolate(dt2);
     }
     if (!over) {
       for (const d2 of this.world.drops) {
         if (d2.requested) continue;
-        if (dist(this.local.x, this.local.z, d2.x, d2.z) <= CFG.supplyDrop.pickupRadius) {
+        const pickupRadius = d2.kind === "shard" ? CFG.shardDrop.pickupRadius : CFG.supplyDrop.pickupRadius;
+        if (dist(this.local.x, this.local.z, d2.x, d2.z) <= pickupRadius) {
           d2.requested = true;
           this.requestSupplyPickup(d2.id);
         }
@@ -3009,12 +4170,17 @@ export var Game = class {
     this.world.weatherKind = weatherKind;
     this.sm.setWeather(weatherKind);
     this.sm.updateWeather(dt2);
-    const rangeMult = weatherKind === "fog" ? WEATHER.fog.towerRangeMult : 1;
-    if (!over) this.buildMgr.updateTowers(dt2, this.enemyMgr.list, now, rangeMult);
+    const rangeMult = (weatherKind === "fog" ? WEATHER.fog.towerRangeMult : 1) * this.boonMult.rangeMult;
+    if (!over) this.buildMgr.updateTowers(dt2, this.enemyMgr.list, now, rangeMult, this.boonMult.ammoSaveChance, this.isHost);
     this.sm.setNightMode(this.wave.phase === PHASE.COMBAT && (this.wave.wave + 1) % CFG.wave.nightEvery === 0);
     this.sm.updateNight(dt2);
+    const milestoneTier = crystalMilestoneTier(this.wave.wave);
+    if (milestoneTier !== this.world.crystalMilestone) {
+      this.world.setCrystalMilestone(milestoneTier);
+      if (milestoneTier > 0) this.ui?.toast(`💍 크리스탈이 ${milestoneTier}번째 고리를 얻었다 — ${this.wave.wave}웨이브를 버텨낸 증표다`, "good");
+    }
     this._updateMusicPhase();
-    this.world.update(dt2, now);
+    this.world.update(dt2, now, this.isHost);
     this.projectiles.update(dt2);
     this.fx.update(dt2);
     this.buildMgr.update(dt2, this.sm.camera);
@@ -3035,6 +4201,8 @@ export var Game = class {
     if (inp.hit(km.get("upgrade"))) this.setBuildMode("upgrade");
     if (inp.hit(km.get("repair"))) this.setBuildMode("repair");
     if (inp.hit(km.get("sell"))) this.setBuildMode("sell");
+    if (inp.hit(km.get("move"))) this.setBuildMode("move");
+    if (inp.hit(km.get("targetMode"))) this.setBuildMode("targetMode");
     if (inp.hit(km.get("cancel"))) this.setBuildMode(null);
     if (inp.hit(km.get("shard"))) this.requestShard();
     if (inp.hit(km.get("skillBlast"))) this.requestSkillBlast();
@@ -3042,12 +4210,15 @@ export var Game = class {
     if (inp.hit(km.get("skillBarrier"))) this.requestSkillBarrier();
     if (inp.hit(km.get("skillRift"))) this.requestSkillRift();
     if (inp.hit(km.get("skillSummon"))) this.requestSkillSummon();
+    if (inp.hit(km.get("skillOverload"))) this.requestSkillOverload();
     if (inp.hit(km.get("tame"))) this.requestTame();
     if (inp.hit(km.get("releasePet"))) this.requestReleasePet();
+    if (inp.hit(km.get("sealPortal"))) this.requestSealPortal();
     if (inp.hit(km.get("reload"))) this.requestReload();
     if (inp.hit(km.get("startWave")) && this.wave.phase === PHASE.PREP) this.requestStartWave();
     const pointer = this.sm.updatePointerWorld();
-    this.buildMgr.updateGhost(pointer, this.myPool);
+    const ghostRangeMult = (this.world.weatherKind === "fog" ? WEATHER.fog.towerRangeMult : 1) * this.boonMult.rangeMult;
+    this.buildMgr.updateGhost(pointer, this.myPool, ghostRangeMult);
     if (inp.clicked) {
       if (this.buildMgr.mode && CFG.builds[this.buildMgr.mode]) {
         if (this.buildMgr.ghostValid && this.buildMgr.ghostCell) {
@@ -3072,6 +4243,24 @@ export var Game = class {
         if (this.buildMgr.hover) this.requestRepair(this.buildMgr.hover.id);
       } else if (this.buildMgr.mode === "sell") {
         if (this.buildMgr.hover) this.requestSell(this.buildMgr.hover.id);
+      } else if (this.buildMgr.mode === "targetMode") {
+        const h2 = this.buildMgr.hover;
+        if (h2 && !h2.isTower) this.ui?.toast("공격 타워만 우선순위를 바꿀 수 있습니다", "bad");
+        else if (h2) this.requestTargetPriority(h2.id);
+      } else if (this.buildMgr.mode === "move") {
+        if (!this.buildMgr.relocateSource) {
+          const h2 = this.buildMgr.hover;
+          if (h2) {
+            this.buildMgr.pickRelocateSource(h2);
+            this.ui?.toast(`${h2.def.icon} ${h2.def.name}을(를) 옮길 위치를 선택하세요`, "warn");
+          }
+        } else if (this.buildMgr.ghostValid && this.buildMgr.ghostCell) {
+          const c2 = this.buildMgr.ghostCell;
+          this.requestRelocate(this.buildMgr.relocateSource.id, c2.gx, c2.gz);
+          this.buildMgr.cancelRelocate();
+        } else if (this.buildMgr.ghostReason) {
+          this.ui?.toast(this.buildMgr.ghostReason, "bad");
+        }
       } else if (this.buildMgr.hover?.stationKind) {
         this.tryOpenStation(this.buildMgr.hover);
       } else {
@@ -3079,7 +4268,9 @@ export var Game = class {
       }
     }
     if (inp.rightClicked && this.buildMgr.mode) this.setBuildMode(null);
+    const wasBlockingLocal = this.local.blocking;
     this.local.blocking = this.local.alive && inp.down(km.get("block")) && !this.buildMgr.mode;
+    if (this.local.blocking && !wasBlockingLocal) this.local._blockStartAt = performance.now() / 1e3;
     if (this.local.blocking) this.local.cancelHarvest();
     if (inp.hit(km.get("attack")) && !this.local.blocking) this.requestAttack();
     if (inp.hit(km.get("dash"))) this._tryDash();
@@ -3171,6 +4362,10 @@ export var Game = class {
       if (!raw) return null;
       const save = JSON.parse(raw);
       if (!save || save.v !== 1 || !save.snap) return null;
+      const s2 = save.snap;
+      if (!s2.w || typeof s2.w.wave !== "number" || !s2.e || !s2.b || !s2.n || !s2.r || typeof s2.c !== "number") {
+        return null;
+      }
       return save;
     } catch {
       return null;
@@ -3184,24 +4379,43 @@ export var Game = class {
   }
   resumeLocal(save) {
     this.begin({ seed: save.seed, shared: save.shared, difficulty: save.difficulty, resumed: true, daily: !!save.daily });
+    if (this.daily && save.seed !== dateSeed()) {
+      this.daily = false;
+      this.ui?.toast("자정이 지나 더 이상 오늘의 도전 기록에는 반영되지 않습니다 — 이어서 플레이는 계속됩니다", "warn");
+    }
     const s2 = save.snap;
     this.enemyMgr.applySnapshot(s2.e, s2.w.wave + 1);
     this.buildMgr.applySnapshot(s2.b);
     this.world.applyNodeSnapshot(s2.n);
+    this.world.restartDepletedRespawns();
     this.wave.applySnapshot(s2.w);
     if (s2.cm) this.world.crystal.maxHp = s2.cm;
     if (s2.ca !== void 0) this.world.crystal.armorLv = s2.ca;
     if (s2.cr !== void 0) this.world.crystal.regenLv = s2.cr;
     if (s2.cx !== void 0) this.world.crystal.auraLv = s2.cx;
     if (s2.crf !== void 0) this.world.crystal.reflectLv = s2.crf;
+    if (s2.cj !== void 0) this.world.crystal.judgeLv = s2.cj;
+    if (s2.csk !== void 0) this.world.crystal.shockLv = s2.csk;
+    if (s2.cg !== void 0) this.world.crystal.graceLv = s2.cg;
+    if (s2.crn !== void 0) this.world.crystal.resonanceLv = s2.crn;
+    if (s2.cml !== void 0) this.world.crystal.materielLv = s2.cml;
+    this.world.crystal.shieldUntil = s2.cs != null ? performance.now() / 1e3 + s2.cs : 0;
     if (s2.bm) {
       Object.assign(this.boonMult, s2.bm);
       this.wave.prepBonus = this.boonMult.prepDelta || 0;
     }
+    if (s2.pb) this.pickedBoons = s2.pb;
     if (s2.sr) this._shardTrickleStacks = s2.sr;
+    if (s2.tb) Object.assign(this.tempBoon, s2.tb);
+    this._merchant = s2.mc ? { offers: s2.mc.offers, boughtBy: s2.mc.boughtBy || {} } : null;
+    if (s2.fs) Object.assign(this.feast, s2.fs);
     if (s2.pt) {
       this._pet = { type: s2.pt[2], x: s2.pt[0], z: s2.pt[1], rot: s2.pt[3] || 0, lv: s2.pt[4] || 0, ownerId: this.local.id, cd: 0 };
       this.world.setPet(s2.pt[0], s2.pt[1], s2.pt[2], s2.pt[3], s2.pt[4] || 0);
+    }
+    if (s2.psl) {
+      const sealedSet = new Set(s2.psl);
+      this.world.portals.forEach((po2, i) => po2.sealed = sealedSet.has(i));
     }
     this.world.crystal.hp = s2.c;
     if (s2.r.team) this.pools.team = s2.r.team;
@@ -3209,23 +4423,36 @@ export var Game = class {
     const savedPlayer = Object.values(s2.p || {})[0];
     if (savedPlayer) {
       this.local.harvestLv = savedPlayer.hv;
+      this.local.outfitLv = savedPlayer.ol || 0;
+      this.local.weaponProficiencyLv = savedPlayer.wp || 0;
       this.local.tools = {};
       for (const k2 of savedPlayer.tl || []) this.local.tools[k2] = true;
       this.local.weaponLv = savedPlayer.wl || {};
       this.local.weaponSpec = savedPlayer.ws || {};
       this.local.equipped = savedPlayer.eq || null;
+      if (savedPlayer.mh > this.local.maxHp) {
+        this.local.maxHp = savedPlayer.mh;
+        this.local.hp = this.local.maxHp;
+      }
     }
     if (save.stats) this.stats = save.stats;
     if (!this.stats.newAchievements) this.stats.newAchievements = [];
     if (!this.stats.bossKillsSeen) this.stats.bossKillsSeen = [];
+    if (!this.stats.weathersSeen) this.stats.weathersSeen = [];
     if (!this.stats.dishesCooked) this.stats.dishesCooked = [];
     if (!this.stats.trapsTriggered) this.stats.trapsTriggered = 0;
-    if (this.stats.spentBy && !this.stats.spentBy.merchant) this.stats.spentBy.merchant = { wood: 0, stone: 0, iron: 0 };
+    if (this.stats.spentBy && !this.stats.spentBy.merchant) this.stats.spentBy.merchant = { wood: 0, stone: 0, iron: 0, copper: 0, coal: 0, shard: 0 };
+    if (this.stats.spentBy && !this.stats.spentBy.portalSeal) this.stats.spentBy.portalSeal = { wood: 0, stone: 0, iron: 0, copper: 0, coal: 0, shard: 0 };
     if (!this.stats.elitesKilled) this.stats.elitesKilled = 0;
+    if (!this.stats.berserkKilled) this.stats.berserkKilled = 0;
     if (!this.stats.treasuresCaught) this.stats.treasuresCaught = 0;
+    if (!this.stats.golemsDefeated) this.stats.golemsDefeated = 0;
     if (!this.stats.comboCount) this.stats.comboCount = 0;
+    if (!this.stats.critCount) this.stats.critCount = 0;
     if (!this.stats.repairPostHealed) this.stats.repairPostHealed = 0;
+    if (!this.stats.campHealed) this.stats.campHealed = 0;
     if (!this.stats.scoutsIntercepted) this.stats.scoutsIntercepted = 0;
+    if (!this.stats.earlyStarts) this.stats.earlyStarts = 0;
     this.ui?.toast(`이어하기 — 웨이브 ${this.wave.displayWave}`, "good");
   }
   render() {

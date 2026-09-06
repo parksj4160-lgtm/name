@@ -1,9 +1,10 @@
 import { ACHIEVEMENTS, loadUnlocked, unlock } from './achievements.js';
-import { CFG, DIFFICULTIES, SPECIAL_WAVES, needsPickaxe, specialWaveKind, waveComposition } from './config.js';
+import { BESTIARY_CATS, BESTIARY_INFO, loadBestiarySeen } from './bestiary.js';
+import { CFG, DIFFICULTIES, SPECIAL_WAVES, TARGET_PRIORITY_LABEL, needsPickaxe, portalSealCost, specialWaveKind, waveComposition, waveReward } from './config.js';
 import { Game } from './game.js';
 import { keyLabel } from './keymap.js';
 import { META_UPGRADES, buyMetaUpgrade, earnMetaCurrency, loadMeta } from './meta.js';
-import { canAfford, clamp, costText, dateSeed, fmtTime, roomCode, todayKey } from './utils.js';
+import { COST_KEYS, RES_ICON, canAfford, clamp, costText, dateSeed, dist, fmtTime, roomCode, safeGetItem, safeSetItem, todayKey } from './utils.js';
 import { PHASE } from './wave.js';
 
 var $2 = (id) => document.getElementById(id);
@@ -13,6 +14,7 @@ var TUTORIAL_STEPS = [
   "🎒 목재 20을 모았으면 <kbd>I</kbd> 로 인벤토리를 열어 🪚 제작대를 지으세요 (벽·타워는 그 다음)",
   "준비가 되면 <kbd>Enter</kbd> 로 첫 웨이브를 시작하세요!"
 ];
+var GIVE_AMOUNTS = [["wood", 10], ["stone", 10], ["copper", 5], ["coal", 5], ["iron", 3], ["shard", 1]];
 export var UI = class {
   constructor(game2) {
     this.game = game2;
@@ -31,11 +33,13 @@ export var UI = class {
       hupCost: $2("hup-cost"),
       poolMode: $2("pool-mode"),
       biomeTag: $2("biome-tag"),
+      portalTag: $2("portal-tag"),
       iron: $2("res-iron"),
       toolRow: $2("tool-row"),
       crystalFill: $2("crystal-fill"),
       crystalText: $2("crystal-text"),
       crystalWarning: $2("crystal-warning"),
+      blindOverlay: $2("blind-overlay"),
       waveLabel: $2("wave-label"),
       waveState: $2("wave-state"),
       waveBtn: $2("btn-wave"),
@@ -45,6 +49,9 @@ export var UI = class {
       hpText: $2("hp-text"),
       harvestWrap: $2("harvest-wrap"),
       harvestFill: $2("harvest-fill"),
+      dashWrap: $2("dash-wrap"),
+      dashFill: $2("dash-fill"),
+      dashText: $2("dash-text"),
       prompt: $2("prompt"),
       buildHint: $2("build-hint"),
       invBtn: $2("btn-inv"),
@@ -72,9 +79,12 @@ export var UI = class {
       coal: $2("res-coal"),
       ammoRow: $2("ammo-row"),
       petRow: $2("pet-row"),
+      outfitRow: $2("outfit-row"),
       tutorialText: $2("tutorial-text"),
       achList: $2("ach-list"),
       achCount: $2("ach-count"),
+      bestiaryList: $2("bestiary-list"),
+      bestiaryCount: $2("bestiary-count"),
       historyList: $2("history-list"),
       historyCount: $2("history-count"),
       metaList: $2("meta-list"),
@@ -97,6 +107,7 @@ export var UI = class {
     this.refreshAchievements();
     this.refreshHistory();
     this.refreshMetaShop();
+    this.refreshBestiary();
   }
   // 로비의 🏕️ 원정 준비 — 결정 조각 잔액과 업그레이드 목록을 그린다
   refreshMetaShop() {
@@ -134,6 +145,12 @@ export var UI = class {
         }
         this.game.sfx.upgrade();
         this.toast(`${r.icon} ${r.name} Lv.${r.level} 습득! 다음 판부터 적용된다`, "good");
+        const m2 = loadMeta();
+        if (Object.keys(META_UPGRADES).every((k2) => (m2.levels[k2] || 0) >= META_UPGRADES[k2].max) && unlock("expeditionMaster")) {
+          const a = ACHIEVEMENTS.expeditionMaster;
+          this.toast(`🏆 업적 달성! ${a.icon} ${a.name} — ${a.desc}`, "good");
+          this.refreshAchievements();
+        }
         this.refreshMetaShop();
       };
     }
@@ -184,7 +201,12 @@ export var UI = class {
       for (const [key, icon, name, desc] of [
         ["upgrade", "⬆️", "업그레이드", "건물을 클릭해 레벨을 올린다. 최대 레벨 타워는 특화를 고른다"],
         ["repair", "🔧", "수리", "손상된 만큼만 자원을 쓴다"],
-        ["sell", "🔨", "철거", "투자한 자원의 50%를 돌려받는다"]
+        ["move", "🚚", "이동", "레벨·특화는 그대로 두고 위치만 옮긴다. 철거 후 재건축보다 싸다(투자 자원의 25%)"],
+        ["sell", "🔨", "철거", "투자한 자원의 50%를 돌려받는다"],
+        // 나머지 넷(업그레이드·수리·이동·철거)과 구조가 완전히 같은 건설 모드 토글인데, 여기
+        // 목록에는 빠져 있었다 — 키보드 단축키(기본 O)로만 켤 수 있어서 터치/모바일 플레이어는
+        // 아예 접근할 방법이 없었다(터치엔 키보드가 없으니 이 인벤토리 행이 유일한 진입로다).
+        ["targetMode", "🎯", "우선순위", "공격 타워를 클릭할 때마다 표적 우선순위가 순환한다(위협적인 순 → 가까운 순 → 체력 많은 순 → 체력 적은 순)"]
       ]) {
         rows2.push({
           key,
@@ -302,6 +324,20 @@ export var UI = class {
           action: () => g2.requestUpgradeWeapon(key)
         });
       }
+      const hasWorkbench = g2.hasStation("workbench");
+      const oLv = g2.local.outfitLv;
+      const oMaxed = oLv >= CFG.outfit.maxLv;
+      const oNext = CFG.outfit.tiers[oLv];
+      rows2.push({
+        key: "outfit",
+        icon: oMaxed ? CFG.outfit.tiers[oLv - 1].icon : oNext.icon,
+        name: oMaxed ? `${CFG.outfit.tiers[oLv - 1].name} (최고 단계)` : `${oNext.name} 착용 (${oLv + 1}/${CFG.outfit.maxLv}단계)`,
+        desc: oMaxed ? "몬스터 근접 접촉 피해를 줄여준다. 이미 최고 단계다." : `몬스터 근접 접촉 피해 -${Math.round(oNext.reduce * 100)}%, 대신 이동속도 ${Math.round(oNext.speedMult * 100)}%`,
+        cost: oMaxed ? null : oNext.cost,
+        state: oMaxed ? "owned" : !hasWorkbench ? "locked" : canAfford(g2.myPool, oNext.cost) ? "" : "poor",
+        note: oMaxed ? "최대 단계" : !hasWorkbench ? "제작대 필요" : null,
+        action: () => g2.requestOutfitUpgrade()
+      });
       return rows2;
     }
     if (tab === "skill") {
@@ -312,10 +348,23 @@ export var UI = class {
         chill: () => g2.requestSkillChill(),
         barrier: () => g2.requestSkillBarrier(),
         rift: () => g2.requestSkillRift(),
-        summon: () => g2.requestSkillSummon()
+        summon: () => g2.requestSkillSummon(),
+        overload: () => g2.requestSkillOverload()
       };
-      const HOTKEYS = { heal: "shard", blast: "skillBlast", chill: "skillChill", barrier: "skillBarrier", rift: "skillRift", summon: "skillSummon" };
+      const HOTKEYS = { heal: "shard", blast: "skillBlast", chill: "skillChill", barrier: "skillBarrier", rift: "skillRift", summon: "skillSummon", overload: "skillOverload" };
       return Object.entries(CFG.skills).map(([key, s]) => {
+        if (key === "overload") {
+          const have = pool.shard || 0;
+          return {
+            key,
+            icon: s.icon,
+            name: s.name,
+            desc: s.desc,
+            note: have >= s.minCost ? `💠${have}개 전부` : `최소 💠${s.minCost}`,
+            state: have >= s.minCost ? "" : "poor",
+            action: ACTIONS[key]
+          };
+        }
         const shardCost = key === "heal" ? s.cost : g2._skillCost(s);
         const cost = { shard: shardCost };
         return {
@@ -346,6 +395,36 @@ export var UI = class {
           state: maxed ? "owned" : canAfford(pool, cost) ? "" : "poor",
           note: maxed ? "최대 레벨" : null,
           action: () => g2.requestCrystalUpgrade(key)
+        };
+      });
+    }
+    if (tab === "relic") {
+      const picked = g2.pickedBoons || {};
+      const keys = Object.keys(picked);
+      if (!keys.length) {
+        return [{
+          key: "none",
+          icon: "🏺",
+          name: "아직 없음",
+          desc: "보스를 처치하면 유물을, 엔드리스를 이어가면 축복을 고른다 — 고른 것이 여기 쌓인다",
+          cost: null,
+          state: "locked",
+          action: () => {
+          }
+        }];
+      }
+      return keys.map((key) => {
+        const def = CFG.boons[key];
+        const count = picked[key];
+        return {
+          key,
+          icon: def.icon,
+          name: count > 1 ? `${def.name} x${count}` : def.name,
+          desc: def.desc,
+          cost: null,
+          state: "owned",
+          action: () => {
+          }
         };
       });
     }
@@ -383,7 +462,8 @@ export var UI = class {
       craft: "제작대를 지으면 도구와 무기를, 화로를 지으면 철을 만들 수 있다.",
       skill: "정수(💠)를 회복 대신 전투에 쓴다. 회복과 경쟁하니 상황에 맞게 고를 것.",
       gear: "손에 들 것을 고른다. 든 것의 효과만 적용되고, 바위·광맥은 곡괭이를 쥐어야 캔다.",
-      crystal: "정수(💠)로 크리스탈 자체를 영구히 강화한다. 각 트랙 5레벨까지, 레벨이 오를수록 비용도 오른다."
+      crystal: "정수(💠)로 크리스탈 자체를 영구히 강화한다. 각 트랙 5레벨까지, 레벨이 오를수록 비용도 오른다.",
+      relic: "지금까지 이 판에서 고른 축복·유물 목록이다. 열람 전용이라 클릭해도 아무 일도 일어나지 않는다."
     };
     this.el.invDesc.textContent = DESC[this._invTab];
     for (const t2 of this.el.invTabs.querySelectorAll(".inv-tab")) {
@@ -439,6 +519,12 @@ export var UI = class {
       this.el.buildHint.innerHTML = `${this._buildSpec(mode)} — 좌클릭 배치 / 우클릭·Esc 취소`;
       return;
     }
+    if (mode === "move" && g2.buildMgr.relocateSource) {
+      const src = g2.buildMgr.relocateSource;
+      const okMove = g2.buildMgr.ghostValid;
+      this.el.buildHint.innerHTML = `${src.def.icon} ${src.def.name} 옮길 위치를 클릭하세요` + (okMove ? "" : g2.buildMgr.ghostReason ? ` — <span class="lack">${g2.buildMgr.ghostReason}</span>` : "") + " (우클릭·Esc 취소)";
+      return;
+    }
     const hovered = g2.buildMgr?.hover;
     const detail = hovered ? this._hoverDetail(mode, hovered) : null;
     if (detail) {
@@ -447,6 +533,10 @@ export var UI = class {
       this.el.buildHint.textContent = "업그레이드할 건물을 클릭하세요 (벽은 내구도, 타워는 공격력·사거리 상승 — 최대 레벨 타워는 특화 선택)";
     } else if (mode === "repair") {
       this.el.buildHint.textContent = "수리할 건물을 클릭하세요 (손상된 비율만큼 자원 소모, 완전 파괴 재건축보다 저렴)";
+    } else if (mode === "move") {
+      this.el.buildHint.textContent = "옮길 건물을 클릭하세요 (철거 후 재건축보다 싸게 위치를 바꾼다)";
+    } else if (mode === "targetMode") {
+      this.el.buildHint.textContent = "우선순위를 바꿀 공격 타워를 클릭하세요 (위협적인 순 → 가까운 순 → 체력 많은 순 → 체력 적은 순으로 순환)";
     } else {
       this.el.buildHint.textContent = "철거할 건물을 클릭하세요 (투자 자원의 50% 환급)";
     }
@@ -486,6 +576,17 @@ export var UI = class {
       const ok2 = canAfford(g2.myPool, cost);
       return `${name} — ${hp} · 수리 비용 <b class="${ok2 ? "" : "lack"}">${costText(cost)}</b>`;
     }
+    if (mode === "move") {
+      const cost = g2.buildMgr.relocateCost(b);
+      const ok2 = canAfford(g2.myPool, cost);
+      return `${name} 클릭해 이동 대상으로 선택 — 이동 비용 <b class="${ok2 ? "" : "lack"}">${costText(cost) || "-"}</b> (철거 후 재건축의 절반)`;
+    }
+    if (mode === "targetMode") {
+      if (!b.isTower) return `${name} — 공격 타워가 아니라 우선순위가 없다`;
+      const order = ["threat", "nearest", "strongest", "weakest"];
+      const next2 = order[(order.indexOf(b.targetPriority) + 1) % order.length];
+      return `${name} — 현재 <b>${TARGET_PRIORITY_LABEL[b.targetPriority]}</b> · 클릭하면 <b>${TARGET_PRIORITY_LABEL[next2]}</b>(으)로`;
+    }
     const next = b.def.levels[b.level];
     if (!next) {
       if (b.specDef) return `${name} ${b.specDef.icon} <b>${b.specDef.name}</b> — 특화 완료`;
@@ -502,15 +603,16 @@ export var UI = class {
       if (a === void 0 || c2 === void 0 || a === c2) return;
       parts.push(`${label} ${a}${unit}→<b>${c2}${unit}</b>`);
     };
+    const pct = (v) => v == null ? v : Math.round(v * 100);
     diff("내구도", cur.hp, next.hp);
     diff("공격력", cur.dmg, next.dmg);
     diff("사거리", cur.range, next.range);
     diff("연사", cur.rate, next.rate);
-    diff("둔화", cur.slow, next.slow);
+    diff("둔화", pct(cur.slow), pct(next.slow), "%");
     diff("범위", cur.splash, next.splash);
     diff("독 피해", cur.poisonDps, next.poisonDps);
     diff("묶기", cur.root, next.root, "초");
-    diff("버프", cur.buffMult, next.buffMult);
+    diff("버프", pct(cur.buffMult), pct(next.buffMult), "%");
     diff("버프 범위", cur.buffRadius, next.buffRadius);
     diff("회복", cur.healRate, next.healRate);
     diff("회복 범위", cur.healRadius, next.healRadius);
@@ -521,14 +623,14 @@ export var UI = class {
   _bindLobby() {
     const g2 = this.game;
     const nameIn = $2("in-name");
-    nameIn.value = localStorage.getItem("cd.name") || "";
+    nameIn.value = safeGetItem("cd.name") || "";
     const takeName = () => {
       const n = (nameIn.value || "플레이어").trim().slice(0, 10) || "플레이어";
-      localStorage.setItem("cd.name", n);
+      safeSetItem("cd.name", n);
       g2.net.name = n;
       return n;
     };
-    this.selectedDifficulty = localStorage.getItem("cd.difficulty") || "normal";
+    this.selectedDifficulty = safeGetItem("cd.difficulty") || "normal";
     if (!DIFFICULTIES[this.selectedDifficulty]) this.selectedDifficulty = "normal";
     const diffOpts = Array.from(document.querySelectorAll("#diff-seg .diff-opt"));
     const paintDiff = () => {
@@ -538,7 +640,7 @@ export var UI = class {
     for (const btn of diffOpts) {
       btn.onclick = () => {
         this.selectedDifficulty = btn.dataset.diff;
-        localStorage.setItem("cd.difficulty", this.selectedDifficulty);
+        safeSetItem("cd.difficulty", this.selectedDifficulty);
         paintDiff();
       };
     }
@@ -558,7 +660,13 @@ export var UI = class {
       takeName();
       g2.net.leave();
       this.el.lobby.classList.add("hidden");
-      g2.resumeLocal(save);
+      try {
+        g2.resumeLocal(save);
+      } catch (err) {
+        console.error("resumeLocal failed", err);
+        Game.clearLocalSave();
+        this.toast("저장된 게임을 불러올 수 없어 새 게임으로 시작합니다", "bad");
+      }
     };
     $2("btn-resume-discard").onclick = () => {
       Game.clearLocalSave();
@@ -679,7 +787,8 @@ export var UI = class {
       const s2 = size / CFG.world.size;
       const x2 = (px - size / 2) / s2;
       const z2 = (pz - size / 2) / s2;
-      g2.requestPing(x2, z2);
+      const kind = e.shiftKey ? "help" : e.ctrlKey || e.metaKey || e.altKey ? "attack" : "look";
+      g2.requestPing(x2, z2, kind);
     };
     $2("tutorial-skip").onclick = () => this._endTutorial();
     addEventListener("keydown", (e) => {
@@ -718,11 +827,11 @@ export var UI = class {
       this.toast("키를 기본값으로 되돌렸다", "good");
     };
     const cbBox = $2("chk-colorblind");
-    this.colorblind = localStorage.getItem("cd.colorblind") === "1";
+    this.colorblind = safeGetItem("cd.colorblind") === "1";
     cbBox.checked = this.colorblind;
     cbBox.onchange = () => {
       this.colorblind = cbBox.checked;
-      localStorage.setItem("cd.colorblind", this.colorblind ? "1" : "0");
+      safeSetItem("cd.colorblind", this.colorblind ? "1" : "0");
     };
   }
   _refreshRebindLabels() {
@@ -835,7 +944,10 @@ export var UI = class {
       const r = stick.getBoundingClientRect();
       cx = r.left + r.width / 2;
       cy = r.top + r.height / 2;
-      stick.setPointerCapture(id);
+      try {
+        stick.setPointerCapture(id);
+      } catch {
+      }
     });
     stick.addEventListener("pointermove", (e) => {
       if (e.pointerId !== id) return;
@@ -879,7 +991,7 @@ export var UI = class {
       this.toast("크리스탈을 지켜라! 자원·몬스터를 클릭해 캐고 때린다, I로 인벤토리", "good");
       this.toast(`${bcfg.icon} 지형: ${bcfg.name} — ${bcfg.desc}`, "warn");
     }
-    if (resumed || localStorage.getItem("cd.tutorialDone")) {
+    if (resumed || safeGetItem("cd.tutorialDone")) {
       this.el.tutorial.classList.add("hidden");
       this._tutStep = -1;
     } else {
@@ -894,7 +1006,7 @@ export var UI = class {
   _endTutorial() {
     this._tutStep = -1;
     this.el.tutorial.classList.add("hidden");
-    localStorage.setItem("cd.tutorialDone", "1");
+    safeSetItem("cd.tutorialDone", "1");
   }
   // 좌상단 도구 줄 — 눌러서 바로 손에 쥔다. 지금 든 것은 테두리로 표시한다.
   _refreshTools() {
@@ -1023,8 +1135,10 @@ export var UI = class {
 <li>생존 시간 <b>${fmtTime(stats.time)}</b></li>
 <li>처치한 몬스터 <b>${stats.kills}</b></li>
 <li>채집한 자원 <b>${stats.harvested}</b></li>
-<li>소모한 자원 <b>🪵${stats.spentWood} 🪨${stats.spentStone}${stats.spentIron ? ` ⚙️${stats.spentIron}` : ""}</b>${this._spendBreakdown(stats)}</li>
+<li>💠 획득한 정수 <b>${stats.shardEarned || 0}</b></li>
+<li>소모한 자원 <b>${this._spentSummary(stats)}</b>${this._spendBreakdown(stats)}</li>
 <li>건설한 구조물 <b>${stats.built}</b></li>`;
+    this._renderMvp(stats);
     const log = $2("result-wavelog");
     if (stats.waveLog && stats.waveLog.length) {
       log.innerHTML = stats.waveLog.map(
@@ -1066,6 +1180,27 @@ export var UI = class {
     this.refreshAchievements();
     this.refreshHistory();
     this.refreshMetaShop();
+    this.refreshBestiary();
+  }
+  // 로비의 📖 도감 — 실제로 마주친 종류만 아이콘·이름·설명을 보여주고, 못 본 건 ??? 로 가린다
+  refreshBestiary() {
+    const box = this.el.bestiaryList;
+    if (!box) return;
+    const seen = loadBestiarySeen();
+    const entries = Object.entries(BESTIARY_INFO);
+    const got = entries.filter(([k2]) => seen[k2]).length;
+    this.el.bestiaryCount.textContent = `${got} / ${entries.length}`;
+    box.innerHTML = Object.entries(BESTIARY_CATS).map(([catKey, catName]) => {
+      const rows = entries.filter(([, info]) => info.cat === catKey).map(([k2, info]) => {
+        const known = !!seen[k2];
+        const src = CFG.enemies[k2] || CFG.variants[k2];
+        const icon = known ? src.icon : "❔";
+        const name = known ? src.name : "???";
+        const desc = known ? info.desc : "아직 마주치지 않았다";
+        return `<span class="bi-item ${known ? "on" : ""}"><span class="bi-icon">${icon}</span><span class="bi-name">${name}</span><span class="bi-desc">${desc}</span></span>`;
+      }).join("");
+      return `<div class="bi-cat">${catName}</div><div class="bi-grid">${rows}</div>`;
+    }).join("");
   }
   // 로비의 업적 목록을 채운다 — 전체 달성 현황을 항상 볼 수 있게
   refreshAchievements() {
@@ -1082,24 +1217,48 @@ export var UI = class {
 <span class="ai-desc">${a.desc}</span>
 </li>`).join("");
   }
+  // 결과 화면 상단 합계 줄 — COST_KEYS(utils.js) 기준이라 새 재료가 추가돼도 자동으로 잡힌다.
+  // 목재·광물은 0이어도 항상 보여주고(기존 표시와 동일), 나머지는 실제로 썼을 때만 보여준다.
+  _spentSummary(stats) {
+    return COST_KEYS.filter((k2) => k2 !== "arrow").map((k2) => {
+      const v = stats["spent" + k2[0].toUpperCase() + k2.slice(1)] || 0;
+      return k2 === "wood" || k2 === "stone" || v ? `${RES_ICON[k2]}${v}` : null;
+    }).filter(Boolean).join(" ");
+  }
   // 자원을 어디에 썼는지 항목별로 쪼개 보여준다 (쓴 곳만)
   _spendBreakdown(stats) {
     const LABELS2 = { build: "건설", upgrade: "업그레이드", repair: "수리", harvest: "채집속도", craft: "제작", merchant: "상인" };
     const by = stats.spentBy || {};
-    const rows = Object.entries(LABELS2).map(([key, label]) => [label, by[key] || { wood: 0, stone: 0, iron: 0 }]).filter(([, c2]) => c2.wood || c2.stone || c2.iron).map(([label, c2]) => {
-      const parts = [];
-      if (c2.wood) parts.push(`🪵${c2.wood}`);
-      if (c2.stone) parts.push(`🪨${c2.stone}`);
-      if (c2.iron) parts.push(`⚙️${c2.iron}`);
+    const rows = Object.entries(LABELS2).map(([key, label]) => [label, by[key] || {}]).filter(([, c2]) => COST_KEYS.some((k2) => c2[k2])).map(([label, c2]) => {
+      const parts = COST_KEYS.filter((k2) => k2 !== "arrow" && c2[k2]).map((k2) => `${RES_ICON[k2]}${c2[k2]}`);
       return `<span>${label} ${parts.join(" ")}</span>`;
     });
     return rows.length ? `<div class="breakdown">${rows.join("")}</div>` : "";
+  }
+  // 지금까지 결과 화면은 팀 전체 합계만 보여줬다 — 여럿이 같이 했을 때 "누가 얼마나 기여했는지"는
+  // 전혀 안 보였다. 근접·활·폭탄가방으로 직접 조준한 피해·처치만 집계한 stats.dmgByPlayer/
+  // killsByPlayer(game.js의 _hurtEnemy)를 피해량 순으로 나열하고, 1등에게 👑 표시를 붙인다.
+  // 혼자 할 때는 비교 대상이 없어 의미가 없으므로 참가자가 2명 이상일 때만 보여준다.
+  _renderMvp(stats) {
+    const el2 = $2("result-mvp");
+    const players = [...this.game.players.values()];
+    if (players.length < 2) {
+      el2.classList.add("hidden");
+      return;
+    }
+    const rows = players.map((p2) => ({
+      name: p2.name || "플레이어",
+      dmg: Math.round((stats.dmgByPlayer || {})[p2.id] || 0),
+      kills: (stats.killsByPlayer || {})[p2.id] || 0
+    })).sort((a, b) => b.dmg - a.dmg);
+    el2.innerHTML = rows.map((r, i) => `<li class="${i === 0 && r.dmg > 0 ? "mvp" : ""}"><span>${i === 0 && r.dmg > 0 ? "👑 " : ""}${r.name}</span><span>피해 <b>${r.dmg}</b> · 처치 <b>${r.kills}</b></span></li>`).join("");
+    el2.classList.remove("hidden");
   }
   // 최고 기록을 localStorage에 누적하고, 갱신된 기록을 돌려준다
   _recordStats(win, stats, finalWave) {
     let rec;
     try {
-      rec = JSON.parse(localStorage.getItem("cd.record") || "{}");
+      rec = JSON.parse(safeGetItem("cd.record") || "{}");
     } catch {
       rec = {};
     }
@@ -1108,14 +1267,14 @@ export var UI = class {
     rec.totalKills = (rec.totalKills || 0) + stats.kills;
     rec.plays = (rec.plays || 0) + 1;
     rec.wins = (rec.wins || 0) + (win ? 1 : 0);
-    localStorage.setItem("cd.record", JSON.stringify(rec));
+    safeSetItem("cd.record", JSON.stringify(rec));
     return { ...rec, isNewBest };
   }
   // 최근 10판의 웨이브·시간·처치·지형·난이도를 남긴다 — 나아진 걸 판마다 체감할 수 있게
   _recordHistory(win, stats, finalWave) {
     let hist;
     try {
-      hist = JSON.parse(localStorage.getItem("cd.history") || "[]");
+      hist = JSON.parse(safeGetItem("cd.history") || "[]");
     } catch {
       hist = [];
     }
@@ -1130,7 +1289,7 @@ export var UI = class {
       difficulty: this.game.difficulty || "normal"
     });
     hist = hist.slice(0, 10);
-    localStorage.setItem("cd.history", JSON.stringify(hist));
+    safeSetItem("cd.history", JSON.stringify(hist));
     return hist;
   }
   // 오늘의 도전 최고 기록 — 날짜별로 그날의 가장 좋은 결과 하나만 남긴다(같은 날 여러 번 도전 가능,
@@ -1139,17 +1298,14 @@ export var UI = class {
     const key = todayKey();
     let all;
     try {
-      all = JSON.parse(localStorage.getItem("cd.daily") || "{}");
+      all = JSON.parse(safeGetItem("cd.daily") || "{}");
     } catch {
       all = {};
     }
     const prev = all[key];
     const isNewBest = !prev || finalWave > prev.wave || finalWave === prev.wave && !prev.win && win;
     if (isNewBest) all[key] = { wave: finalWave, win, time: stats.time, kills: stats.kills };
-    try {
-      localStorage.setItem("cd.daily", JSON.stringify(all));
-    } catch {
-    }
+    safeSetItem("cd.daily", JSON.stringify(all));
     return { best: all[key], isNewBest };
   }
   _refreshDailyBest() {
@@ -1157,7 +1313,7 @@ export var UI = class {
     if (!el2) return;
     let all;
     try {
-      all = JSON.parse(localStorage.getItem("cd.daily") || "{}");
+      all = JSON.parse(safeGetItem("cd.daily") || "{}");
     } catch {
       all = {};
     }
@@ -1170,7 +1326,7 @@ export var UI = class {
     if (!list) return;
     let hist;
     try {
-      hist = JSON.parse(localStorage.getItem("cd.history") || "[]");
+      hist = JSON.parse(safeGetItem("cd.history") || "[]");
     } catch {
       hist = [];
     }
@@ -1225,7 +1381,6 @@ export var UI = class {
     this.el.iron.textContent = Math.floor(pool.iron || 0);
     this.el.copper.textContent = Math.floor(pool.copper || 0);
     this.el.coal.textContent = Math.floor(pool.coal || 0);
-    // 생고기는 종류별로 세서 자원 패널에 한 줄로 보여준다(0마리면 줄 자체를 숨긴다)
     const stock = pool.ammo || {};
     const usedTypes = /* @__PURE__ */ new Set();
     for (const b of g2.buildMgr.buildings.values()) if (b.ammoType) usedTypes.add(b.ammoType);
@@ -1237,7 +1392,8 @@ export var UI = class {
         return n > 0 ? `${ic}${n}` : `<span class="out">${ic}0</span>`;
       });
       this.el.ammoRow.innerHTML = `📦 탄약 ${parts.join(" ")}`;
-    }    const meat = pool.meat || {};
+    }
+    const meat = pool.meat || {};
     const meatParts = Object.keys(CFG.cook).filter((k2) => meat[k2] > 0).map((k2) => `${CFG.enemies[k2].icon}${meat[k2]}`);
     this.el.meatRow.classList.toggle("hidden", meatParts.length === 0);
     if (meatParts.length) this.el.meatRow.textContent = `🥩 생고기 ${meatParts.join(" ")}`;
@@ -1249,6 +1405,16 @@ export var UI = class {
       const star = lv >= CFG.tame.maxLevel ? " ★" : ` Lv.${lv}`;
       this.el.petRow.textContent = `${tc2.icon} ${tc2.name}${star}`;
     }
+    const sealedCount = g2.world.portals.filter((p3) => p3.sealed).length;
+    this.el.portalTag.classList.toggle("hidden", sealedCount === 0);
+    if (sealedCount) this.el.portalTag.textContent = `🌀 포탈 ${sealedCount}/${g2.world.portals.length} 봉쇄됨`;
+    const oLv2 = g2.local.outfitLv;
+    this.el.outfitRow.classList.toggle("hidden", oLv2 <= 0);
+    if (oLv2 > 0) {
+      const tier = CFG.outfit.tiers[oLv2 - 1];
+      this.el.outfitRow.textContent = `${tier.icon} ${tier.name}`;
+    }
+    this.el.blindOverlay.classList.toggle("hidden", performance.now() / 1e3 >= g2.local.blindUntil);
     this._refreshTools();
     const c2 = g2.world.crystal;
     const ratio = clamp(c2.hp / c2.maxHp, 0, 1);
@@ -1304,6 +1470,14 @@ export var UI = class {
     } else {
       this.el.harvestWrap.classList.add("hidden");
     }
+    if (p2.dashCd > 0) {
+      this.el.dashWrap.classList.remove("hidden");
+      const ready = 1 - clamp(p2.dashCd / CFG.player.dash.cooldown, 0, 1);
+      this.el.dashFill.style.transform = `scaleX(${ready})`;
+      this.el.dashText.textContent = `💨 ${p2.dashCd.toFixed(1)}s`;
+    } else {
+      this.el.dashWrap.classList.add("hidden");
+    }
     const near = g2.world.nearestNode(p2.x, p2.z, CFG.harvest.range);
     if (near && !g2.buildMgr.mode) {
       this.el.prompt.classList.remove("hidden");
@@ -1313,6 +1487,16 @@ export var UI = class {
       } else {
         const label = near.type === "tree" ? "🌳 나무" : near.type === "copper" ? "🟠 구리 광맥" : near.type === "coal" ? "⚫ 석탄층" : "🪨 바위";
         this.el.prompt.innerHTML = `${label} — <b>눌러서 채집</b> (남은 ${near.charges})`;
+      }
+    } else if (!g2.buildMgr.mode && g2.wave.phase === PHASE.PREP) {
+      const openPortals = g2.world.portals.filter((po2) => !po2.sealed);
+      const portal = openPortals.find((po2) => dist(p2.x, p2.z, po2.x, po2.z) <= CFG.portalSeal.radius);
+      if (portal && openPortals.length > 1) {
+        const cost = portalSealCost(g2.wave.wave + 1);
+        this.el.prompt.classList.remove("hidden");
+        this.el.prompt.innerHTML = `🌀 포탈 — <kbd>${keyLabel(g2.km.get("sealPortal"))}</kbd>로 봉쇄 (${costText(cost)}, 다음 웨이브 동안 이쪽에서 적이 안 나온다)`;
+      } else {
+        this.el.prompt.classList.add("hidden");
       }
     } else {
       this.el.prompt.classList.add("hidden");
@@ -1384,16 +1568,21 @@ export var UI = class {
     return { x: cx + dx * s2, y: cy + dy * s2 };
   }
   // 준비 시간에 다음 웨이브 구성을 미리 보여준다 (보스 등장 웨이브는 강조 표시)
+  // 정수가 웨이브 클리어로만 들어오는 지금 체계에서, 이번 웨이브를 넘기면 정수가 얼마나
+  // 들어오는지도 같이 보여준다 — 코어 폭주처럼 "지금 다 쓸지, 한 웨이브만 더 버텨서 모을지"를
+  // 판단하려면 다음 보상이 얼마인지부터 알아야 한다.
   _showWavePreview(wave) {
     if (this._previewWave === wave) return;
     this._previewWave = wave;
-    const comp = waveComposition(wave);
+    const comp = waveComposition(wave, this.game.players.size);
     const hasBoss = comp.some((c2) => CFG.enemies[c2.type]?.boss);
     const special = specialWaveKind(wave);
     const specialTag = special ? `<span class="special-tag">${SPECIAL_WAVES[special].icon} ${SPECIAL_WAVES[special].name}</span>` : "";
+    const reward = waveReward(wave);
+    const shardTag = `<span class="shard-reward" title="이 웨이브를 넘기면 받는 정수">💠+${reward.shard}</span>`;
     this.el.wavePreview.innerHTML = specialTag + comp.map(
       (c2) => `<span class="${CFG.enemies[c2.type]?.boss ? "boss" : ""}">${CFG.enemies[c2.type].icon}<b>${c2.count}</b></span>`
-    ).join("");
+    ).join("") + shardTag;
     this.el.wavePreview.classList.toggle("boss-wave", hasBoss);
     this.el.wavePreview.classList.toggle("special-wave", !!special);
     this.el.wavePreview.title = special ? SPECIAL_WAVES[special].desc : "";
@@ -1439,7 +1628,7 @@ export var UI = class {
     const g2 = this.game;
     const list = this.el.partyList;
     const ids = [...g2.players.keys()].join(",");
-    const toolsSig = Object.keys(CFG.craft).filter((k2) => g2.local.tools[k2]).join(",");
+    const toolsSig = [...g2.players.values()].map((p2) => `${p2.id}:${Object.keys(CFG.craft).filter((k2) => p2.tools?.[k2]).join(",")}`).join("|");
     if (this._partyIds !== ids || this._partyShared !== g2.shared || this._partyToolsSig !== toolsSig) {
       this._partyIds = ids;
       this._partyShared = g2.shared;
@@ -1455,15 +1644,13 @@ export var UI = class {
         who.textContent = p2.name + (p2.isLocal ? " (나)" : "");
         li2.append(dot, who);
         if (!p2.isLocal && !g2.shared) {
-          const give = document.createElement("button");
-          give.className = "give";
-          give.textContent = "🪵10";
-          give.onclick = () => g2.requestGive(p2.id, 10, 0);
-          const give2 = document.createElement("button");
-          give2.className = "give";
-          give2.textContent = "🪨10";
-          give2.onclick = () => g2.requestGive(p2.id, 0, 10);
-          li2.append(give, give2);
+          for (const [key, amt] of GIVE_AMOUNTS) {
+            const give = document.createElement("button");
+            give.className = "give";
+            give.textContent = `${RES_ICON[key]}${amt}`;
+            give.onclick = () => g2.requestGive(p2.id, key, amt);
+            li2.append(give);
+          }
         }
         if (!p2.isLocal) {
           for (const key of Object.keys(CFG.craft)) {
@@ -1546,10 +1733,11 @@ export var UI = class {
     }
     if (g2.world.drops.length) {
       const dp = 3 + Math.sin(performance.now() / 150) * 1.4;
-      ctx.fillStyle = "#ffd21a";
-      ctx.strokeStyle = "rgba(255,210,26,0.9)";
       ctx.lineWidth = 1.4;
       for (const d2 of g2.world.drops) {
+        const isShard = d2.kind === "shard";
+        ctx.fillStyle = isShard ? "#d689ff" : "#ffd21a";
+        ctx.strokeStyle = isShard ? "rgba(214,137,255,0.9)" : "rgba(255,210,26,0.9)";
         ctx.beginPath();
         ctx.arc(tx(d2.x), tz(d2.z), dp, 0, Math.PI * 2);
         ctx.fill();
@@ -1587,7 +1775,8 @@ export var UI = class {
       ctx.arc(px, pz, 3.6, 0, Math.PI * 2);
       ctx.stroke();
     }
-    for (const e of g2.enemyMgr.list) {
+    const blinded = performance.now() / 1e3 < g2.local.blindUntil;
+    for (const e of blinded ? [] : g2.enemyMgr.list) {
       if (e.dead || e.st.wild) continue;
       const ex = tx(e.x), ez = tz(e.z), r = e.st.boss ? 3.2 : 2.2;
       ctx.fillStyle = e.st.boss ? "#ff3050" : "#ff6a7d";
@@ -1605,9 +1794,9 @@ export var UI = class {
         ctx.stroke();
       }
     }
-    ctx.strokeStyle = "#ffcc55";
     for (const ping of g2.fx.pings) {
       const k2 = ping.t / ping.life;
+      ctx.strokeStyle = ping.css || "#ffcc55";
       ctx.globalAlpha = 1 - k2;
       ctx.lineWidth = 2;
       ctx.beginPath();
@@ -1627,6 +1816,14 @@ export var UI = class {
       ctx.fill();
       ctx.lineWidth = p2.isLocal ? 1.4 : 1;
       ctx.stroke();
+      if (!p2.alive) {
+        ctx.strokeStyle = `rgba(255,90,106,${pulse})`;
+        ctx.lineWidth = 1.6;
+        ctx.beginPath();
+        ctx.arc(tx(p2.x), tz(p2.z), 5 + pulse * 3, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.strokeStyle = "rgba(255,255,255,0.9)";
+      }
     }
   }
 };

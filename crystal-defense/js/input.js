@@ -12,18 +12,28 @@ export var Input = class {
     this._touchId = null;
     this._dragId = null;
     this._dragLast = { x: 0, y: 0 };
+    const isTyping = (e) => {
+      const t2 = e.target;
+      return t2 && (t2.tagName === "INPUT" || t2.tagName === "TEXTAREA" || t2.isContentEditable);
+    };
     addEventListener("keydown", (e) => {
-      if (e.repeat) return;
+      if (e.repeat || isTyping(e)) return;
       const k2 = e.key.toLowerCase();
       this.keys.add(k2);
       this.pressed.add(k2);
       if ([" ", "arrowup", "arrowdown", "arrowleft", "arrowright"].includes(k2)) e.preventDefault();
     });
-    addEventListener("keyup", (e) => this.keys.delete(e.key.toLowerCase()));
+    addEventListener("keyup", (e) => {
+      if (isTyping(e)) return;
+      this.keys.delete(e.key.toLowerCase());
+    });
     addEventListener("blur", () => this.keys.clear());
     canvas2.addEventListener("contextmenu", (e) => e.preventDefault());
     canvas2.addEventListener("pointerdown", (e) => {
-      canvas2.setPointerCapture?.(e.pointerId);
+      try {
+        canvas2.setPointerCapture?.(e.pointerId);
+      } catch {
+      }
       sm2.setPointer(e.clientX, e.clientY);
       this.mouse.x = e.clientX;
       this.mouse.y = e.clientY;

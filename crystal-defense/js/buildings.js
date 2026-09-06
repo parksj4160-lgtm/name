@@ -1,6 +1,6 @@
 import * as THREE from '../vendor/three.module.js';
 import { CFG } from './config.js';
-import { canAfford, dist } from './utils.js';
+import { COST_KEYS, canAfford, dist } from './utils.js';
 
 var GEO2 = {
   wall: new THREE.BoxGeometry(1.88, 2.3, 1.88),
@@ -29,7 +29,8 @@ var GEO2 = {
   repairCrossV: new THREE.BoxGeometry(0.24, 0.74, 0.24),
   repairCrossH: new THREE.BoxGeometry(0.74, 0.24, 0.24),
   sniperBarrel: new THREE.CylinderGeometry(0.13, 0.17, 2.3, 8),
-  sniperScope: new THREE.CylinderGeometry(0.12, 0.12, 0.6, 10)
+  sniperScope: new THREE.CylinderGeometry(0.12, 0.12, 0.6, 10),
+  armoryCrate: new THREE.BoxGeometry(0.62, 0.5, 0.62)
 };
 var MAT2 = {
   wall: [
@@ -51,14 +52,26 @@ var MAT2 = {
   furnaceFire: new THREE.MeshStandardMaterial({ color: 16750899, emissive: 15693600, emissiveIntensity: 1.4, roughness: 0.4 }),
   trapBase: new THREE.MeshStandardMaterial({ color: 4863530, roughness: 0.85, metalness: 0.3 }),
   trapSpike: new THREE.MeshStandardMaterial({ color: 14238251, roughness: 0.4, metalness: 0.6 }),
+  // 수렁 함정 — 기존 함정과 같은 형태(원판+가시)를 그대로 쓰되, 색만 늪 진흙과 뿌리(root
+  // 상태이상 연출이 쓰는 것과 같은 계열의 색)로 갈아서 한눈에 다른 종류임을 구분한다.
+  mireBase: new THREE.MeshStandardMaterial({ color: 4873530, roughness: 0.95, metalness: 0.05 }),
+  mireSpike: new THREE.MeshStandardMaterial({ color: 13215862, roughness: 0.7, metalness: 0.1 }),
+  // 폭발 함정 — 같은 원판+가시 형태를 재사용하되, 화로 불꽃(furnaceFire)과 같은 계열의
+  // 발광 주황색으로 갈아서 "밟으면 범위 피해"라는 성격을 색으로도 드러낸다.
+  blastBase: new THREE.MeshStandardMaterial({ color: 3226938, roughness: 0.8, metalness: 0.2 }),
+  blastSpike: new THREE.MeshStandardMaterial({ color: 16750899, emissive: 12545792, emissiveIntensity: 1.1, roughness: 0.4 }),
   gateLintel: new THREE.MeshStandardMaterial({ color: 13211199, roughness: 0.6, metalness: 0.25 }),
   watchtower: new THREE.MeshStandardMaterial({ color: 16764245, emissive: 12886835, emissiveIntensity: 1, roughness: 0.3 }),
   harvesterPost: new THREE.MeshStandardMaterial({ color: 6971297, roughness: 0.9 }),
   harvesterWheel: new THREE.MeshStandardMaterial({ color: 10309763, roughness: 0.7, metalness: 0.15 }),
   harvesterBasket: new THREE.MeshStandardMaterial({ color: 12159565, roughness: 0.8 }),
   repairpost: new THREE.MeshStandardMaterial({ color: 6274976, emissive: 2790492, emissiveIntensity: 0.85, roughness: 0.35 }),
+  campCanvas: new THREE.MeshStandardMaterial({ color: 13207101, roughness: 0.85 }),
+  campGlow: new THREE.MeshStandardMaterial({ color: 16759111, emissive: 16746522, emissiveIntensity: 1.3, roughness: 0.3 }),
   sniper: new THREE.MeshStandardMaterial({ color: 3817291, roughness: 0.35, metalness: 0.75 }),
   sniperScope: new THREE.MeshStandardMaterial({ color: 16726843, emissive: 16720418, emissiveIntensity: 0.9, roughness: 0.3 }),
+  armoryCrate: new THREE.MeshStandardMaterial({ color: 11760670, roughness: 0.75, metalness: 0.15 }),
+  armoryBelt: new THREE.MeshStandardMaterial({ color: 12759680, emissive: 8859136, emissiveIntensity: 0.7, roughness: 0.4 }),
   ghostOk: new THREE.MeshStandardMaterial({ color: 5570463, transparent: true, opacity: 0.45, emissive: 2002770, emissiveIntensity: 0.6 }),
   ghostBad: new THREE.MeshStandardMaterial({ color: 16734826, transparent: true, opacity: 0.4, emissive: 9379372, emissiveIntensity: 0.6 }),
   barBg: new THREE.MeshBasicMaterial({ color: 1119519, transparent: true, opacity: 0.8, depthTest: false }),
@@ -73,6 +86,7 @@ function barLayer(bg, fg) {
 }
 var RANGE_RING_GEO = new THREE.RingGeometry(0.96, 1, 40);
 var PROJECTILE_COLOR = { arrow: 16769162, frost: 8382719, cannon: 16751178, poison: 3526479, snare: 13215862, lightning: 16769126, sniper: 16726843 };
+var PRIORITY_RING_COLOR = { nearest: 5024991, strongest: 16733525, weakest: 8443136 };
 var nextId = 1;
 function resetBuildingIds() {
   nextId = 1;
@@ -90,6 +104,7 @@ var Building = class {
     this.level = 1;
     this.spec = null;
     this.ownerId = ownerId;
+    this.targetPriority = def.targetMode === "highestHp" ? "strongest" : "threat";
     this.maxHp = def.levels[0].hp;
     this.hp = this.maxHp;
     this.cooldown = 0;
@@ -129,9 +144,11 @@ var Building = class {
     this._specStats = out;
     return out;
   }
-  // 최대 레벨에 도달한 전투 타워만, 아직 안 골랐을 때 한 번 고를 수 있다
+  // 최대 레벨에 도달한 전투 타워, 그리고(공격은 안 해도) 보루도 — 나머지 모든 타워가 이미
+  // 특화로 "같은 건물을 다르게" 쓸 수 있는데 보루만 빠져 있었다. isSupport엔 레거시 감시탑도
+  // 섞여 있지만 CFG.towerSpec에 항목을 안 넣을 것이므로 실질적으로 보루에만 열린다.
   get canSpecialize() {
-    return this.isTower && !this.spec && this.level >= this.def.levels.length && !!CFG.towerSpec[this.key];
+    return (this.isTower || this.isSupport) && !this.spec && this.level >= this.def.levels.length && !!CFG.towerSpec[this.key];
   }
   get specDef() {
     return this.spec ? CFG.towerSpec[this.key]?.[this.spec] || null : null;
@@ -148,15 +165,21 @@ var Building = class {
   get isRepairPost() {
     return this.key === "repairpost";
   }
+  get isHealCamp() {
+    return this.key === "camp";
+  }
+  get isArmory() {
+    return this.key === "armory";
+  }
   // 다가가서 클릭하면 작업창이 열리는 시설이면 그 종류("craft"/"smelt")
   get stationKind() {
     return this.def.station || null;
   }
   get isTrap() {
-    return this.key === "trap";
+    return this.key === "trap" || this.key === "mire" || this.key === "blast";
   }
   get isTower() {
-    return this.key !== "wall" && this.key !== "gate" && this.key !== "trap" && !this.isSupport && !this.isHarvester && !this.isRepairPost && !this.stationKind;
+    return this.key !== "wall" && this.key !== "gate" && !this.isTrap && !this.isSupport && !this.isHarvester && !this.isRepairPost && !this.isHealCamp && !this.isArmory && !this.stationKind;
   }
   get nextCost() {
     const nxt = this.def.levels[this.level];
@@ -169,7 +192,7 @@ var Building = class {
     fg.position.z = 0.01;
     barLayer(bg, fg);
     g2.add(bg, fg);
-    g2.position.y = this.key === "wall" || this.key === "gate" ? 2.7 : this.key === "workbench" ? 1.6 : this.key === "trap" ? 0.7 : this.key === "harvester" ? 1.9 : 3.4;
+    g2.position.y = this.key === "wall" || this.key === "gate" ? 2.7 : this.key === "workbench" ? 1.6 : this.isTrap ? 0.7 : this.key === "harvester" ? 1.9 : 3.4;
     g2.visible = false;
     g2.renderOrder = 5;
     this.mesh.add(g2);
@@ -249,6 +272,26 @@ var Building = class {
     this.specRing.visible = true;
     this.specRing.material.color.setHex(sp2.ring);
     this.specRing.material.opacity = 0.62;
+  }
+  // 우선순위 표시 — 나머지 셋(0.06/0.13/0.2)보다 한 단 위(0.27)에 띄운다. 대부분의 타워는
+  // 기본값(threat, 저격탑만 strongest)을 그대로 쓰므로 고리가 안 뜨는 게 정상이다 — 실제로
+  // 플레이어가 O로 손댄 타워만 눈에 띄어서, 방어선을 훑어보면 "내가 손댄 타워"가 바로 구분된다.
+  refreshPriorityRing() {
+    const isDefault = this.targetPriority === (this.def.targetMode === "highestHp" ? "strongest" : "threat");
+    if (isDefault) {
+      if (this.priorityRing) this.priorityRing.visible = false;
+      return;
+    }
+    if (!this.priorityRing) {
+      const r = new THREE.Mesh(GEO2.buffRing, MAT2.buffRing.clone());
+      r.rotation.x = -Math.PI / 2;
+      r.position.y = 0.27;
+      this.mesh.add(r);
+      this.priorityRing = r;
+    }
+    this.priorityRing.visible = true;
+    this.priorityRing.material.color.setHex(PRIORITY_RING_COLOR[this.targetPriority]);
+    this.priorityRing.material.opacity = 0.62;
   }
   applyLevel(level) {
     this.level = level;
@@ -379,14 +422,28 @@ function buildMesh(key, level) {
     g2.userData.wheel = wheel;
     return g2;
   }
-  if (key === "trap") {
-    const plate = new THREE.Mesh(GEO2.trapBase, MAT2.trapBase);
+  if (key === "camp") {
+    const canvas2 = new THREE.Mesh(new THREE.ConeGeometry(0.85, 1.1, 4), MAT2.campCanvas);
+    canvas2.position.y = 0.55;
+    canvas2.rotation.y = Math.PI / 4;
+    canvas2.castShadow = true;
+    canvas2.receiveShadow = true;
+    g2.add(canvas2);
+    const glow = new THREE.Mesh(new THREE.SphereGeometry(0.2, 8, 8), MAT2.campGlow);
+    glow.position.set(0, 0.28, 0.7);
+    g2.add(glow);
+    return g2;
+  }
+  if (key === "trap" || key === "mire" || key === "blast") {
+    const baseMat = key === "mire" ? MAT2.mireBase : key === "blast" ? MAT2.blastBase : MAT2.trapBase;
+    const spikeMat = key === "mire" ? MAT2.mireSpike : key === "blast" ? MAT2.blastSpike : MAT2.trapSpike;
+    const plate = new THREE.Mesh(GEO2.trapBase, baseMat);
     plate.position.y = 0.06;
     plate.receiveShadow = true;
     g2.add(plate);
     for (let i = 0; i < 5; i++) {
       const a = Math.PI * 2 * i / 5;
-      const spike = new THREE.Mesh(GEO2.trapSpike, MAT2.trapSpike);
+      const spike = new THREE.Mesh(GEO2.trapSpike, spikeMat);
       spike.position.set(Math.cos(a) * 0.42, 0.24, Math.sin(a) * 0.42);
       spike.castShadow = true;
       g2.add(spike);
@@ -463,6 +520,23 @@ function buildMesh(key, level) {
     scope.position.set(0, 0.3, 0.15);
     scope.castShadow = true;
     turret.add(barrel, scope);
+  } else if (key === "armory") {
+    const crateA = new THREE.Mesh(GEO2.armoryCrate, MAT2.armoryCrate);
+    crateA.position.set(-0.3, -0.15, 0.05);
+    crateA.rotation.y = 0.35;
+    crateA.castShadow = true;
+    const crateB = new THREE.Mesh(GEO2.armoryCrate, MAT2.armoryCrate);
+    crateB.position.set(0.28, 0.05, -0.08);
+    crateB.rotation.y = -0.25;
+    crateB.castShadow = true;
+    const crateC = new THREE.Mesh(GEO2.armoryCrate, MAT2.armoryCrate);
+    crateC.position.set(0, 0.42, 0.02);
+    crateC.rotation.y = 0.6;
+    crateC.castShadow = true;
+    const beltG = new THREE.Mesh(GEO2.supportRing, MAT2.armoryBelt);
+    beltG.rotation.x = Math.PI / 2;
+    beltG.position.y = -0.32;
+    turret.add(crateA, crateB, crateC, beltG);
   } else {
     const head = new THREE.Mesh(GEO2.headCannon, MAT2.cannon);
     head.castShadow = true;
@@ -497,6 +571,7 @@ export var BuildManager = class {
     this.ghostReason = "";
     this.ghostCell = null;
     this.hover = null;
+    this.relocateSource = null;
     this.onImpact = null;
     this.onSynergy = null;
     this.rangeRing = new THREE.Mesh(RANGE_RING_GEO, MAT2.rangeRing);
@@ -508,18 +583,54 @@ export var BuildManager = class {
   setMode(mode) {
     if (this.mode === mode) mode = null;
     this.mode = mode;
+    this.relocateSource = null;
     this._syncGhost();
     this.sm.setBuildGridVisible(!!mode);
     this.sm.setBuildView(!!mode);
     return this.mode;
+  }
+  // 이동(move) 모드 1단계에서 대상 건물을 고르면 호출된다 — mode 자체는 "move"로 그대로 두고
+  // (실제 CFG.builds 키로 바꾸면 아래 updateGhost의 비용 판정이 신축 비용을 참조하게 돼 버린다)
+  // relocateSource 만 채워서 2단계(고스트 배치 미리보기)로 넘어간다.
+  pickRelocateSource(building) {
+    this.relocateSource = building;
+    this._syncGhost();
+  }
+  cancelRelocate() {
+    this.relocateSource = null;
+    this._syncGhost();
+  }
+  // 투입 비용의 25% — 철거 후 재건축(50% 손실)보다 싸게 자리를 옮기게 해 주되, 공짜는 아니다.
+  relocateCost(b) {
+    const inv = this.investedCost(b);
+    const out = {};
+    for (const k2 of COST_KEYS) if (inv[k2]) out[k2] = Math.ceil(inv[k2] * 0.25);
+    return out;
+  }
+  // place()와 정확히 같은 canPlace 판정을 새 위치에 적용한다 — 레벨·특화·체력·탄약은
+  // 전혀 안 건드리고 위치(격자·좌표·메시)만 옮긴다.
+  relocate(b, gx, gz) {
+    const res = this.grid.canPlace(gx, gz, (x2, z2) => this.world.blocksBuild(x2, z2), b.key);
+    if (!res.ok) return null;
+    this.grid.clear(b.gx, b.gz);
+    b.gx = gx;
+    b.gz = gz;
+    b.x = res.x;
+    b.z = res.z;
+    b.mesh.position.set(res.x, 0, res.z);
+    this.grid.set(gx, gz, b);
+    this.grid.dirty = true;
+    this.fx.ring(res.x, res.z, 9109440, 2);
+    return b;
   }
   _syncGhost() {
     if (this.ghost) {
       this.root.remove(this.ghost);
       this.ghost = null;
     }
-    if (!this.mode || !CFG.builds[this.mode]) return;
-    const g2 = buildMesh(this.mode, 1);
+    const key = this.mode === "move" ? this.relocateSource?.key : this.mode;
+    if (!key || !CFG.builds[key]) return;
+    const g2 = buildMesh(key, 1);
     g2.traverse((o) => {
       if (o.isMesh) {
         o.material = MAT2.ghostOk;
@@ -537,7 +648,7 @@ export var BuildManager = class {
     });
   }
   // 매 프레임: 포인터 위치에 고스트 배치 / 대상 건물 하이라이트
-  updateGhost(pointer, resources) {
+  updateGhost(pointer, resources, rangeMult = 1) {
     this.hover = null;
     if (!this.mode || !pointer) {
       if (this.ghost) this.ghost.visible = false;
@@ -548,31 +659,35 @@ export var BuildManager = class {
       }
       return;
     }
-    if (this.mode === "upgrade" || this.mode === "sell" || this.mode === "repair") {
+    if (this.mode === "upgrade" || this.mode === "sell" || this.mode === "repair" || this.mode === "targetMode" || this.mode === "move" && !this.relocateSource) {
       if (this.ghost) this.ghost.visible = false;
       const b = this.grid.atWorld(pointer.x, pointer.z);
       this.hover = b || null;
       if (b && b.isSupport) this._showRangeRing(b.x, b.z, b.stats.buffRadius ?? b.stats.detectRadius);
       else if (b && b.isHarvester) this._showRangeRing(b.x, b.z, b.stats.detectRadius);
       else if (b && b.isRepairPost) this._showRangeRing(b.x, b.z, b.stats.healRadius);
-      else if (b && b.isTower) this._showRangeRing(b.x, b.z, b.stats.range);
+      else if (b && b.isHealCamp) this._showRangeRing(b.x, b.z, b.stats.healRadius);
+      else if (b && b.isArmory) this._showRangeRing(b.x, b.z, b.stats.supplyRadius);
+      else if (b && b.isTower) this._showRangeRing(b.x, b.z, b.stats.range * rangeMult);
       else this.rangeRing.visible = false;
       return;
     }
+    const placeKey = this.mode === "move" ? this.relocateSource.key : this.mode;
     const g2 = this.grid.toGrid(pointer.x, pointer.z);
-    const res = this.grid.canPlace(g2.gx, g2.gz, (x2, z2) => this.world.blocksBuild(x2, z2), this.mode);
+    const res = this.grid.canPlace(g2.gx, g2.gz, (x2, z2) => this.world.blocksBuild(x2, z2), placeKey);
     const w2 = this.grid.toWorld(g2.gx, g2.gz);
     if (this.ghost) {
       this.ghost.visible = true;
       this.ghost.position.set(w2.x, 0, w2.z);
     }
-    const lv1 = CFG.builds[this.mode].levels[0];
-    const previewRadius = lv1.buffRadius ?? lv1.detectRadius ?? lv1.healRadius ?? lv1.range;
+    const lv1 = CFG.builds[placeKey].levels[0];
+    const previewRadius = lv1.buffRadius ?? lv1.detectRadius ?? lv1.healRadius ?? (lv1.range != null ? lv1.range * rangeMult : void 0);
     if (previewRadius) this._showRangeRing(w2.x, w2.z, previewRadius);
     else this.rangeRing.visible = false;
     let ok = res.ok;
     let why = res.why;
-    if (ok && !canAfford(resources, CFG.builds[this.mode].cost)) {
+    const cost = this.mode === "move" ? this.relocateCost(this.relocateSource) : CFG.builds[this.mode].cost;
+    if (ok && !canAfford(resources, cost)) {
       ok = false;
       why = "자원이 부족합니다";
     }
@@ -628,13 +743,14 @@ export var BuildManager = class {
     return b;
   }
   // 현재 레벨까지 투입된 총 자원 (레벨 1 기본 비용 + 업그레이드 비용 누적)
+  // COST_KEYS(utils.js) 기준 — 구리·석탄처럼 나중에 추가된 재료도 여기서 자동으로 잡힌다
+  // (예전엔 목재·광물·철 3개만 하드코딩해서, 구리·석탄이 든 타워를 철거/수리하면 그 재료만
+  // 환급·차감 계산에서 조용히 빠지는 버그가 있었다).
   investedCost(b) {
-    const total = { wood: 0, stone: 0, iron: 0 };
+    const total = {};
     for (let i = 0; i < b.level; i++) {
       const c2 = i === 0 ? b.def.cost : b.def.levels[i].cost;
-      total.wood += c2?.wood || 0;
-      total.stone += c2?.stone || 0;
-      total.iron += c2?.iron || 0;
+      for (const k2 of COST_KEYS) total[k2] = (total[k2] || 0) + (c2?.[k2] || 0);
     }
     return total;
   }
@@ -642,34 +758,40 @@ export var BuildManager = class {
     const inv = this.investedCost(b);
     if (b.spec) {
       const sc = CFG.towerSpec.cost;
-      inv.wood += sc.wood || 0;
-      inv.stone += sc.stone || 0;
-      inv.iron += sc.iron || 0;
+      for (const k2 of COST_KEYS) inv[k2] = (inv[k2] || 0) + (sc[k2] || 0);
     }
-    return { wood: Math.floor(inv.wood * 0.5), stone: Math.floor(inv.stone * 0.5), iron: Math.floor(inv.iron * 0.5) };
+    const out = {};
+    for (const k2 of COST_KEYS) out[k2] = Math.floor((inv[k2] || 0) * 0.5);
+    return out;
   }
   // 손상 비율에 비례한 수리 비용 (완전 파괴 상태를 100% 재건축하는 것보다 저렴하게)
   repairCost(b) {
     const ratio = 1 - b.hp / b.maxHp;
     if (ratio <= 1e-3) return null;
     const inv = this.investedCost(b);
-    const cost = { wood: Math.ceil(inv.wood * ratio * 0.4), stone: Math.ceil(inv.stone * ratio * 0.4) };
-    if (inv.iron) cost.iron = Math.ceil(inv.iron * ratio * 0.4);
+    const cost = {};
+    for (const k2 of COST_KEYS) if (inv[k2]) cost[k2] = Math.ceil(inv[k2] * ratio * 0.4);
     return cost;
   }
   repair(b) {
     b.hp = b.maxHp;
     b.refreshBar();
   }
-  // 호스트에서만: 타워 조준/사격
-  updateTowers(dt2, enemies, now, rangeMult = 1) {
+  // 조준·발사 애니메이션(포탑 회전·투사체 시각 효과)은 매끄러운 화면을 위해 모든 클라이언트에서
+  // 돈다. 하지만 탄약(b.ammo)은 snapshot()/applySnapshot()으로 동기화되는 호스트 권위 값이라,
+  // 참가자가 자기 화면에서 똑같은 판정으로 로컬 탄약까지 깎아버리면 그 값이 다음 스냅샷이 오기
+  // 전까지(최대 83ms) 실제 호스트 상태와 어긋난다 — 하필 탄창이 정확히 1발 남은 순간에 이 어긋남이
+  // 참가자 화면에서만 "탄약 소진" 토스트를 먼저 띄우는 식으로 새어나갈 수 있다. isHost가 아니면
+  // 조준·발사 연출은 그대로 두되 탄약 차감·소진 콜백만 건너뛴다 — 그 자리는 다음 스냅샷이 채운다.
+  updateTowers(dt2, enemies, now, rangeMult = 1, ammoSaveChance = 0, isHost = true) {
     const silences = enemies.filter((e) => !e.dead && e.silenceUntil > now);
     for (const b of this.buildings.values()) {
       if (!b.isTower) continue;
       const st = b.stats;
       b.cooldown -= dt2;
       b.silenced = silences.some((e) => dist(b.x, b.z, e.x, e.z) <= CFG.bossPattern.silenceRadius);
-      if (b.silenced) {
+      b.cursed = b.curseUntil > now;
+      if (b.silenced || b.cursed) {
         if (b.turret) b.turret.rotation.y += dt2 * 0.4;
         continue;
       }
@@ -680,12 +802,13 @@ export var BuildManager = class {
       }
       if (target && b.cooldown <= 0) {
         const empty = b.ammoEmpty;
-        if (!empty && b.ammoType) {
+        if (isHost && !empty && b.ammoType && !(ammoSaveChance > 0 && Math.random() < ammoSaveChance)) {
           b.ammo -= 1;
           if (b.ammo <= 0) this.onAmmoEmpty?.(b);
         }
         b.cooldown = 1 / (st.rate * (empty ? CFG.ammo.emptyRateMult : 1));
-        this.shoot(b, target, empty);      }
+        this.shoot(b, target, empty);
+      }
     }
   }
   // 화살탑 시너지: 사거리 안(정확히는 인접 반경)에 서리탑이 있으면 true
@@ -730,6 +853,17 @@ export var BuildManager = class {
     }
     return 1 + Math.min(s2.max, count * s2.dpsMultPerNeighbor);
   }
+  // 대포탑 시너지: poisonSynergyMult와 정확히 같은 구조 — 인접한 다른 대포탑 하나당
+  // 폭발 반경이 누적 증가(상한 있음)
+  cannonSynergyMult(b) {
+    const s2 = CFG.synergy.cannonCluster;
+    let count = 0;
+    for (const o of this.buildings.values()) {
+      if (o === b || o.key !== "cannon") continue;
+      if (dist(b.x, b.z, o.x, o.z) <= s2.radius) count++;
+    }
+    return 1 + Math.min(s2.max, count * s2.splashMultPerNeighbor);
+  }
   // 범위 안 보루(support)들의 공격력 버프를 모두 더한다 (중첩 가능, 상한 100%)
   supportBuffMult(b) {
     let bonus = 0;
@@ -740,11 +874,14 @@ export var BuildManager = class {
     }
     return 1 + Math.min(1, bonus);
   }
-  // 사거리 안에서 크리스탈에 가장 가까운(=가장 위협적인) 적을 고른다. targetMode가 "highestHp"인
-  // 타워(저격탑)만 예외로, 대신 사거리 안에서 남은 체력이 가장 많은 적을 고른다.
+  // 사거리 안에서 우선순위 모드에 맞는 적을 고른다. 기본값은 크리스탈에 가장 가까운(=가장
+  // 위협적인) 적("threat")이고, 저격탑만 기본이 "strongest"(남은 체력이 가장 많은 적)다.
+  // 어느 타워든 우선순위 모드(O 키)로 이 기본값을 4가지 중 하나로 직접 바꿀 수 있다:
+  // threat(위협적인 순) · nearest(타워에 가까운 순) · strongest(체력 많은 순, 저격탑 기본) ·
+  // weakest(체력 적은 순, 마무리 사냥용).
   _acquire(b, enemies, range) {
-    const byHp = b.def.targetMode === "highestHp";
-    let best = null, bestScore = byHp ? -Infinity : Infinity;
+    const mode = b.targetPriority || (b.def.targetMode === "highestHp" ? "strongest" : "threat");
+    let best = null, bestScore = mode === "strongest" ? -Infinity : Infinity;
     const r2 = range * range;
     let detector = null;
     for (const e of enemies) {
@@ -757,21 +894,27 @@ export var BuildManager = class {
       }
       const d2 = (e.x - b.x) ** 2 + (e.z - b.z) ** 2;
       if (d2 > r2) continue;
-      if (byHp) {
-        if (e.hp > bestScore) {
-          bestScore = e.hp;
-          best = e;
-        }
-        continue;
-      }
-      const score = e.x * e.x + e.z * e.z;
-      if (score < bestScore) {
+      let score;
+      if (mode === "strongest" || mode === "weakest") score = e.hp;
+      else if (mode === "nearest") score = d2;
+      else score = e.x * e.x + e.z * e.z;
+      if (mode === "strongest" ? score > bestScore : score < bestScore) {
         bestScore = score;
         best = e;
       }
     }
     if (best && best.st.burrows && best.diving) this.onDetectBurrow?.(best);
     return best;
+  }
+  // 우선순위 모드(O)에서 타워를 클릭하면 호출된다 — 4가지를 순서대로 돌린다.
+  cycleTargetPriority(id) {
+    const b = this.buildings.get(id);
+    if (!b || !b.isTower) return null;
+    const order = ["threat", "nearest", "strongest", "weakest"];
+    const cur = b.targetPriority || (b.def.targetMode === "highestHp" ? "strongest" : "threat");
+    b.targetPriority = order[(order.indexOf(cur) + 1) % order.length];
+    b.refreshPriorityRing();
+    return b.targetPriority;
   }
   // 투사체 발사 연출 → 명중 시 onImpact (데미지 적용은 호스트에서만)
   shoot(b, target, empty = false) {
@@ -781,6 +924,10 @@ export var BuildManager = class {
     if (b.key === "poison" && st.poisonDps) {
       const pm = this.poisonSynergyMult(b);
       if (pm !== 1) effStats = { ...effStats, poisonDps: Math.round(effStats.poisonDps * pm) };
+    }
+    if (b.key === "cannon" && st.splash) {
+      const cm2 = this.cannonSynergyMult(b);
+      if (cm2 !== 1) effStats = { ...effStats, splash: effStats.splash * cm2 };
     }
     if (empty) {
       const m = CFG.ammo.emptyDmgMult;
@@ -796,7 +943,7 @@ export var BuildManager = class {
     const speed = b.key === "cannon" ? 26 : b.key === "sniper" ? 65 : 42;
     this.projectiles.fire(from, to2, speed, color, (pos) => {
       this.fx.burst(pos.x, pos.y, pos.z, color, b.key === "cannon" ? 12 : 5, b.key === "cannon" ? 6 : 3);
-      if (b.key === "cannon") this.fx.ring(pos.x, pos.z, color, st.splash);
+      if (b.key === "cannon") this.fx.ring(pos.x, pos.z, color, effStats.splash);
       this.onImpact?.(b, effStats, pos);
     });
   }
@@ -840,6 +987,13 @@ export var BuildManager = class {
             b._synergyNotified = true;
             this.onSynergy?.("sniperVenom");
           }
+        } else if (b.key === "cannon") {
+          const cm2 = this.cannonSynergyMult(b);
+          b.showSynergy(cm2 > 1, 16750899);
+          if (cm2 > 1 && !b._synergyNotified) {
+            b._synergyNotified = true;
+            this.onSynergy?.("cannonCluster");
+          }
         }
       }
     }
@@ -853,16 +1007,21 @@ export var BuildManager = class {
       this._lastHover = null;
     }
   }
+  // 저주(curseUntil)는 호스트 로컬 performance.now() 기준 절대 시각이라 그대로 네트워크로
+  // 보내면 참가자의 performance.now()(서로 다른 기준점)와 비교했을 때 의미가 없다 —
+  // wave.snapshot()의 prepLeft와 같은 원칙으로, "남은 시간"만 상대값으로 실어 보낸다.
   snapshot() {
+    const now = performance.now() / 1e3;
     const out = [];
     for (const b of this.buildings.values()) {
-      out.push([b.id, b.key, b.gx, b.gz, b.level, Math.round(b.hp), b.ownerId || "", b.spec || "", b.ammo]);
+      const curseLeft = Math.max(0, Math.round(((b.curseUntil || 0) - now) * 10) / 10);
+      out.push([b.id, b.key, b.gx, b.gz, b.level, Math.round(b.hp), b.ownerId || "", b.spec || "", b.ammo, b.targetPriority, curseLeft]);
     }
     return out;
   }
   applySnapshot(list) {
     const seen = /* @__PURE__ */ new Set();
-    for (const [id, key, gx, gz, level, hp, owner, spec, ammo] of list) {
+    for (const [id, key, gx, gz, level, hp, owner, spec, ammo, targetPriority, curseLeft] of list) {
       seen.add(id);
       let b = this.buildings.get(id);
       if (!b) b = this.place(key, gx, gz, owner, id);
@@ -879,9 +1038,15 @@ export var BuildManager = class {
       b.hp = hp;
       b.refreshBar();
       if (ammo !== void 0 && b.ammoType) {
+        if (b.ammo > 0 && ammo <= 0) this.onAmmoEmpty?.(b);
         b.ammo = ammo;
         b.refreshAmmoBar();
       }
+      if (targetPriority && targetPriority !== b.targetPriority) {
+        b.targetPriority = targetPriority;
+        b.refreshPriorityRing();
+      }
+      b.curseUntil = curseLeft > 0 ? performance.now() / 1e3 + curseLeft : 0;
     }
     for (const id of [...this.buildings.keys()]) {
       if (!seen.has(id)) this.remove(id);
