@@ -77,6 +77,10 @@ var MAT2 = {
   barBg: new THREE.MeshBasicMaterial({ color: 1119519, transparent: true, opacity: 0.8, depthTest: false }),
   barFg: new THREE.MeshBasicMaterial({ color: 6745736, depthTest: false }),
   rangeRing: new THREE.MeshBasicMaterial({ color: 14061311, transparent: true, opacity: 0.35, side: THREE.DoubleSide }),
+  outpostPole: new THREE.MeshStandardMaterial({ color: 0x8B6B44, roughness: 0.85 }),
+  outpostFlag: new THREE.MeshStandardMaterial({ color: 0xE8604A, roughness: 0.7, side: THREE.DoubleSide, emissive: 0x3A0E06, emissiveIntensity: 0.25 }),
+  outpostBase: new THREE.MeshStandardMaterial({ color: 0x7A8088, roughness: 0.95 }),
+  outpostZone: new THREE.MeshBasicMaterial({ color: 0xE8604A, transparent: true, opacity: 0.42, side: THREE.DoubleSide }),
   buffRing: new THREE.MeshBasicMaterial({ color: 14061311, transparent: true, opacity: 0.5, side: THREE.DoubleSide })
 };
 function barLayer(bg, fg) {
@@ -171,6 +175,9 @@ var Building = class {
   get isArmory() {
     return this.key === "armory";
   }
+  get isOutpost() {
+    return this.key === "outpost";
+  }
   // 다가가서 클릭하면 작업창이 열리는 시설이면 그 종류("craft"/"smelt")
   get stationKind() {
     return this.def.station || null;
@@ -179,7 +186,7 @@ var Building = class {
     return this.key === "trap" || this.key === "mire" || this.key === "blast";
   }
   get isTower() {
-    return this.key !== "wall" && this.key !== "gate" && !this.isTrap && !this.isSupport && !this.isHarvester && !this.isRepairPost && !this.isHealCamp && !this.isArmory && !this.stationKind;
+    return this.key !== "wall" && this.key !== "gate" && !this.isTrap && !this.isSupport && !this.isHarvester && !this.isRepairPost && !this.isHealCamp && !this.isArmory && !this.isOutpost && !this.stationKind;
   }
   get nextCost() {
     const nxt = this.def.levels[this.level];
@@ -192,7 +199,7 @@ var Building = class {
     fg.position.z = 0.01;
     barLayer(bg, fg);
     g2.add(bg, fg);
-    g2.position.y = this.key === "wall" || this.key === "gate" ? 2.7 : this.key === "workbench" ? 1.6 : this.isTrap ? 0.7 : this.key === "harvester" ? 1.9 : 3.4;
+    g2.position.y = this.key === "wall" || this.key === "gate" ? 2.7 : this.key === "workbench" ? 1.6 : this.isTrap ? 0.7 : this.key === "harvester" ? 1.9 : this.key === "outpost" ? 3.2 : 3.4;
     g2.visible = false;
     g2.renderOrder = 5;
     this.mesh.add(g2);
@@ -422,6 +429,31 @@ function buildMesh(key, level) {
     g2.userData.wheel = wheel;
     return g2;
   }
+  if (key === "outpost") {
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 3, 6), MAT2.outpostPole);
+    pole.position.y = 1.5;
+    pole.castShadow = true;
+    g2.add(pole);
+    // 깃발은 레벨이 오를수록 커진다 — 구역이 넓어진 것을 멀리서도 알아볼 수 있게
+    const w2 = 0.7 + level * 0.18;
+    const flag = new THREE.Mesh(new THREE.PlaneGeometry(w2, w2 * 0.6), MAT2.outpostFlag);
+    flag.position.set(w2 / 2 + 0.08, 2.6, 0);
+    flag.castShadow = true;
+    g2.add(flag);
+    const base = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.7, 0.34, 7), MAT2.outpostBase);
+    base.position.y = 0.17;
+    base.castShadow = true;
+    base.receiveShadow = true;
+    g2.add(base);
+    // 자기가 만든 건설 구역을 바닥에 항상 그려 둔다 — 어디까지 지을 수 있는지 건설 모드를
+    // 켜지 않고도 보이지 않으면 이 건물의 존재 이유 자체가 안 읽힌다.
+    const r2 = CFG.builds.outpost.levels[level - 1].zoneRadius;
+    const ring = new THREE.Mesh(new THREE.RingGeometry(r2 - 0.22, r2, 72), MAT2.outpostZone);
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.y = 0.04;
+    g2.add(ring);
+    return g2;
+  }
   if (key === "camp") {
     const canvas2 = new THREE.Mesh(new THREE.ConeGeometry(0.85, 1.1, 4), MAT2.campCanvas);
     canvas2.position.y = 0.55;
@@ -560,6 +592,9 @@ export var BuildManager = class {
     this.sm = sm2;
     this.grid = grid;
     this.world = world;
+    // 전초기지 배치 판정에 포탈 위치가 필요하다 — 판정은 grid.canPlace 한 곳에 모여 있어야
+    // 건설 미리보기(고스트)와 실제 배치가 같은 이유 문자열을 쓴다.
+    grid.portals = world.portals;
     this.fx = fx;
     this.projectiles = projectiles;
     this.buildings = /* @__PURE__ */ new Map();
@@ -607,10 +642,19 @@ export var BuildManager = class {
     for (const k2 of COST_KEYS) if (inv[k2]) out[k2] = Math.ceil(inv[k2] * 0.25);
     return out;
   }
+  // 살아있는 전초기지가 만들어 낸 추가 건설 구역. 깃발이 부서지면 목록에서 사라지므로
+  // 그 구역도 함께 없어진다(이미 지은 건물은 남는다 — 판정은 "새로 짓는 순간"에만 걸린다).
+  zones() {
+    const out = [];
+    for (const b of this.buildings.values()) {
+      if (b.def.expandsZone) out.push({ x: b.x, z: b.z, r: b.stats.zoneRadius });
+    }
+    return out;
+  }
   // place()와 정확히 같은 canPlace 판정을 새 위치에 적용한다 — 레벨·특화·체력·탄약은
   // 전혀 안 건드리고 위치(격자·좌표·메시)만 옮긴다.
   relocate(b, gx, gz) {
-    const res = this.grid.canPlace(gx, gz, (x2, z2) => this.world.blocksBuild(x2, z2), b.key);
+    const res = this.grid.canPlace(gx, gz, (x2, z2) => this.world.blocksBuild(x2, z2), b.key, this.zones());
     if (!res.ok) return null;
     this.grid.clear(b.gx, b.gz);
     b.gx = gx;
@@ -668,20 +712,21 @@ export var BuildManager = class {
       else if (b && b.isRepairPost) this._showRangeRing(b.x, b.z, b.stats.healRadius);
       else if (b && b.isHealCamp) this._showRangeRing(b.x, b.z, b.stats.healRadius);
       else if (b && b.isArmory) this._showRangeRing(b.x, b.z, b.stats.supplyRadius);
+      else if (b && b.isOutpost) this._showRangeRing(b.x, b.z, b.stats.zoneRadius);
       else if (b && b.isTower) this._showRangeRing(b.x, b.z, b.stats.range * rangeMult);
       else this.rangeRing.visible = false;
       return;
     }
     const placeKey = this.mode === "move" ? this.relocateSource.key : this.mode;
     const g2 = this.grid.toGrid(pointer.x, pointer.z);
-    const res = this.grid.canPlace(g2.gx, g2.gz, (x2, z2) => this.world.blocksBuild(x2, z2), placeKey);
+    const res = this.grid.canPlace(g2.gx, g2.gz, (x2, z2) => this.world.blocksBuild(x2, z2), placeKey, this.zones());
     const w2 = this.grid.toWorld(g2.gx, g2.gz);
     if (this.ghost) {
       this.ghost.visible = true;
       this.ghost.position.set(w2.x, 0, w2.z);
     }
     const lv1 = CFG.builds[placeKey].levels[0];
-    const previewRadius = lv1.buffRadius ?? lv1.detectRadius ?? lv1.healRadius ?? (lv1.range != null ? lv1.range * rangeMult : void 0);
+    const previewRadius = lv1.buffRadius ?? lv1.detectRadius ?? lv1.healRadius ?? lv1.zoneRadius ?? (lv1.range != null ? lv1.range * rangeMult : void 0);
     if (previewRadius) this._showRangeRing(w2.x, w2.z, previewRadius);
     else this.rangeRing.visible = false;
     let ok = res.ok;
@@ -701,17 +746,23 @@ export var BuildManager = class {
     this.rangeRing.position.set(x2, 0.05, z2);
     this.rangeRing.scale.setScalar(radius);
   }
-  // 실제 배치(권한 있는 쪽에서만 호출). 성공 시 Building 반환
-  place(key, gx, gz, ownerId, id) {
-    const res = this.grid.canPlace(gx, gz, (x2, z2) => this.world.blocksBuild(x2, z2), key);
-    if (!res.ok) return null;
-    const b = new Building(key, gx, gz, res.x, res.z, ownerId, id);
+  // 실제 배치. force 는 스냅샷 복제 전용 — 참가자는 호스트의 상태를 "그대로 옮겨 그릴" 뿐이라
+  // 배치 규칙을 다시 심사하면 안 된다. 특히 전초기지 구역은 시간이 지나면 사라질 수 있어서
+  // (깃발이 부서지면), 그 구역 안에 이미 지어진 건물이 담긴 스냅샷을 나중에 받은 참가자가
+  // 심사를 다시 돌리면 그 건물들을 통째로 못 그리는 디싱크가 난다. 단, 격자가 이미 차 있으면
+  // force 여도 건너뛴다(다른 건물의 격자 등록을 덮어써 상태가 깨지는 것을 막는다 —
+  // 다음 스냅샷에서 정리된 뒤 정상적으로 들어온다).
+  place(key, gx, gz, ownerId, id, force) {
+    const res = this.grid.canPlace(gx, gz, (x2, z2) => this.world.blocksBuild(x2, z2), key, this.zones());
+    if (!res.ok && !(force && !this.grid.at(gx, gz) && this.grid.inBounds(gx, gz))) return null;
+    const w3 = res.ok ? res : this.grid.toWorld(gx, gz);
+    const b = new Building(key, gx, gz, w3.x, w3.z, ownerId, id);
     if (id && id >= nextId) nextId = id + 1;
     this.root.add(b.mesh);
     this.buildings.set(b.id, b);
     this.grid.set(gx, gz, b);
     b.turret = b.mesh.userData.turret;
-    this.fx.ring(res.x, res.z, 9109440, 2);
+    this.fx.ring(w3.x, w3.z, 9109440, 2);
     return b;
   }
   remove(id) {
@@ -1024,7 +1075,7 @@ export var BuildManager = class {
     for (const [id, key, gx, gz, level, hp, owner, spec, ammo, targetPriority, curseLeft] of list) {
       seen.add(id);
       let b = this.buildings.get(id);
-      if (!b) b = this.place(key, gx, gz, owner, id);
+      if (!b) b = this.place(key, gx, gz, owner, id, true);
       if (!b) continue;
       if (b.level !== level) {
         b.applyLevel(level);

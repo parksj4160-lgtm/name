@@ -1709,6 +1709,16 @@ export var UI = class {
     ctx.beginPath();
     ctx.arc(size / 2, size / 2, CFG.world.buildRadius * s2, 0, Math.PI * 2);
     ctx.stroke();
+    // 전초기지가 넓혀 놓은 구역도 홈 구역과 같은 방식으로 그린다 — 미니맵만 봐도 지금 내
+    // 영역이 어디까지인지 한눈에 들어와야 이 건물을 어디에 더 세울지 판단할 수 있다.
+    ctx.strokeStyle = "rgba(232,96,74,0.7)";
+    for (const b of g2.buildMgr.buildings.values()) {
+      if (!b.def.expandsZone) continue;
+      ctx.beginPath();
+      ctx.arc(tx(b.x), tz(b.z), b.stats.zoneRadius * s2, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.strokeStyle = "rgba(95,212,255,0.5)";
     for (const n of g2.world.nodes) {
       if (n.depleted) continue;
       ctx.fillStyle = n.type === "tree" ? "#3e8b47" : n.type === "copper" ? "#c87137" : n.type === "coal" ? "#3a3a42" : "#9aa3b5";

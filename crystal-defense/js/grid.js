@@ -92,12 +92,28 @@ export var BuildGrid = class {
   // 건설 가능 판정. 이유 문자열을 함께 돌려준다.
   // key 가 fieldPlacement 건물(채집기)이면 채집 노드가 사실 전부 buildRadius 밖에 있어서
   // 방어선 안에서는 노드에 닿을 수조차 없다 — 그런 건물만 바깥쪽 반경 제한을 건너뛴다.
-  canPlace(gx, gz, blockers, key) {
+  // zones — 전초기지가 만들어 낸 추가 건설 구역([{x,z,r}]). 크리스탈 주위 원 하나뿐이던
+  // 건설 가능 영역이 이제 "원들의 합집합"이 된다. 판정만 넓어질 뿐 나머지 규칙(코어 반경·중복·
+  // 겹침)은 그대로다.
+  canPlace(gx, gz, blockers, key, zones) {
     if (!this.inBounds(gx, gz)) return { ok: false, why: "맵 밖입니다" };
     const w2 = this.toWorld(gx, gz);
     const d2 = Math.hypot(w2.x, w2.z);
-    const fieldPlacement = key && CFG.builds[key]?.fieldPlacement;
-    if (!fieldPlacement && d2 > CFG.world.buildRadius) return { ok: false, why: "건설 가능 구역 밖입니다" };
+    const def = key && CFG.builds[key];
+    const fieldPlacement = def?.fieldPlacement;
+    if (!fieldPlacement && d2 > CFG.world.buildRadius) {
+      const inZone = zones && zones.some((z2) => Math.hypot(w2.x - z2.x, w2.z - z2.z) <= z2.r);
+      if (!inZone) return { ok: false, why: "건설 가능 구역 밖입니다 (🚩 전초기지를 세우면 넓어집니다)" };
+    }
+    // 전초기지 자신은 "밖으로 미는" 물건이라 홈 구역 안에서는 지을 수 없고, 서로 겹쳐 세우거나
+    // 포탈을 덮어 스폰을 막을 수도 없다.
+    if (def?.expandsZone) {
+      if (d2 < CFG.world.outpostMinCore) return { ok: false, why: "전초기지는 방어선 밖에만 세울 수 있습니다" };
+      if (zones && zones.some((z2) => Math.hypot(w2.x - z2.x, w2.z - z2.z) < CFG.world.outpostMinGap))
+        return { ok: false, why: "다른 전초기지와 너무 가깝습니다" };
+      if (this.portals && this.portals.some((p2) => Math.hypot(w2.x - p2.x, w2.z - p2.z) < CFG.world.outpostMinPortal))
+        return { ok: false, why: "포탈과 너무 가깝습니다" };
+    }
     if (d2 < CFG.world.coreRadius) return { ok: false, why: "크리스탈에 너무 가깝습니다" };
     if (this.at(gx, gz)) return { ok: false, why: "이미 건물이 있습니다" };
     if (blockers && blockers(w2.x, w2.z)) return { ok: false, why: "다른 오브젝트와 겹칩니다" };

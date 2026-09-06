@@ -135,6 +135,7 @@ export var Game = class {
     this._seenFoxGuard = false;
     this._seenFrostaxe = false;
     this._seenHarvester = false;
+    this._seenOutpost = false;
     this._seenHunt = false;
     this._seenKnockback = false;
     this._seenRaccoon = false;
@@ -1986,6 +1987,10 @@ export var Game = class {
     if (key === "sniper" && !this._seenSniper) {
       this._seenSniper = true;
       this._notify(playerId, "🎯 저격탑 건설! 사거리 안에서 남은 체력이 가장 많은 적을 저격합니다 — 다른 타워보다 사거리가 훨씬 깁니다", "good");
+    }
+    if (key === "outpost" && !this._seenOutpost) {
+      this._seenOutpost = true;
+      this._notify(playerId, "🚩 전초기지 건설! 깃발 주위가 새 건설 구역이 됐습니다 — 이제 저기에도 타워·벽을 지을 수 있습니다. 깃발이 부서지면 그 구역은 사라집니다", "good");
     }
   }
   // COST_KEYS(utils.js)를 그대로 따라간다 — 새 재료가 추가돼도 여기 손댈 필요 없이
