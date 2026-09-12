@@ -3,7 +3,13 @@ import { CFG } from './config.js';
 import { COST_KEYS, canAfford, dist } from './utils.js';
 
 var GEO2 = {
-  wall: new THREE.BoxGeometry(1.88, 2.3, 1.88),
+  // 벽은 정육면체 하나였다 — 가장 많이 짓는 건물인데 회색 판지 상자처럼 보였다. 기단 → 아래단 →
+  // 위단(조금 좁게) → 갓돌로 쌓아 올리면 폴리곤 몇 개만 더 쓰고도 "석벽"으로 읽힌다.
+  wallFoot: new THREE.BoxGeometry(2, 0.26, 2),
+  wall: new THREE.BoxGeometry(1.9, 1, 1.9),
+  wallUpper: new THREE.BoxGeometry(1.72, 0.85, 1.72),
+  wallCap: new THREE.BoxGeometry(1.96, 0.2, 1.96),
+  wallMerlon: new THREE.BoxGeometry(0.44, 0.34, 0.44),
   base: new THREE.CylinderGeometry(0.9, 1, 0.7, 8),
   pillar: new THREE.CylinderGeometry(0.42, 0.5, 1.9, 8),
   headArrow: new THREE.ConeGeometry(0.55, 1.1, 7),
@@ -38,6 +44,8 @@ var MAT2 = {
     new THREE.MeshStandardMaterial({ color: 10465476, roughness: 0.8 }),
     new THREE.MeshStandardMaterial({ color: 14207373, roughness: 0.6, metalness: 0.3 })
   ],
+  // 기단·갓돌용 어두운 돌 — 본체와 명도를 갈라야 층이 쌓인 것으로 읽힌다
+  wallDark: new THREE.MeshStandardMaterial({ color: 5723731, roughness: 0.95 }),
   base: new THREE.MeshStandardMaterial({ color: 7171962, roughness: 0.9 }),
   arrow: new THREE.MeshStandardMaterial({ color: 13148506, roughness: 0.6, metalness: 0.2 }),
   frost: new THREE.MeshStandardMaterial({ color: 7329023, emissive: 2787e3, emissiveIntensity: 0.7, roughness: 0.3 }),
@@ -378,16 +386,30 @@ var Building = class {
 function buildMesh(key, level) {
   const g2 = new THREE.Group();
   if (key === "wall") {
-    const m2 = new THREE.Mesh(GEO2.wall, MAT2.wall[level - 1]);
-    m2.position.y = 1.15;
+    const stone = MAT2.wall[level - 1];
+    const foot = new THREE.Mesh(GEO2.wallFoot, MAT2.wallDark);
+    foot.position.y = 0.13;
+    foot.receiveShadow = true;
+    const m2 = new THREE.Mesh(GEO2.wall, stone);
+    m2.position.y = 0.76;
     m2.castShadow = true;
     m2.receiveShadow = true;
-    g2.add(m2);
-    if (level >= 2) {
-      const cap = new THREE.Mesh(new THREE.BoxGeometry(2, 0.28, 2), MAT2.wall[level - 1]);
-      cap.position.y = 2.4;
-      cap.castShadow = true;
-      g2.add(cap);
+    const upper = new THREE.Mesh(GEO2.wallUpper, stone);
+    upper.position.y = 1.69;
+    upper.castShadow = true;
+    upper.receiveShadow = true;
+    const cap = new THREE.Mesh(GEO2.wallCap, MAT2.wallDark);
+    cap.position.y = 2.21;
+    cap.castShadow = true;
+    g2.add(foot, m2, upper, cap);
+    // 최종 단계에만 성가퀴를 올려, 다 올린 벽인지 멀리서도 실루엣으로 구분된다
+    if (level >= 3) {
+      for (const [dx, dz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+        const mer = new THREE.Mesh(GEO2.wallMerlon, stone);
+        mer.position.set(dx * 0.68, 2.48, dz * 0.68);
+        mer.castShadow = true;
+        g2.add(mer);
+      }
     }
     return g2;
   }

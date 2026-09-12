@@ -327,11 +327,22 @@ button.go:disabled { opacity: 0.4; cursor: not-allowed; }
   backdrop-filter: blur(4px); padding: 16px; overflow: auto;
 }
 .card {
-  width: min(460px, 94vw); background: var(--panel); border: 1px solid var(--line);
-  border-radius: 18px; padding: 22px; box-shadow: 0 24px 70px rgba(0,0,0,0.6);
+  width: min(460px, 94vw); border: 1px solid var(--line);
+  background: linear-gradient(180deg, rgba(28,40,60,0.94), rgba(11,16,27,0.96));
+  border-radius: 18px; padding: 22px;
+  box-shadow: 0 24px 70px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.08);
 }
 .card.center { text-align: center; }
-.card h1 { margin: 0 0 6px; font-size: 26px; letter-spacing: -0.5px; }
+.card h1 { margin: 0 0 6px; font-size: 28px; letter-spacing: -0.5px; font-weight: 800; }
+/* 제목만은 단색 흰 글씨 대신 크리스탈 색 그라데이션으로 — 게임 이름을 처음 만나는 자리다.
+   background-clip:text 를 못 쓰는 환경에서는 글자가 통째로 사라지므로 @supports 로 감싼다. */
+@supports ((-webkit-background-clip: text) or (background-clip: text)) {
+  .card h1.title {
+    background: linear-gradient(180deg, #ffffff 10%, #8fe3ff 55%, #4aa6e8 100%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 2px 10px rgba(95,212,255,0.35));
+  }
+}
 .card .sub { margin: 0 0 16px; color: var(--dim); font-size: 13px; line-height: 1.6; }
 .row { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; }
 .row label { width: 60px; font-size: 13px; color: var(--dim); }
@@ -504,14 +515,25 @@ button.ghost { background: transparent; color: var(--dim); }
 .inv-list { display: flex; flex-direction: column; gap: 8px; overflow-y: auto; padding-right: 2px; }
 .inv-item {
   display: flex; align-items: center; gap: 12px; width: 100%; text-align: left;
-  background: rgba(255,255,255,0.05); color: var(--text);
+  background: linear-gradient(180deg, rgba(255,255,255,0.07), rgba(255,255,255,0.03));
+  color: var(--text);
   border: 1px solid var(--line); border-radius: 10px;
   padding: 10px 12px; cursor: pointer; font: inherit;
-  transition: background 0.12s, border-color 0.12s;
+  transition: background 0.12s, border-color 0.12s, transform 0.08s;
 }
-.inv-item:hover:not(:disabled) { background: rgba(95,212,255,0.16); border-color: var(--cyan); }
+.inv-item:hover:not(:disabled) {
+  background: linear-gradient(180deg, rgba(95,212,255,0.22), rgba(95,212,255,0.1));
+  border-color: var(--cyan); transform: translateX(2px);
+}
 .inv-item:disabled { cursor: not-allowed; opacity: 0.65; }
-.inv-item .ii-icon { font-size: 22px; line-height: 1; flex: 0 0 auto; width: 26px; text-align: center; }
+/* 아이콘을 네모 타일에 앉힌다 — 맨 이모지만 있을 때는 줄마다 시작점이 들쭉날쭉해 보였다
+   (이모지 글리프 폭이 제각각이라 자원 패널에서도 같은 문제를 고친 적이 있다) */
+.inv-item .ii-icon {
+  font-size: 20px; line-height: 1; flex: 0 0 auto;
+  width: 34px; height: 34px; border-radius: 9px;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(10,16,28,0.55); border: 1px solid rgba(120,190,255,0.14);
+}
 .inv-item .ii-body { display: flex; flex-direction: column; gap: 2px; flex: 1 1 auto; min-width: 0; }
 .inv-item .ii-body b { font-size: 14px; }
 .inv-item .ii-desc { font-size: 11px; color: var(--dim); }

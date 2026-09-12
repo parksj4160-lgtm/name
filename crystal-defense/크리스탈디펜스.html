@@ -337,11 +337,22 @@ button.go:disabled { opacity: 0.4; cursor: not-allowed; }
   backdrop-filter: blur(4px); padding: 16px; overflow: auto;
 }
 .card {
-  width: min(460px, 94vw); background: var(--panel); border: 1px solid var(--line);
-  border-radius: 18px; padding: 22px; box-shadow: 0 24px 70px rgba(0,0,0,0.6);
+  width: min(460px, 94vw); border: 1px solid var(--line);
+  background: linear-gradient(180deg, rgba(28,40,60,0.94), rgba(11,16,27,0.96));
+  border-radius: 18px; padding: 22px;
+  box-shadow: 0 24px 70px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.08);
 }
 .card.center { text-align: center; }
-.card h1 { margin: 0 0 6px; font-size: 26px; letter-spacing: -0.5px; }
+.card h1 { margin: 0 0 6px; font-size: 28px; letter-spacing: -0.5px; font-weight: 800; }
+/* 제목만은 단색 흰 글씨 대신 크리스탈 색 그라데이션으로 — 게임 이름을 처음 만나는 자리다.
+   background-clip:text 를 못 쓰는 환경에서는 글자가 통째로 사라지므로 @supports 로 감싼다. */
+@supports ((-webkit-background-clip: text) or (background-clip: text)) {
+  .card h1.title {
+    background: linear-gradient(180deg, #ffffff 10%, #8fe3ff 55%, #4aa6e8 100%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 2px 10px rgba(95,212,255,0.35));
+  }
+}
 .card .sub { margin: 0 0 16px; color: var(--dim); font-size: 13px; line-height: 1.6; }
 .row { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; }
 .row label { width: 60px; font-size: 13px; color: var(--dim); }
@@ -514,14 +525,25 @@ button.ghost { background: transparent; color: var(--dim); }
 .inv-list { display: flex; flex-direction: column; gap: 8px; overflow-y: auto; padding-right: 2px; }
 .inv-item {
   display: flex; align-items: center; gap: 12px; width: 100%; text-align: left;
-  background: rgba(255,255,255,0.05); color: var(--text);
+  background: linear-gradient(180deg, rgba(255,255,255,0.07), rgba(255,255,255,0.03));
+  color: var(--text);
   border: 1px solid var(--line); border-radius: 10px;
   padding: 10px 12px; cursor: pointer; font: inherit;
-  transition: background 0.12s, border-color 0.12s;
+  transition: background 0.12s, border-color 0.12s, transform 0.08s;
 }
-.inv-item:hover:not(:disabled) { background: rgba(95,212,255,0.16); border-color: var(--cyan); }
+.inv-item:hover:not(:disabled) {
+  background: linear-gradient(180deg, rgba(95,212,255,0.22), rgba(95,212,255,0.1));
+  border-color: var(--cyan); transform: translateX(2px);
+}
 .inv-item:disabled { cursor: not-allowed; opacity: 0.65; }
-.inv-item .ii-icon { font-size: 22px; line-height: 1; flex: 0 0 auto; width: 26px; text-align: center; }
+/* 아이콘을 네모 타일에 앉힌다 — 맨 이모지만 있을 때는 줄마다 시작점이 들쭉날쭉해 보였다
+   (이모지 글리프 폭이 제각각이라 자원 패널에서도 같은 문제를 고친 적이 있다) */
+.inv-item .ii-icon {
+  font-size: 20px; line-height: 1; flex: 0 0 auto;
+  width: 34px; height: 34px; border-radius: 9px;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(10,16,28,0.55); border: 1px solid rgba(120,190,255,0.14);
+}
 .inv-item .ii-body { display: flex; flex-direction: column; gap: 2px; flex: 1 1 auto; min-width: 0; }
 .inv-item .ii-body b { font-size: 14px; }
 .inv-item .ii-desc { font-size: 11px; color: var(--dim); }
@@ -900,7 +922,7 @@ button.corner.mute.off { opacity: 0.5; }
 <!-- ================= 로비 ================= -->
 <div id="lobby" class="overlay">
   <div class="card">
-    <h1>크리스탈 디펜스</h1>
+    <h1 class="title">크리스탈 디펜스</h1>
     <p class="sub">중앙의 수정을 지켜라. 파밍 → 건설 → 방어의 반복. 목표는 <b>10웨이브 생존</b>.</p>
 
     <div class="row">
@@ -15977,7 +15999,13 @@ ${stats.riskWavesCleared ? `<li>\u26A0\uFE0F \uC704\uD5D8 \uACC4\uC57D \uC2B9\uB
 
   // js/buildings.js
   var GEO2 = {
-    wall: new qs(1.88, 2.3, 1.88),
+    // 벽은 정육면체 하나였다 — 가장 많이 짓는 건물인데 회색 판지 상자처럼 보였다. 기단 → 아래단 →
+    // 위단(조금 좁게) → 갓돌로 쌓아 올리면 폴리곤 몇 개만 더 쓰고도 "석벽"으로 읽힌다.
+    wallFoot: new qs(2, 0.26, 2),
+    wall: new qs(1.9, 1, 1.9),
+    wallUpper: new qs(1.72, 0.85, 1.72),
+    wallCap: new qs(1.96, 0.2, 1.96),
+    wallMerlon: new qs(0.44, 0.34, 0.44),
     base: new su(0.9, 1, 0.7, 8),
     pillar: new su(0.42, 0.5, 1.9, 8),
     headArrow: new au(0.55, 1.1, 7),
@@ -16012,6 +16040,8 @@ ${stats.riskWavesCleared ? `<li>\u26A0\uFE0F \uC704\uD5D8 \uACC4\uC57D \uC2B9\uB
       new sd({ color: 10465476, roughness: 0.8 }),
       new sd({ color: 14207373, roughness: 0.6, metalness: 0.3 })
     ],
+    // 기단·갓돌용 어두운 돌 — 본체와 명도를 갈라야 층이 쌓인 것으로 읽힌다
+    wallDark: new sd({ color: 5723731, roughness: 0.95 }),
     base: new sd({ color: 7171962, roughness: 0.9 }),
     arrow: new sd({ color: 13148506, roughness: 0.6, metalness: 0.2 }),
     frost: new sd({ color: 7329023, emissive: 2787e3, emissiveIntensity: 0.7, roughness: 0.3 }),
@@ -16352,16 +16382,29 @@ ${stats.riskWavesCleared ? `<li>\u26A0\uFE0F \uC704\uD5D8 \uACC4\uC57D \uC2B9\uB
   function buildMesh(key, level) {
     const g2 = new Wl();
     if (key === "wall") {
-      const m2 = new Xs(GEO2.wall, MAT2.wall[level - 1]);
-      m2.position.y = 1.15;
+      const stone = MAT2.wall[level - 1];
+      const foot = new Xs(GEO2.wallFoot, MAT2.wallDark);
+      foot.position.y = 0.13;
+      foot.receiveShadow = true;
+      const m2 = new Xs(GEO2.wall, stone);
+      m2.position.y = 0.76;
       m2.castShadow = true;
       m2.receiveShadow = true;
-      g2.add(m2);
-      if (level >= 2) {
-        const cap = new Xs(new qs(2, 0.28, 2), MAT2.wall[level - 1]);
-        cap.position.y = 2.4;
-        cap.castShadow = true;
-        g2.add(cap);
+      const upper = new Xs(GEO2.wallUpper, stone);
+      upper.position.y = 1.69;
+      upper.castShadow = true;
+      upper.receiveShadow = true;
+      const cap = new Xs(GEO2.wallCap, MAT2.wallDark);
+      cap.position.y = 2.21;
+      cap.castShadow = true;
+      g2.add(foot, m2, upper, cap);
+      if (level >= 3) {
+        for (const [dx, dz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+          const mer = new Xs(GEO2.wallMerlon, stone);
+          mer.position.set(dx * 0.68, 2.48, dz * 0.68);
+          mer.castShadow = true;
+          g2.add(mer);
+        }
       }
       return g2;
     }
