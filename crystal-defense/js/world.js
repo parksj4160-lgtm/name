@@ -8,7 +8,14 @@ var GEO = {
   rock: new THREE.IcosahedronGeometry(1, 0),
   stump: new THREE.CylinderGeometry(0.34, 0.4, 0.5, 6),
   crystal: new THREE.OctahedronGeometry(2, 0),
+  // 투명한 겉면 안에서 반대로 도는 속심 — 팔면체 하나만 있을 때는 각도에 따라 그냥 흰
+  // 덩어리로 보였는데, 안에 심이 하나 더 있으면 유리 속이 들여다보이는 깊이가 생긴다.
+  crystalInner: new THREE.OctahedronGeometry(1.1, 0),
+  crystalShard: new THREE.OctahedronGeometry(0.4, 0),
   pedestal: new THREE.CylinderGeometry(3, 3.6, 1.1, 8),
+  // 받침을 한 단 더 올려 계단형으로 — 원기둥 하나는 위에서 내려다보면 그냥 납작한 원이었다
+  pedestalTop: new THREE.CylinderGeometry(2.35, 2.85, 0.5, 8),
+  pedestalRing: new THREE.TorusGeometry(2.62, 0.09, 6, 32),
   portal: new THREE.TorusGeometry(2.2, 0.28, 8, 24),
   gem: new THREE.OctahedronGeometry(0.4, 0),
   gemStump: new THREE.CylinderGeometry(0.3, 0.36, 0.16, 6),
@@ -201,11 +208,46 @@ export var World = class {
     ped.castShadow = true;
     ped.receiveShadow = true;
     g2.add(ped);
+    const pedTop = new THREE.Mesh(GEO.pedestalTop, MAT.pedestal);
+    pedTop.position.y = 1.32;
+    pedTop.castShadow = true;
+    pedTop.receiveShadow = true;
+    g2.add(pedTop);
+    // 받침 위 테두리를 크리스탈 색으로 한 줄 둘러, 돌 받침과 크리스탈이 같은 물건으로 묶인다
+    const pedRing = new THREE.Mesh(GEO.pedestalRing, new THREE.MeshStandardMaterial({
+      color: 6545663, emissive: 2795212, emissiveIntensity: 0.8, roughness: 0.4
+    }));
+    pedRing.rotation.x = -Math.PI / 2;
+    pedRing.position.y = 1.56;
+    g2.add(pedRing);
     const core = new THREE.Mesh(GEO.crystal, MAT.crystal.clone());
     core.position.y = 3.4;
     core.castShadow = true;
     g2.add(core);
     this.crystalMesh = core;
+    // 겉면 안에서 반대로 도는 속심
+    const inner = new THREE.Mesh(GEO.crystalInner, new THREE.MeshStandardMaterial({
+      color: 11599871, emissive: 4367871, emissiveIntensity: 1.8, roughness: 0.2
+    }));
+    inner.position.y = 3.4;
+    g2.add(inner);
+    this.crystalInner = inner;
+    // 주위를 도는 작은 파편 셋 — 정지한 물체만 있던 화면 한가운데에 상시 움직임이 생긴다
+    const shards = new THREE.Group();
+    shards.position.y = 3.4;
+    this.crystalShardList = [];
+    for (let i = 0; i < 3; i++) {
+      const s2 = new THREE.Mesh(GEO.crystalShard, MAT.crystal.clone());
+      const a2 = i / 3 * Math.PI * 2;
+      s2.userData.a = a2;
+      s2.userData.r = 2.85 + i * 0.22;
+      s2.userData.yOff = (i - 1) * 0.5;
+      s2.position.set(Math.cos(a2) * s2.userData.r, s2.userData.yOff, Math.sin(a2) * s2.userData.r);
+      shards.add(s2);
+      this.crystalShardList.push(s2);
+    }
+    g2.add(shards);
+    this.crystalShards = shards;
     const halo = new THREE.Mesh(
       new THREE.RingGeometry(3.8, 4.4, 48),
       new THREE.MeshBasicMaterial({ color: 6545663, transparent: true, opacity: 0.4, side: THREE.DoubleSide })
@@ -727,6 +769,24 @@ export var World = class {
     const ratio = this.crystal.hp / this.crystal.maxHp;
     this.crystalMesh.material.emissiveIntensity = 0.6 + ratio * 1.2;
     this.crystalMesh.material.color.setHSL(0.52 * ratio + 0, 0.9, 0.55 + 0.1 * ratio);
+    // 속심은 겉면과 반대로 돌아 유리 속이 움직이는 것처럼 보이고, 체력이 깎이면 같이 어두워진다
+    if (this.crystalInner) {
+      this.crystalInner.rotation.y -= dt2 * 0.85;
+      this.crystalInner.rotation.x += dt2 * 0.3;
+      this.crystalInner.position.y = this.crystalMesh.position.y;
+      this.crystalInner.material.emissiveIntensity = 0.7 + ratio * 1.5;
+    }
+    // 파편은 공전하면서 각자 다른 속도로 자전하고, 위아래로도 조금씩 흔들린다
+    if (this.crystalShards) {
+      this.crystalShards.rotation.y += dt2 * 0.42;
+      this.crystalShards.position.y = this.crystalMesh.position.y;
+      for (let i = 0; i < this.crystalShardList.length; i++) {
+        const s2 = this.crystalShardList[i];
+        s2.rotation.y += dt2 * (1.1 + i * 0.4);
+        s2.rotation.z += dt2 * 0.6;
+        s2.position.y = s2.userData.yOff + Math.sin(now * 1.1 + i * 2.1) * 0.22;
+      }
+    }
     this.sm.crystalLight.intensity = (1.2 + ratio * 1.6) * this.sm.crystalNightMult;
     if (this._pulse > 0) {
       this._pulse -= dt2;

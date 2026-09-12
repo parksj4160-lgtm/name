@@ -3,8 +3,21 @@ import { CFG, WEATHER, needsPickaxe } from './config.js';
 import { clamp, dist, payCost } from './utils.js';
 
 var GEO4 = {
-  body: new THREE.CapsuleGeometry(0.38, 0.7, 4, 10),
-  head: new THREE.SphereGeometry(0.3, 12, 10),
+  // 몸통은 어깨가 넓고 허리가 좁은 형태로 — 예전엔 반지름이 일정한 캡슐 하나뿐이라 위에서
+  // 내려다보는 이 게임의 카메라에서는 그냥 알약 한 개로만 보였다.
+  body: new THREE.CylinderGeometry(0.3, 0.22, 0.62, 10),
+  head: new THREE.SphereGeometry(0.235, 12, 10),
+  // 후드는 머리 위를 덮는 반구 — 내려다보는 각도에서 화면에 가장 크게 잡히는 면이라
+  // 여기에 플레이어 색을 칠해야 멀리서도 누가 누군지 바로 읽힌다.
+  hood: new THREE.SphereGeometry(0.275, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.5),
+  pauldron: new THREE.SphereGeometry(0.16, 8, 6),
+  belt: new THREE.CylinderGeometry(0.245, 0.245, 0.1, 10),
+  leg: new THREE.CapsuleGeometry(0.105, 0.34, 3, 6),
+  boot: new THREE.BoxGeometry(0.22, 0.11, 0.3),
+  // 어깨를 덮는 짧은 망토. 등까지 내려오는 긴 망토로도 만들어 봤는데, 천 시뮬레이션이 없으니
+  // 어느 각도에서 보든 옆으로 삐져나온 판때기로 보였다. 짧게 끊으면 그럴 일이 없으면서도
+  // 위에서 내려다보는 이 게임의 카메라에는 어깨 실루엣이 또렷하게 잡힌다.
+  cape: new THREE.CylinderGeometry(0.31, 0.44, 0.36, 12, 1, true, Math.PI * 0.55, Math.PI * 0.9),
   arm: new THREE.CapsuleGeometry(0.12, 0.45, 3, 6),
   tool: new THREE.BoxGeometry(0.14, 0.9, 0.14),
   sword: new THREE.BoxGeometry(0.1, 1.05, 0.24),
@@ -88,17 +101,65 @@ var Player = class {
     const g2 = new THREE.Group();
     const mat = new THREE.MeshStandardMaterial({ color: this.color, roughness: 0.6, metalness: 0.1, transparent: true });
     this.mat = mat;
+    // 어두운 가죽 — 벨트·부츠·망토 안감처럼 몸 색을 끊어 주는 자리에 쓴다. 온몸이 한 가지
+    // 색이면 위에서 봤을 때 덩어리 하나로 뭉개진다.
+    const dark = new THREE.MeshStandardMaterial({ color: 3157558, roughness: 0.85 });
     const body = new THREE.Mesh(GEO4.body, mat);
-    body.position.y = 0.85;
+    body.position.y = 1.02;
     body.castShadow = true;
+    const belt = new THREE.Mesh(GEO4.belt, dark);
+    belt.position.y = 0.76;
+    belt.castShadow = true;
     const head = new THREE.Mesh(GEO4.head, new THREE.MeshStandardMaterial({ color: 15913904, roughness: 0.8 }));
-    head.position.y = 1.55;
+    head.position.y = 1.5;
     head.castShadow = true;
-    g2.add(body, head);
+    const hood = new THREE.Mesh(GEO4.hood, mat);
+    hood.position.y = 1.53;
+    hood.castShadow = true;
+    g2.add(body, belt, head, hood);
+    // 어깨 갑주는 어두운 색 — 몸통과 같은 색으로 뒀더니 어깨선이 사라져 통짜로 보였다
+    for (const side of [-1, 1]) {
+      const pa = new THREE.Mesh(GEO4.pauldron, dark);
+      pa.position.set(side * 0.3, 1.26, 0);
+      pa.scale.set(1, 0.72, 1);
+      pa.castShadow = true;
+      g2.add(pa);
+    }
+    // 망토는 몸 색을 어둡게 깐 것 — 같은 색이면 몸통과 뭉치고, 전혀 다른 색이면 팀 색이 흐려진다
+    const capeCol = new THREE.Color(this.color).multiplyScalar(0.55);
+    const cape = new THREE.Mesh(GEO4.cape, new THREE.MeshStandardMaterial({
+      color: capeCol, roughness: 0.8, side: THREE.DoubleSide
+    }));
+    cape.position.set(0, 1.24, -0.02);
+    cape.castShadow = true;
+    g2.add(cape);
+    this.cape = cape;
+    // 다리 — 예전엔 아예 없어서 캐릭터가 땅에 떠 있는 알약처럼 보였다. 걸을 때 번갈아
+    // 흔들리는 것만으로 "걸어간다"는 느낌이 완전히 달라진다.
+    this.legs = [];
+    for (const side of [-1, 1]) {
+      const pivot = new THREE.Group();
+      pivot.position.set(side * 0.14, 0.58, 0);
+      const leg = new THREE.Mesh(GEO4.leg, mat);
+      leg.position.y = -0.25;
+      leg.castShadow = true;
+      const boot = new THREE.Mesh(GEO4.boot, dark);
+      boot.position.set(0, -0.47, 0.04);
+      boot.castShadow = true;
+      pivot.add(leg, boot);
+      g2.add(pivot);
+      this.legs.push(pivot);
+    }
     const arm = new THREE.Mesh(GEO4.arm, mat);
     arm.position.set(0.42, 1.05, 0.1);
     g2.add(arm);
     this.arm = arm;
+    // 반대쪽 팔 — 도구를 든 팔과 반대로 흔들려야 걷는 동작이 자연스럽다
+    const armOff = new THREE.Mesh(GEO4.arm, mat);
+    armOff.position.set(-0.42, 1.05, 0.1);
+    armOff.castShadow = true;
+    g2.add(armOff);
+    this.armOff = armOff;
     const tool = new THREE.Mesh(GEO4.tool, WEAPON_MAT.default);
     tool.position.set(0.5, 1, 0.35);
     tool.rotation.x = -0.4;
@@ -262,6 +323,15 @@ var Player = class {
       this.arm.rotation.x = moving ? Math.sin(t2 * 9) * 0.6 : Math.sin(t2 * 2) * 0.08;
       this.tool.rotation.x = -0.4;
     }
+    // 다리·반대쪽 팔은 걸을 때 서로 반대 위상으로 흔들린다. 멈춰 있으면 아주 약하게 숨쉬듯.
+    const stride = moving ? Math.sin(t2 * 9) * 0.62 : 0;
+    if (this.legs) {
+      this.legs[0].rotation.x = stride;
+      this.legs[1].rotation.x = -stride;
+    }
+    if (this.armOff) this.armOff.rotation.x = moving ? -stride * 0.85 : Math.sin(t2 * 2 + 1) * 0.07;
+    // 망토는 이동할 때 살짝 뒤로 날린다
+    if (this.cape) this.cape.rotation.x = (moving ? 0.13 : 0.03) + Math.sin(t2 * 4) * 0.025;
     const bob = moving ? Math.abs(Math.sin(t2 * 9)) * 0.09 : 0;
     this.mesh.position.y = bob;
     this.mesh.rotation.y = this.rot;

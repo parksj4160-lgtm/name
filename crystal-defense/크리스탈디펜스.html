@@ -176,28 +176,52 @@ button.go:disabled { opacity: 0.4; cursor: not-allowed; }
 }
 #party-list .give:hover { background: rgba(95,212,255,0.2); }
 
+/* ---------- 좌하단 묶음 (상태 + 스킬) ---------- */
+/* 세로 묶음이라 상태바 줄 수가 늘어도 스킬 바를 밀어낼 뿐 겹치지 않는다 */
+/* 카드 하나 안에 상태바와 스킬을 같이 담는다 — 따로 떠 있을 때는 서로 관계없는 두 물건처럼
+   보였다. 테두리·배경은 .panel 이 담당한다. */
+#left-cluster {
+  left: 14px; bottom: 14px; z-index: 5;
+  display: flex; flex-direction: column; gap: 8px; align-items: stretch;
+  width: 312px; max-width: calc(100vw - 28px);
+}
+
 /* ---------- 플레이어 상태 ---------- */
-#player-panel { left: 14px; bottom: 92px; width: 220px; display: flex; flex-direction: column; gap: 6px; }
+#player-panel { display: flex; flex-direction: column; gap: 6px; }
 .prompt { font-size: 12px; color: var(--warn); }
 
 /* ---------- 정수 스킬 바 ---------- */
+/* 위에 가는 구분선을 둬서 "상태"와 "쓸 수 있는 것"이 한 카드 안에서도 나뉘어 읽힌다 */
 #skill-bar {
-  position: fixed; left: 14px; bottom: 172px; display: flex; gap: 5px; z-index: 5;
+  position: static; display: flex; gap: 5px; flex-wrap: wrap;
+  padding-top: 8px; border-top: 1px solid rgba(120,190,255,0.14);
 }
 .skill-btn {
-  position: relative; width: 40px; height: 40px; border-radius: 10px; padding: 0;
-  background: rgba(14,20,33,0.85); border: 1px solid var(--line); color: var(--text);
+  position: relative; width: 36px; height: 36px; border-radius: 10px; padding: 0;
+  /* 평평한 단색이던 것을 위아래 그라데이션 + 안쪽 윗변 하이라이트로 — 버튼이 눌러지는
+     물건처럼 보인다 */
+  background: linear-gradient(180deg, rgba(30,42,62,0.92), rgba(13,19,31,0.94));
+  border: 1px solid var(--line); color: var(--text);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.08);
   font-family: inherit; display: flex; flex-direction: column; align-items: center; justify-content: center;
-  cursor: pointer; transition: opacity 0.12s, border-color 0.12s;
+  cursor: pointer; transition: opacity 0.12s, border-color 0.12s, transform 0.08s, box-shadow 0.12s;
 }
-.skill-btn .ic { font-size: 17px; line-height: 1; }
+.skill-btn .ic { font-size: 19px; line-height: 1; }
 .skill-btn b {
-  position: absolute; right: -3px; bottom: -3px; min-width: 13px; height: 13px; line-height: 13px;
-  border-radius: 7px; background: rgba(95,212,255,0.9); color: #06121c; font-size: 8px; font-weight: 700;
-  text-align: center; padding: 0 2px;
+  position: absolute; right: -3px; bottom: -3px; min-width: 15px; height: 15px; line-height: 15px;
+  border-radius: 8px; background: linear-gradient(180deg, #7fdcff, #3aa8dc); color: #04121c;
+  font-size: 9px; font-weight: 800; text-align: center; padding: 0 3px;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.45);
 }
-.skill-btn.lack { opacity: 0.4; }
-.skill-btn:hover { border-color: var(--cyan); }
+/* 쓸 수 있는 스킬만 테두리가 살짝 빛난다 — 정수가 모자란 것과 한눈에 구분된다 */
+.skill-btn:not(.lack) { border-color: rgba(95,212,255,0.45); }
+.skill-btn.lack { opacity: 0.38; }
+.skill-btn.lack b { background: #48566b; color: #0a0f18; box-shadow: none; }
+.skill-btn:not(.lack):hover {
+  border-color: var(--cyan); transform: translateY(-2px);
+  box-shadow: 0 8px 18px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.12), 0 0 14px rgba(95,212,255,0.3);
+}
+.skill-btn:not(.lack):active { transform: translateY(0); }
 
 /* ---------- 인벤토리 열기 버튼 ---------- */
 .inv-open {
@@ -225,10 +249,18 @@ button.go:disabled { opacity: 0.4; cursor: not-allowed; }
 .hint b.lack { color: var(--bad); }
 
 /* ---------- 미니맵 ---------- */
+/* 액자(테두리·그림자·안쪽 하이라이트)는 바깥 div가, 실제 그리기는 안쪽 캔버스가 맡는다 —
+   캔버스에 직접 border-radius를 주면 캔버스가 그린 픽셀과 테두리가 서로 어긋나 보인다 */
+#minimap-frame {
+  position: fixed; right: 14px; bottom: 14px; padding: 5px;
+  border-radius: 14px; border: 1px solid var(--line);
+  background: linear-gradient(180deg, rgba(26,36,54,0.88), rgba(12,18,30,0.9));
+  box-shadow: 0 14px 38px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.07);
+  backdrop-filter: blur(8px); line-height: 0; z-index: 5;
+}
 #minimap {
-  position: fixed; right: 14px; bottom: 14px; width: 176px; height: 176px;
-  border-radius: 12px; border: 1px solid var(--line); background: rgba(10,14,24,0.72);
-  backdrop-filter: blur(6px); cursor: pointer;
+  display: block; width: 176px; height: 176px;
+  border-radius: 10px; background: rgba(8,12,20,0.85); cursor: pointer;
 }
 
 /* ---------- 토스트 ---------- */
@@ -583,13 +615,13 @@ button.corner.mute.off { opacity: 0.5; }
   .preview { font-size: 11px; gap: 6px; }
 
   #minimap { width: 88px; height: 88px; }
+  #minimap-frame { padding: 3px; border-radius: 10px; }
 
-  /* 조이스틱·터치 버튼 위쪽, 건설 바 위쪽에 겹치지 않는 자리 */
-  #player-panel { left: 10px; bottom: 236px; width: 42vw; gap: 4px; }
+  /* 조이스틱·터치 버튼 위쪽, 건설 바 위쪽에 겹치지 않는 자리 — 묶음 전체를 한 번에 올린다 */
+  #left-cluster { left: 10px; bottom: 236px; width: 46vw; gap: 6px; }
+  #player-panel { gap: 4px; }
   .prompt { font-size: 11px; }
 
-  /* 정수 스킬 바 — 조이스틱(왼쪽 아래)과 겹치지 않도록 player-panel보다 더 위로 올린다 */
-  #skill-bar { left: 10px; bottom: 340px; }
   .skill-btn { width: 34px; height: 34px; border-radius: 8px; }
   .skill-btn .ic { font-size: 15px; }
 
@@ -692,22 +724,27 @@ button.corner.mute.off { opacity: 0.5; }
     <ul id="party-list"></ul>
   </div>
 
-  <!-- 좌하단: 플레이어 상태 -->
-  <div id="player-panel" class="panel">
-    <div class="bar hp"><i id="hp-fill"></i><span id="hp-text">100 / 100</span></div>
-    <div id="harvest-wrap" class="bar harvest hidden"><i id="harvest-fill"></i><span>채집 중…</span></div>
-    <div id="dash-wrap" class="bar dash hidden"><i id="dash-fill"></i><span id="dash-text"></span></div>
-    <div id="root-wrap" class="bar root hidden"><i id="root-fill"></i><span id="root-text"></span></div>
-    <div id="crew-wrap" class="bar crew hidden"><i></i><span id="crew-text"></span></div>
-    <div id="prompt" class="prompt hidden"></div>
-  </div>
+  <!-- 좌하단 묶음 — 체력/상태바와 정수 스킬 바는 원래 각자 화면에 고정돼 있었는데, 상태바는
+       아래에서 위로 자라고(채집·돌진·속박·탑승 중에 줄이 늘어난다) 스킬 바는 고정된 높이에
+       박혀 있어서 줄이 셋 이상 뜨면 서로 겹쳤다. 한 세로 묶음으로 만들면 구조적으로 겹칠 수
+       없고, 시각적으로도 "내 상태"가 한 덩어리로 읽힌다. -->
+  <div id="left-cluster" class="panel">
+    <div id="player-panel">
+      <div class="bar hp"><i id="hp-fill"></i><span id="hp-text">100 / 100</span></div>
+      <div id="harvest-wrap" class="bar harvest hidden"><i id="harvest-fill"></i><span>채집 중…</span></div>
+      <div id="dash-wrap" class="bar dash hidden"><i id="dash-fill"></i><span id="dash-text"></span></div>
+      <div id="root-wrap" class="bar root hidden"><i id="root-fill"></i><span id="root-text"></span></div>
+      <div id="crew-wrap" class="bar crew hidden"><i></i><span id="crew-text"></span></div>
+      <div id="prompt" class="prompt hidden"></div>
+    </div>
 
-  <!-- 정수 스킬 바 — 지금까지 회복·폭발·시간왜곡·긴급방벽·중력균열·정령소환·코어폭주 7종은
-       전부 키보드 단축키로만 썼다(R·T·Y·B·C·N·;). 화면 어디에도 안내가 없어 도움말을 안 읽으면
-       존재 자체를 모를 수 있었고, 모바일은 애초에 누를 방법조차 없었다 — 근접 상호작용과 달리
-       "즉발"이라 지금까지의 #touch-action 방식과도 안 맞아 계속 빠져 있었다. 클릭/탭으로도 똑같이
-       쓸 수 있게 하고, 정수가 부족하면 반투명하게 표시한다. 내용은 CFG.skills에서 그려진다. -->
-  <div id="skill-bar"></div>
+    <!-- 정수 스킬 바 — 지금까지 회복·폭발·시간왜곡·긴급방벽·중력균열·정령소환·코어폭주 7종은
+         전부 키보드 단축키로만 썼다(R·T·Y·B·C·N·;). 화면 어디에도 안내가 없어 도움말을 안 읽으면
+         존재 자체를 모를 수 있었고, 모바일은 애초에 누를 방법조차 없었다 — 근접 상호작용과 달리
+         "즉발"이라 지금까지의 #touch-action 방식과도 안 맞아 계속 빠져 있었다. 클릭/탭으로도 똑같이
+         쓸 수 있게 하고, 정수가 부족하면 반투명하게 표시한다. 내용은 CFG.skills에서 그려진다. -->
+    <div id="skill-bar"></div>
+  </div>
 
   <!-- 하단 중앙: 배치/모드 안내 -->
   <div id="build-hint" class="hint"></div>
@@ -718,8 +755,10 @@ button.corner.mute.off { opacity: 0.5; }
     <span id="inv-badge" class="badge hidden"></span>
   </button>
 
-  <!-- 우하단: 미니맵 -->
-  <canvas id="minimap" width="200" height="200"></canvas>
+  <!-- 우하단: 미니맵 (테두리만 있던 맨 캔버스를 액자에 넣어 다른 패널과 같은 재질로 맞춘다) -->
+  <div id="minimap-frame">
+    <canvas id="minimap" width="200" height="200"></canvas>
+  </div>
 
   <div id="toasts"></div>
 
@@ -18797,8 +18836,21 @@ ${stats.riskWavesCleared ? `<li>\u26A0\uFE0F \uC704\uD5D8 \uACC4\uC57D \uC2B9\uB
 
   // js/player.js
   var GEO4 = {
-    body: new iu(0.38, 0.7, 4, 10),
-    head: new Zu(0.3, 12, 10),
+    // 몸통은 어깨가 넓고 허리가 좁은 형태로 — 예전엔 반지름이 일정한 캡슐 하나뿐이라 위에서
+    // 내려다보는 이 게임의 카메라에서는 그냥 알약 한 개로만 보였다.
+    body: new su(0.3, 0.22, 0.62, 10),
+    head: new Zu(0.235, 12, 10),
+    // 후드는 머리 위를 덮는 반구 — 내려다보는 각도에서 화면에 가장 크게 잡히는 면이라
+    // 여기에 플레이어 색을 칠해야 멀리서도 누가 누군지 바로 읽힌다.
+    hood: new Zu(0.275, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.5),
+    pauldron: new Zu(0.16, 8, 6),
+    belt: new su(0.245, 0.245, 0.1, 10),
+    leg: new iu(0.105, 0.34, 3, 6),
+    boot: new qs(0.22, 0.11, 0.3),
+    // 어깨를 덮는 짧은 망토. 등까지 내려오는 긴 망토로도 만들어 봤는데, 천 시뮬레이션이 없으니
+    // 어느 각도에서 보든 옆으로 삐져나온 판때기로 보였다. 짧게 끊으면 그럴 일이 없으면서도
+    // 위에서 내려다보는 이 게임의 카메라에는 어깨 실루엣이 또렷하게 잡힌다.
+    cape: new su(0.31, 0.44, 0.36, 12, 1, true, Math.PI * 0.55, Math.PI * 0.9),
     arm: new iu(0.12, 0.45, 3, 6),
     tool: new qs(0.14, 0.9, 0.14),
     sword: new qs(0.1, 1.05, 0.24),
@@ -18882,17 +18934,60 @@ ${stats.riskWavesCleared ? `<li>\u26A0\uFE0F \uC704\uD5D8 \uACC4\uC57D \uC2B9\uB
       const g2 = new Wl();
       const mat = new sd({ color: this.color, roughness: 0.6, metalness: 0.1, transparent: true });
       this.mat = mat;
+      const dark = new sd({ color: 3157558, roughness: 0.85 });
       const body = new Xs(GEO4.body, mat);
-      body.position.y = 0.85;
+      body.position.y = 1.02;
       body.castShadow = true;
+      const belt = new Xs(GEO4.belt, dark);
+      belt.position.y = 0.76;
+      belt.castShadow = true;
       const head = new Xs(GEO4.head, new sd({ color: 15913904, roughness: 0.8 }));
-      head.position.y = 1.55;
+      head.position.y = 1.5;
       head.castShadow = true;
-      g2.add(body, head);
+      const hood = new Xs(GEO4.hood, mat);
+      hood.position.y = 1.53;
+      hood.castShadow = true;
+      g2.add(body, belt, head, hood);
+      for (const side of [-1, 1]) {
+        const pa2 = new Xs(GEO4.pauldron, dark);
+        pa2.position.set(side * 0.3, 1.26, 0);
+        pa2.scale.set(1, 0.72, 1);
+        pa2.castShadow = true;
+        g2.add(pa2);
+      }
+      const capeCol = new Kr(this.color).multiplyScalar(0.55);
+      const cape = new Xs(GEO4.cape, new sd({
+        color: capeCol,
+        roughness: 0.8,
+        side: p
+      }));
+      cape.position.set(0, 1.24, -0.02);
+      cape.castShadow = true;
+      g2.add(cape);
+      this.cape = cape;
+      this.legs = [];
+      for (const side of [-1, 1]) {
+        const pivot = new Wl();
+        pivot.position.set(side * 0.14, 0.58, 0);
+        const leg = new Xs(GEO4.leg, mat);
+        leg.position.y = -0.25;
+        leg.castShadow = true;
+        const boot = new Xs(GEO4.boot, dark);
+        boot.position.set(0, -0.47, 0.04);
+        boot.castShadow = true;
+        pivot.add(leg, boot);
+        g2.add(pivot);
+        this.legs.push(pivot);
+      }
       const arm = new Xs(GEO4.arm, mat);
       arm.position.set(0.42, 1.05, 0.1);
       g2.add(arm);
       this.arm = arm;
+      const armOff = new Xs(GEO4.arm, mat);
+      armOff.position.set(-0.42, 1.05, 0.1);
+      armOff.castShadow = true;
+      g2.add(armOff);
+      this.armOff = armOff;
       const tool = new Xs(GEO4.tool, WEAPON_MAT.default);
       tool.position.set(0.5, 1, 0.35);
       tool.rotation.x = -0.4;
@@ -19056,6 +19151,13 @@ ${stats.riskWavesCleared ? `<li>\u26A0\uFE0F \uC704\uD5D8 \uACC4\uC57D \uC2B9\uB
         this.arm.rotation.x = moving ? Math.sin(t2 * 9) * 0.6 : Math.sin(t2 * 2) * 0.08;
         this.tool.rotation.x = -0.4;
       }
+      const stride = moving ? Math.sin(t2 * 9) * 0.62 : 0;
+      if (this.legs) {
+        this.legs[0].rotation.x = stride;
+        this.legs[1].rotation.x = -stride;
+      }
+      if (this.armOff) this.armOff.rotation.x = moving ? -stride * 0.85 : Math.sin(t2 * 2 + 1) * 0.07;
+      if (this.cape) this.cape.rotation.x = (moving ? 0.13 : 0.03) + Math.sin(t2 * 4) * 0.025;
       const bob = moving ? Math.abs(Math.sin(t2 * 9)) * 0.09 : 0;
       this.mesh.position.y = bob;
       this.mesh.rotation.y = this.rot;
@@ -19620,7 +19722,14 @@ ${stats.riskWavesCleared ? `<li>\u26A0\uFE0F \uC704\uD5D8 \uACC4\uC57D \uC2B9\uB
     rock: new Xu(1, 0),
     stump: new su(0.34, 0.4, 0.5, 6),
     crystal: new ju(2, 0),
+    // 투명한 겉면 안에서 반대로 도는 속심 — 팔면체 하나만 있을 때는 각도에 따라 그냥 흰
+    // 덩어리로 보였는데, 안에 심이 하나 더 있으면 유리 속이 들여다보이는 깊이가 생긴다.
+    crystalInner: new ju(1.1, 0),
+    crystalShard: new ju(0.4, 0),
     pedestal: new su(3, 3.6, 1.1, 8),
+    // 받침을 한 단 더 올려 계단형으로 — 원기둥 하나는 위에서 내려다보면 그냥 납작한 원이었다
+    pedestalTop: new su(2.35, 2.85, 0.5, 8),
+    pedestalRing: new Ku(2.62, 0.09, 6, 32),
     portal: new Ku(2.2, 0.28, 8, 24),
     gem: new ju(0.4, 0),
     gemStump: new su(0.3, 0.36, 0.16, 6),
@@ -19813,11 +19922,49 @@ ${stats.riskWavesCleared ? `<li>\u26A0\uFE0F \uC704\uD5D8 \uACC4\uC57D \uC2B9\uB
       ped.castShadow = true;
       ped.receiveShadow = true;
       g2.add(ped);
+      const pedTop = new Xs(GEO.pedestalTop, MAT.pedestal);
+      pedTop.position.y = 1.32;
+      pedTop.castShadow = true;
+      pedTop.receiveShadow = true;
+      g2.add(pedTop);
+      const pedRing = new Xs(GEO.pedestalRing, new sd({
+        color: 6545663,
+        emissive: 2795212,
+        emissiveIntensity: 0.8,
+        roughness: 0.4
+      }));
+      pedRing.rotation.x = -Math.PI / 2;
+      pedRing.position.y = 1.56;
+      g2.add(pedRing);
       const core = new Xs(GEO.crystal, MAT.crystal.clone());
       core.position.y = 3.4;
       core.castShadow = true;
       g2.add(core);
       this.crystalMesh = core;
+      const inner = new Xs(GEO.crystalInner, new sd({
+        color: 11599871,
+        emissive: 4367871,
+        emissiveIntensity: 1.8,
+        roughness: 0.2
+      }));
+      inner.position.y = 3.4;
+      g2.add(inner);
+      this.crystalInner = inner;
+      const shards = new Wl();
+      shards.position.y = 3.4;
+      this.crystalShardList = [];
+      for (let i = 0; i < 3; i++) {
+        const s2 = new Xs(GEO.crystalShard, MAT.crystal.clone());
+        const a2 = i / 3 * Math.PI * 2;
+        s2.userData.a = a2;
+        s2.userData.r = 2.85 + i * 0.22;
+        s2.userData.yOff = (i - 1) * 0.5;
+        s2.position.set(Math.cos(a2) * s2.userData.r, s2.userData.yOff, Math.sin(a2) * s2.userData.r);
+        shards.add(s2);
+        this.crystalShardList.push(s2);
+      }
+      g2.add(shards);
+      this.crystalShards = shards;
       const halo = new Xs(
         new qu(3.8, 4.4, 48),
         new es({ color: 6545663, transparent: true, opacity: 0.4, side: p })
@@ -20339,6 +20486,22 @@ ${stats.riskWavesCleared ? `<li>\u26A0\uFE0F \uC704\uD5D8 \uACC4\uC57D \uC2B9\uB
       const ratio = this.crystal.hp / this.crystal.maxHp;
       this.crystalMesh.material.emissiveIntensity = 0.6 + ratio * 1.2;
       this.crystalMesh.material.color.setHSL(0.52 * ratio + 0, 0.9, 0.55 + 0.1 * ratio);
+      if (this.crystalInner) {
+        this.crystalInner.rotation.y -= dt2 * 0.85;
+        this.crystalInner.rotation.x += dt2 * 0.3;
+        this.crystalInner.position.y = this.crystalMesh.position.y;
+        this.crystalInner.material.emissiveIntensity = 0.7 + ratio * 1.5;
+      }
+      if (this.crystalShards) {
+        this.crystalShards.rotation.y += dt2 * 0.42;
+        this.crystalShards.position.y = this.crystalMesh.position.y;
+        for (let i = 0; i < this.crystalShardList.length; i++) {
+          const s2 = this.crystalShardList[i];
+          s2.rotation.y += dt2 * (1.1 + i * 0.4);
+          s2.rotation.z += dt2 * 0.6;
+          s2.position.y = s2.userData.yOff + Math.sin(now * 1.1 + i * 2.1) * 0.22;
+        }
+      }
       this.sm.crystalLight.intensity = (1.2 + ratio * 1.6) * this.sm.crystalNightMult;
       if (this._pulse > 0) {
         this._pulse -= dt2;

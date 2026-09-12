@@ -71,22 +71,27 @@
     <ul id="party-list"></ul>
   </div>
 
-  <!-- 좌하단: 플레이어 상태 -->
-  <div id="player-panel" class="panel">
-    <div class="bar hp"><i id="hp-fill"></i><span id="hp-text">100 / 100</span></div>
-    <div id="harvest-wrap" class="bar harvest hidden"><i id="harvest-fill"></i><span>채집 중…</span></div>
-    <div id="dash-wrap" class="bar dash hidden"><i id="dash-fill"></i><span id="dash-text"></span></div>
-    <div id="root-wrap" class="bar root hidden"><i id="root-fill"></i><span id="root-text"></span></div>
-    <div id="crew-wrap" class="bar crew hidden"><i></i><span id="crew-text"></span></div>
-    <div id="prompt" class="prompt hidden"></div>
-  </div>
+  <!-- 좌하단 묶음 — 체력/상태바와 정수 스킬 바는 원래 각자 화면에 고정돼 있었는데, 상태바는
+       아래에서 위로 자라고(채집·돌진·속박·탑승 중에 줄이 늘어난다) 스킬 바는 고정된 높이에
+       박혀 있어서 줄이 셋 이상 뜨면 서로 겹쳤다. 한 세로 묶음으로 만들면 구조적으로 겹칠 수
+       없고, 시각적으로도 "내 상태"가 한 덩어리로 읽힌다. -->
+  <div id="left-cluster" class="panel">
+    <div id="player-panel">
+      <div class="bar hp"><i id="hp-fill"></i><span id="hp-text">100 / 100</span></div>
+      <div id="harvest-wrap" class="bar harvest hidden"><i id="harvest-fill"></i><span>채집 중…</span></div>
+      <div id="dash-wrap" class="bar dash hidden"><i id="dash-fill"></i><span id="dash-text"></span></div>
+      <div id="root-wrap" class="bar root hidden"><i id="root-fill"></i><span id="root-text"></span></div>
+      <div id="crew-wrap" class="bar crew hidden"><i></i><span id="crew-text"></span></div>
+      <div id="prompt" class="prompt hidden"></div>
+    </div>
 
-  <!-- 정수 스킬 바 — 지금까지 회복·폭발·시간왜곡·긴급방벽·중력균열·정령소환·코어폭주 7종은
-       전부 키보드 단축키로만 썼다(R·T·Y·B·C·N·;). 화면 어디에도 안내가 없어 도움말을 안 읽으면
-       존재 자체를 모를 수 있었고, 모바일은 애초에 누를 방법조차 없었다 — 근접 상호작용과 달리
-       "즉발"이라 지금까지의 #touch-action 방식과도 안 맞아 계속 빠져 있었다. 클릭/탭으로도 똑같이
-       쓸 수 있게 하고, 정수가 부족하면 반투명하게 표시한다. 내용은 CFG.skills에서 그려진다. -->
-  <div id="skill-bar"></div>
+    <!-- 정수 스킬 바 — 지금까지 회복·폭발·시간왜곡·긴급방벽·중력균열·정령소환·코어폭주 7종은
+         전부 키보드 단축키로만 썼다(R·T·Y·B·C·N·;). 화면 어디에도 안내가 없어 도움말을 안 읽으면
+         존재 자체를 모를 수 있었고, 모바일은 애초에 누를 방법조차 없었다 — 근접 상호작용과 달리
+         "즉발"이라 지금까지의 #touch-action 방식과도 안 맞아 계속 빠져 있었다. 클릭/탭으로도 똑같이
+         쓸 수 있게 하고, 정수가 부족하면 반투명하게 표시한다. 내용은 CFG.skills에서 그려진다. -->
+    <div id="skill-bar"></div>
+  </div>
 
   <!-- 하단 중앙: 배치/모드 안내 -->
   <div id="build-hint" class="hint"></div>
@@ -97,8 +102,10 @@
     <span id="inv-badge" class="badge hidden"></span>
   </button>
 
-  <!-- 우하단: 미니맵 -->
-  <canvas id="minimap" width="200" height="200"></canvas>
+  <!-- 우하단: 미니맵 (테두리만 있던 맨 캔버스를 액자에 넣어 다른 패널과 같은 재질로 맞춘다) -->
+  <div id="minimap-frame">
+    <canvas id="minimap" width="200" height="200"></canvas>
+  </div>
 
   <div id="toasts"></div>
 
