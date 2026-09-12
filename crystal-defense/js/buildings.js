@@ -77,11 +77,19 @@ var MAT2 = {
   barBg: new THREE.MeshBasicMaterial({ color: 1119519, transparent: true, opacity: 0.8, depthTest: false }),
   barFg: new THREE.MeshBasicMaterial({ color: 6745736, depthTest: false }),
   rangeRing: new THREE.MeshBasicMaterial({ color: 14061311, transparent: true, opacity: 0.35, side: THREE.DoubleSide }),
-  outpostPole: new THREE.MeshStandardMaterial({ color: 0x8B6B44, roughness: 0.85 }),
-  outpostFlag: new THREE.MeshStandardMaterial({ color: 0xE8604A, roughness: 0.7, side: THREE.DoubleSide, emissive: 0x3A0E06, emissiveIntensity: 0.25 }),
-  outpostBase: new THREE.MeshStandardMaterial({ color: 0x7A8088, roughness: 0.95 }),
-  outpostZone: new THREE.MeshBasicMaterial({ color: 0xE8604A, transparent: true, opacity: 0.42, side: THREE.DoubleSide }),
-  buffRing: new THREE.MeshBasicMaterial({ color: 14061311, transparent: true, opacity: 0.5, side: THREE.DoubleSide })
+  outpostPole: new THREE.MeshStandardMaterial({ color: 9136964, roughness: 0.85 }),
+  outpostFlag: new THREE.MeshStandardMaterial({ color: 15229002, roughness: 0.7, side: THREE.DoubleSide, emissive: 3804678, emissiveIntensity: 0.25 }),
+  outpostBase: new THREE.MeshStandardMaterial({ color: 8028296, roughness: 0.95 }),
+  outpostZone: new THREE.MeshBasicMaterial({ color: 15229002, transparent: true, opacity: 0.42, side: THREE.DoubleSide }),
+  buffRing: new THREE.MeshBasicMaterial({ color: 14061311, transparent: true, opacity: 0.5, side: THREE.DoubleSide }),
+  decoyPost: new THREE.MeshStandardMaterial({ color: 9136964, roughness: 0.9 }),
+  decoyStraw: new THREE.MeshStandardMaterial({ color: 14267484, roughness: 1 }),
+  decoyCloth: new THREE.MeshStandardMaterial({ color: 11552314, roughness: 0.8 }),
+  decoyZone: new THREE.MeshBasicMaterial({ color: 16763989, transparent: true, opacity: 0.16, side: THREE.DoubleSide }),
+  beaconStone: new THREE.MeshStandardMaterial({ color: 6710950, roughness: 0.95 }),
+  beaconBasket: new THREE.MeshStandardMaterial({ color: 2565927, roughness: 0.6, metalness: 0.3 }),
+  beaconFlame: new THREE.MeshStandardMaterial({ color: 16738816, emissive: 16729088, emissiveIntensity: 1.3, roughness: 0.4 }),
+  beaconZone: new THREE.MeshBasicMaterial({ color: 16729088, transparent: true, opacity: 0.15, side: THREE.DoubleSide })
 };
 function barLayer(bg, fg) {
   bg.renderOrder = 5;
@@ -178,6 +186,12 @@ var Building = class {
   get isOutpost() {
     return this.key === "outpost";
   }
+  get isDecoy() {
+    return this.key === "decoy";
+  }
+  get isBeacon() {
+    return this.key === "beacon";
+  }
   // 다가가서 클릭하면 작업창이 열리는 시설이면 그 종류("craft"/"smelt")
   get stationKind() {
     return this.def.station || null;
@@ -186,7 +200,7 @@ var Building = class {
     return this.key === "trap" || this.key === "mire" || this.key === "blast";
   }
   get isTower() {
-    return this.key !== "wall" && this.key !== "gate" && !this.isTrap && !this.isSupport && !this.isHarvester && !this.isRepairPost && !this.isHealCamp && !this.isArmory && !this.isOutpost && !this.stationKind;
+    return this.key !== "wall" && this.key !== "gate" && !this.isTrap && !this.isSupport && !this.isHarvester && !this.isRepairPost && !this.isHealCamp && !this.isArmory && !this.isOutpost && !this.isDecoy && !this.isBeacon && !this.stationKind;
   }
   get nextCost() {
     const nxt = this.def.levels[this.level];
@@ -199,7 +213,7 @@ var Building = class {
     fg.position.z = 0.01;
     barLayer(bg, fg);
     g2.add(bg, fg);
-    g2.position.y = this.key === "wall" || this.key === "gate" ? 2.7 : this.key === "workbench" ? 1.6 : this.isTrap ? 0.7 : this.key === "harvester" ? 1.9 : this.key === "outpost" ? 3.2 : 3.4;
+    g2.position.y = this.key === "wall" || this.key === "gate" ? 2.7 : this.key === "workbench" ? 1.6 : this.isTrap ? 0.7 : this.key === "harvester" ? 1.9 : this.key === "outpost" ? 3.2 : this.isDecoy ? 2.5 : this.isBeacon ? 2.6 : 3.4;
     g2.visible = false;
     g2.renderOrder = 5;
     this.mesh.add(g2);
@@ -279,6 +293,25 @@ var Building = class {
     this.specRing.visible = true;
     this.specRing.material.color.setHex(sp2.ring);
     this.specRing.material.opacity = 0.62;
+  }
+  // 탑승 중 표시 — 나머지 넷(0.06/0.13/0.2/0.27)보다 한 단 위(0.34)에, 탑승한 플레이어 몸에
+  // 입히는 것과 같은 금빛으로 띄운다 — 몸과 타워가 같은 색으로 빛나야 "이 둘이 지금 연결돼
+  // 있다"는 게 멀리서도 바로 읽힌다.
+  showCrew(active) {
+    if (!active) {
+      if (this.crewRing) this.crewRing.visible = false;
+      return;
+    }
+    if (!this.crewRing) {
+      const r = new THREE.Mesh(GEO2.buffRing, MAT2.buffRing.clone());
+      r.rotation.x = -Math.PI / 2;
+      r.position.y = 0.34;
+      this.mesh.add(r);
+      this.crewRing = r;
+    }
+    this.crewRing.visible = true;
+    this.crewRing.material.color.setHex(16763989);
+    this.crewRing.material.opacity = 0.75;
   }
   // 우선순위 표시 — 나머지 셋(0.06/0.13/0.2)보다 한 단 위(0.27)에 띄운다. 대부분의 타워는
   // 기본값(threat, 저격탑만 strongest)을 그대로 쓰므로 고리가 안 뜨는 게 정상이다 — 실제로
@@ -434,24 +467,70 @@ function buildMesh(key, level) {
     pole.position.y = 1.5;
     pole.castShadow = true;
     g2.add(pole);
-    // 깃발은 레벨이 오를수록 커진다 — 구역이 넓어진 것을 멀리서도 알아볼 수 있게
     const w2 = 0.7 + level * 0.18;
     const flag = new THREE.Mesh(new THREE.PlaneGeometry(w2, w2 * 0.6), MAT2.outpostFlag);
     flag.position.set(w2 / 2 + 0.08, 2.6, 0);
     flag.castShadow = true;
     g2.add(flag);
-    const base = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.7, 0.34, 7), MAT2.outpostBase);
-    base.position.y = 0.17;
-    base.castShadow = true;
-    base.receiveShadow = true;
-    g2.add(base);
-    // 자기가 만든 건설 구역을 바닥에 항상 그려 둔다 — 어디까지 지을 수 있는지 건설 모드를
-    // 켜지 않고도 보이지 않으면 이 건물의 존재 이유 자체가 안 읽힌다.
+    const base2 = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.7, 0.34, 7), MAT2.outpostBase);
+    base2.position.y = 0.17;
+    base2.castShadow = true;
+    base2.receiveShadow = true;
+    g2.add(base2);
     const r2 = CFG.builds.outpost.levels[level - 1].zoneRadius;
     const ring = new THREE.Mesh(new THREE.RingGeometry(r2 - 0.22, r2, 72), MAT2.outpostZone);
     ring.rotation.x = -Math.PI / 2;
     ring.position.y = 0.04;
     g2.add(ring);
+    return g2;
+  }
+  if (key === "decoy") {
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.11, 2, 6), MAT2.decoyPost);
+    post.position.y = 1;
+    post.castShadow = true;
+    g2.add(post);
+    const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 1.3, 6), MAT2.decoyPost);
+    arm.rotation.z = Math.PI / 2;
+    arm.position.y = 1.55;
+    arm.castShadow = true;
+    g2.add(arm);
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.28, 8, 8), MAT2.decoyStraw);
+    head.position.y = 2.1;
+    head.castShadow = true;
+    g2.add(head);
+    const cloth = new THREE.Mesh(new THREE.ConeGeometry(0.45, 0.9, 6), MAT2.decoyCloth);
+    cloth.position.y = 1.25;
+    cloth.castShadow = true;
+    g2.add(cloth);
+    const r2 = CFG.builds.decoy.levels[level - 1].tauntRadius;
+    const zone = new THREE.Mesh(new THREE.RingGeometry(r2 - 0.15, r2, 48), MAT2.decoyZone);
+    zone.rotation.x = -Math.PI / 2;
+    zone.position.y = 0.04;
+    g2.add(zone);
+    return g2;
+  }
+  if (key === "beacon") {
+    const cairn = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.6, 0.5, 8), MAT2.beaconStone);
+    cairn.position.y = 0.25;
+    cairn.castShadow = true;
+    cairn.receiveShadow = true;
+    g2.add(cairn);
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.11, 2.4, 6), MAT2.decoyPost);
+    pole.position.y = 1.6;
+    pole.castShadow = true;
+    g2.add(pole);
+    const basket = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.24, 0.4, 8, 1, true), MAT2.beaconBasket);
+    basket.position.y = 2.85;
+    basket.castShadow = true;
+    g2.add(basket);
+    const flame = new THREE.Mesh(new THREE.SphereGeometry(0.24, 8, 8), MAT2.beaconFlame);
+    flame.position.y = 2.95;
+    g2.add(flame);
+    const r3 = CFG.builds.beacon.levels[level - 1].tauntRadius;
+    const zone2 = new THREE.Mesh(new THREE.RingGeometry(r3 - 0.15, r3, 48), MAT2.beaconZone);
+    zone2.rotation.x = -Math.PI / 2;
+    zone2.position.y = 0.04;
+    g2.add(zone2);
     return g2;
   }
   if (key === "camp") {
@@ -592,8 +671,6 @@ export var BuildManager = class {
     this.sm = sm2;
     this.grid = grid;
     this.world = world;
-    // 전초기지 배치 판정에 포탈 위치가 필요하다 — 판정은 grid.canPlace 한 곳에 모여 있어야
-    // 건설 미리보기(고스트)와 실제 배치가 같은 이유 문자열을 쓴다.
     grid.portals = world.portals;
     this.fx = fx;
     this.projectiles = projectiles;
@@ -846,7 +923,7 @@ export var BuildManager = class {
         if (b.turret) b.turret.rotation.y += dt2 * 0.4;
         continue;
       }
-      const target = this._acquire(b, enemies, st.range * rangeMult);
+      const target = this._acquire(b, enemies, st.range * rangeMult * (b.crewedBy ? CFG.crew.rangeMult : 1));
       if (target && b.turret) {
         const ang = Math.atan2(target.x - b.x, target.z - b.z);
         b.turret.rotation.y = ang;
@@ -970,7 +1047,7 @@ export var BuildManager = class {
   // 투사체 발사 연출 → 명중 시 onImpact (데미지 적용은 호스트에서만)
   shoot(b, target, empty = false) {
     const st = b.stats;
-    const mult = this.supportBuffMult(b);
+    const mult = this.supportBuffMult(b) * (b.crewedBy ? CFG.crew.dmgMult : 1);
     let effStats = mult !== 1 ? { ...st, dmg: Math.round(st.dmg * mult) } : st;
     if (b.key === "poison" && st.poisonDps) {
       const pm = this.poisonSynergyMult(b);
@@ -1016,7 +1093,10 @@ export var BuildManager = class {
       this._buffTimer = 0.25;
       for (const b of this.buildings.values()) {
         if (b.ammoBar) b.refreshAmmoBar();
-        if (b.isTower) b.showBuff(this.supportBuffMult(b));
+        if (b.isTower) {
+          b.showBuff(this.supportBuffMult(b) * (b.crewedBy ? CFG.crew.dmgMult : 1));
+          b.showCrew(!!b.crewedBy);
+        }
         if (b.key === "arrow") {
           const active = this.hasNearbyFrost(b);
           b.showSynergy(active, 5891071);

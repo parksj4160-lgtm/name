@@ -13,6 +13,11 @@ const crypto = require('crypto');
 
 const PORT = process.env.PORT || 8080;
 const GUID = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11';
+// 방 하나에 무한정 접속을 받아주면 한 사람이 봇으로 계속 접속해 서버 메모리를 소진시킬 수 있다.
+const MAX_ROOM_SIZE = 16;
+// 헤더가 주장하는 길이만 보고 판정한다 — 실제 페이로드가 그만큼 없어도(악의적으로 조작된 프레임)
+// 버퍼가 무한정 쌓이는 것을 막는다.
+const MAX_FRAME_LEN = 64 * 1024;
 
 /** room -> Set<socket> */
 const rooms = new Map();
@@ -26,6 +31,17 @@ server.on('upgrade', (req, socket) => {
   const key = req.headers['sec-websocket-key'];
   if (!key) { socket.destroy(); return; }
 
+  const url = new URL(req.url, 'http://localhost');
+  const room = (url.searchParams.get('room') || 'LOBBY').toUpperCase();
+
+  // 방이 꽉 찼으면 101 응답 자체를 보내지 않고 그냥 끊는다 — 먼저 101을 보내면 브라우저 쪽
+  // WebSocket은 이미 "연결됨"으로 확정돼 버려서, 뒤늦게 거부해도 조용히 먹통이 될 뿐이다.
+  const existing = rooms.get(room);
+  if (existing && existing.size >= MAX_ROOM_SIZE) {
+    socket.destroy();
+    return;
+  }
+
   const accept = crypto.createHash('sha1').update(key + GUID).digest('base64');
   socket.write(
     'HTTP/1.1 101 Switching Protocols\r\n' +
@@ -33,9 +49,6 @@ server.on('upgrade', (req, socket) => {
     'Connection: Upgrade\r\n' +
     `Sec-WebSocket-Accept: ${accept}\r\n\r\n`
   );
-
-  const url = new URL(req.url, 'http://localhost');
-  const room = (url.searchParams.get('room') || 'LOBBY').toUpperCase();
 
   if (!rooms.has(room)) rooms.set(room, new Set());
   const peers = rooms.get(room);
@@ -50,6 +63,7 @@ server.on('upgrade', (req, socket) => {
     for (;;) {
       const frame = decodeFrame(buf);
       if (!frame) break;
+      if (frame.tooLarge) { socket.destroy(); return; }
       buf = buf.slice(frame.total);
 
       if (frame.opcode === 0x8) { socket.end(); return; }        // close
@@ -87,6 +101,7 @@ function decodeFrame(b) {
     if (b.length < off + 8) return null;
     len = Number(b.readBigUInt64BE(off)); off += 8;
   }
+  if (len > MAX_FRAME_LEN) return { tooLarge: true };
 
   let mask = null;
   if (masked) {

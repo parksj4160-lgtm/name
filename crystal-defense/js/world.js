@@ -572,7 +572,7 @@ export var World = class {
     if (this.pet?.type !== type || this.pet?.lv !== lv) {
       const tc2 = CFG.tame[type];
       this.petBodyMat.color.setHex(tc2.color);
-      const base = type === "wolf" ? 1.15 : type === "stagking" ? 1.05 : 0.85;
+      const base = type === "wolf" ? 1.15 : type === "stagking" ? 1.05 : type === "hawk" ? 0.7 : 0.85;
       this.petGroup.scale.setScalar(base * (1 + lv * 0.12));
       this.petRing.material.color.setHex(tc2.color);
     }
@@ -589,9 +589,10 @@ export var World = class {
       if (this.petRing) this.petRing.visible = false;
       return;
     }
-    const { x: x2, z: z2, rot } = this.pet;
+    const { x: x2, z: z2, rot, type } = this.pet;
     this.petGroup.visible = true;
-    this.petGroup.position.set(x2, 0.36 + Math.abs(Math.sin(now * 5)) * 0.08, z2);
+    const baseY = type === "hawk" ? 2.6 : 0.36;
+    this.petGroup.position.set(x2, baseY + Math.abs(Math.sin(now * 5)) * 0.08, z2);
     if (rot !== void 0) this.petGroup.rotation.y = rot;
     this.petRing.visible = true;
     this.petRing.position.set(x2, 0.05, z2);

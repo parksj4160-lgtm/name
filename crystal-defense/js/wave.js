@@ -83,7 +83,7 @@ export var WaveDirector = class {
           const ec = CFG.elite;
           statMult = { hp: ec.hpMult, scale: ec.scaleMult, dmg: ec.dmgMult, bounty: ec.bountyMult, elite: true };
         } else if (!isBossType) {
-          variant = this._specialKind === "ward" ? "ward" : this._specialKind === "frenzy" ? "vampire" : this._specialKind === "bulwark" ? "shield" : this._specialKind === "immune" ? "resist" : this._specialKind === "armorlegion" ? "armored" : this._specialKind === "phantomlegion" ? "phantom" : this._specialKind === "splitlegion" ? "split" : this._specialKind === "thornlegion" ? "thorn" : this._specialKind === "regenlegion" ? "regen" : rollVariant(this.wave + 1);
+          variant = this._specialKind === "ward" ? "ward" : this._specialKind === "frenzy" ? "vampire" : this._specialKind === "bulwark" ? "shield" : this._specialKind === "immune" ? "resist" : this._specialKind === "armorlegion" ? "armored" : this._specialKind === "phantomlegion" ? "phantom" : this._specialKind === "splitlegion" ? "split" : this._specialKind === "thornlegion" ? "thorn" : this._specialKind === "regenlegion" ? "regen" : this._specialKind === "berserklegion" ? "berserk" : this._specialKind === "dashlegion" ? "dash" : rollVariant(this.wave + 1);
         }
         if (this._thisWavePenalty && !isBossType) {
           const sc = CFG.scoutEvent;

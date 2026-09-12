@@ -4,6 +4,9 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
 <title>크리스탈 디펜스 (Crystal Defense) — 더블클릭 실행판</title>
+
+
+
 <style>
 :root {
   --bg: #0b0f1a;
@@ -101,9 +104,12 @@ button.mini:disabled { opacity: 0.45; cursor: not-allowed; }
 .bar span {
   position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
   font-size: 11px; text-shadow: 0 1px 2px rgba(0,0,0,0.8); font-variant-numeric: tabular-nums;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 4px;
 }
 .bar.hp i { background: linear-gradient(90deg, #ff6a7d, #ffb36a); }
 .bar.harvest i { background: linear-gradient(90deg, #b98a4d, #ffd88a); }
+.bar.root i { background: linear-gradient(90deg, #7c3aed, #c084fc); }
+.bar.crew i { background: linear-gradient(90deg, #d4af37, #ffe58a); }
 .wave-row { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
 #wave-label { font-weight: 700; }
 .state { color: var(--warn); flex: 1; }
@@ -117,6 +123,15 @@ button.go:disabled { opacity: 0.4; cursor: not-allowed; }
 .preview { margin-top: 6px; display: flex; gap: 10px; font-size: 12px; color: var(--dim); }
 .preview b { color: var(--text); font-weight: 700; margin-left: 2px; }
 .preview .boss { color: var(--bad); font-weight: 700; }
+.risk-btn {
+  display: block; width: 100%; margin-top: 8px; padding: 6px 10px; border-radius: 8px;
+  background: rgba(255,255,255,0.06); border: 1px solid var(--line); color: var(--dim);
+  font: inherit; font-size: 11px; text-align: left; cursor: pointer; transition: all 0.12s;
+}
+.risk-btn:hover { border-color: var(--warn); color: var(--text); }
+.risk-btn.armed {
+  background: rgba(255,157,74,0.18); border-color: var(--warn); color: var(--text); font-weight: 700;
+}
 .preview.boss-wave { padding: 3px 6px; border-radius: 6px; background: rgba(255,106,125,0.1); animation: bossPulse 1.4s ease-in-out infinite; }
 @keyframes bossPulse {
   0%, 100% { box-shadow: 0 0 0 rgba(255,106,125,0); }
@@ -164,6 +179,25 @@ button.go:disabled { opacity: 0.4; cursor: not-allowed; }
 /* ---------- 플레이어 상태 ---------- */
 #player-panel { left: 14px; bottom: 92px; width: 220px; display: flex; flex-direction: column; gap: 6px; }
 .prompt { font-size: 12px; color: var(--warn); }
+
+/* ---------- 정수 스킬 바 ---------- */
+#skill-bar {
+  position: fixed; left: 14px; bottom: 172px; display: flex; gap: 5px; z-index: 5;
+}
+.skill-btn {
+  position: relative; width: 40px; height: 40px; border-radius: 10px; padding: 0;
+  background: rgba(14,20,33,0.85); border: 1px solid var(--line); color: var(--text);
+  font-family: inherit; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  cursor: pointer; transition: opacity 0.12s, border-color 0.12s;
+}
+.skill-btn .ic { font-size: 17px; line-height: 1; }
+.skill-btn b {
+  position: absolute; right: -3px; bottom: -3px; min-width: 13px; height: 13px; line-height: 13px;
+  border-radius: 7px; background: rgba(95,212,255,0.9); color: #06121c; font-size: 8px; font-weight: 700;
+  text-align: center; padding: 0 2px;
+}
+.skill-btn.lack { opacity: 0.4; }
+.skill-btn:hover { border-color: var(--cyan); }
 
 /* ---------- 인벤토리 열기 버튼 ---------- */
 .inv-open {
@@ -219,6 +253,12 @@ button.go:disabled { opacity: 0.4; cursor: not-allowed; }
 }
 @keyframes crystalPulse { 0%, 100% { opacity: 0.35; } 50% { opacity: 0.9; } }
 
+/* ---------- ⚠️ 위험 계약 발동 중 (은은하게, 깜빡이지 않음 — 크리스탈 위험 경고와 구분) ---------- */
+#risk-vignette {
+  position: fixed; inset: 0; pointer-events: none; z-index: 3;
+  box-shadow: inset 0 0 110px 16px rgba(255, 157, 74, 0.28);
+}
+
 /* ---------- 칠흑 군주의 암흑 (미니맵 몬스터 표시가 가려지는 동안 화면 가장자리가 어두워짐) ---------- */
 #blind-overlay {
   position: fixed; inset: 0; pointer-events: none; z-index: 3;
@@ -260,7 +300,7 @@ button.go:disabled { opacity: 0.4; cursor: not-allowed; }
 
 /* ---------- 오버레이(로비/결과) ---------- */
 .overlay {
-  position: fixed; inset: 0; z-index: 30; display: flex; align-items: center; justify-content: center;
+  position: fixed; inset: 0; z-index: 30; display: flex; align-items: safe center; justify-content: center;
   background: radial-gradient(circle at 50% 30%, rgba(30,60,100,0.55), rgba(5,8,15,0.92));
   backdrop-filter: blur(4px); padding: 16px; overflow: auto;
 }
@@ -468,6 +508,10 @@ button.ghost { background: transparent; color: var(--dim); }
 button.corner {
   position: fixed; right: 14px; top: 50%; width: 34px; height: 34px; border-radius: 50%;
   background: var(--panel); border: 1px solid var(--line); color: var(--text); cursor: pointer; font-size: 15px;
+  /* 로비(#lobby, z-index 30)를 비롯한 모든 오버레이보다 위에 있어야 한다 — 이 버튼을 #hud
+     밖에 둔 이유 자체가 "로비 화면에서도 눌러야 하니까"인데, z-index가 없으면(기본값 auto)
+     전체 화면을 덮는 #lobby가 그 위에 쌓여 클릭을 가로챈다. */
+  z-index: 35;
 }
 button.corner.mute { top: calc(50% - 44px); font-size: 14px; }
 button.corner.mute.off { opacity: 0.5; }
@@ -493,11 +537,24 @@ button.corner.mute.off { opacity: 0.5; }
   border-radius: 50%; background: rgba(95,212,255,0.4); border: 1px solid var(--cyan);
 }
 #touch-buttons { position: absolute; right: 22px; bottom: 210px; display: flex; flex-direction: column; gap: 10px; pointer-events: auto; }
+/* #prompt(근접 상호작용 안내)가 뜬 두 가지(포탈 봉쇄·타워 탑승)에 맞춰서만 나타난다 —
+   나머지(채집·공격)는 이미 대상을 직접 탭하는 것으로 되므로 버튼이 필요 없다. */
+#touch-action {
+  min-width: 64px; min-height: 64px; padding: 8px 14px; border-radius: 16px;
+  background: var(--panel); border: 1px solid var(--cyan); color: var(--text);
+  font-size: 12px; line-height: 1.3; text-align: center; box-shadow: 0 0 14px rgba(95,212,255,0.25);
+}
+#touch-action.holding { background: rgba(95,212,255,0.28); }
+#touch-action b { display: block; font-size: 18px; }
 #touch-buttons button.harvest { background: rgba(185,138,77,0.32); border-color: rgba(255,216,138,0.5); }
 #touch-buttons button {
   width: 76px; height: 76px; border-radius: 50%; font-size: 14px; font-weight: 700;
   background: rgba(14,20,33,0.85); color: var(--text); border: 1px solid var(--line); font-family: inherit;
 }
+/* 막기·회피는 근처 상호작용과 달리 항상 떠 있다 — 데스크톱 키(Q 홀드·V 탭)를 그대로 흉내낼 뿐이라
+   조금 작게 둬서 touch-action(상황별 안내 버튼)이 더 눈에 띄게 했다. */
+#touch-dash, #touch-block { width: 62px; height: 62px; font-size: 24px; opacity: 0.85; }
+#touch-block.holding { background: rgba(255,200,90,0.32); border-color: rgba(255,200,90,0.6); opacity: 1; }
 
 .shake { animation: shake 0.28s; }
 @keyframes shake {
@@ -530,6 +587,11 @@ button.corner.mute.off { opacity: 0.5; }
   /* 조이스틱·터치 버튼 위쪽, 건설 바 위쪽에 겹치지 않는 자리 */
   #player-panel { left: 10px; bottom: 236px; width: 42vw; gap: 4px; }
   .prompt { font-size: 11px; }
+
+  /* 정수 스킬 바 — 조이스틱(왼쪽 아래)과 겹치지 않도록 player-panel보다 더 위로 올린다 */
+  #skill-bar { left: 10px; bottom: 340px; }
+  .skill-btn { width: 34px; height: 34px; border-radius: 8px; }
+  .skill-btn .ic { font-size: 15px; }
 
   /* 인벤토리 버튼은 터치 조작 위로 올린다 */
   .inv-open { bottom: 116px; padding: 8px 14px; font-size: 13px; }
@@ -575,6 +637,10 @@ button.corner.mute.off { opacity: 0.5; }
 <div id="fx-layer"></div>
 <div id="crystal-warning" class="hidden"></div>
 <div id="blind-overlay" class="hidden"></div>
+<!-- ⚠️ 위험 계약이 발동한 웨이브 내내 화면 가장자리를 옅은 호박색으로 은은하게 물들인다 —
+     크리스탈 위험 경고(빨강, 깜빡임)와는 달리 급박함이 아니라 "지금 이 웨이브 전체가 평소보다
+     세다"는 지속 상태를 알리는 용도라 깜빡이지 않는다. -->
+<div id="risk-vignette" class="hidden"></div>
 
 <!-- ================= HUD ================= -->
 <div id="hud" class="hidden">
@@ -609,9 +675,13 @@ button.corner.mute.off { opacity: 0.5; }
       <button id="btn-wave" class="go">웨이브 시작 <kbd>Enter</kbd></button>
     </div>
     <div id="wave-preview" class="preview hidden"></div>
+    <!-- ⚠️ 위험 계약 — 포탈 봉쇄·전초기지처럼 "장소"에 매인 선택이 아니라 팀이 순수하게
+         "이번 판을 얼마나 세게 받을지"를 정하는 축. 준비 시간에만 눌러 켜고 끌 수 있고,
+         켜진 채로 웨이브가 시작되면 그 한 판만 몬스터가 더 강해지고 보상도 커진다. -->
+    <button id="risk-toggle" class="risk-btn hidden"></button>
     <!-- 떠돌이 상인 — 준비 시간에 가끔만 나타나 이번 준비 시간에만 물건을 판다 -->
     <div id="merchant-panel" class="merchant-panel hidden">
-      <div class="merchant-head">🧳 떠돌이 상인 — 이번 준비 시간에만</div>
+      <div id="merchant-head" class="merchant-head">🧳 떠돌이 상인 — 이번 준비 시간에만</div>
       <div id="merchant-offers" class="merchant-offers"></div>
     </div>
   </div>
@@ -627,8 +697,17 @@ button.corner.mute.off { opacity: 0.5; }
     <div class="bar hp"><i id="hp-fill"></i><span id="hp-text">100 / 100</span></div>
     <div id="harvest-wrap" class="bar harvest hidden"><i id="harvest-fill"></i><span>채집 중…</span></div>
     <div id="dash-wrap" class="bar dash hidden"><i id="dash-fill"></i><span id="dash-text"></span></div>
+    <div id="root-wrap" class="bar root hidden"><i id="root-fill"></i><span id="root-text"></span></div>
+    <div id="crew-wrap" class="bar crew hidden"><i></i><span id="crew-text"></span></div>
     <div id="prompt" class="prompt hidden"></div>
   </div>
+
+  <!-- 정수 스킬 바 — 지금까지 회복·폭발·시간왜곡·긴급방벽·중력균열·정령소환·코어폭주 7종은
+       전부 키보드 단축키로만 썼다(R·T·Y·B·C·N·;). 화면 어디에도 안내가 없어 도움말을 안 읽으면
+       존재 자체를 모를 수 있었고, 모바일은 애초에 누를 방법조차 없었다 — 근접 상호작용과 달리
+       "즉발"이라 지금까지의 #touch-action 방식과도 안 맞아 계속 빠져 있었다. 클릭/탭으로도 똑같이
+       쓸 수 있게 하고, 정수가 부족하면 반투명하게 표시한다. 내용은 CFG.skills에서 그려진다. -->
+  <div id="skill-bar"></div>
 
   <!-- 하단 중앙: 배치/모드 안내 -->
   <div id="build-hint" class="hint"></div>
@@ -668,9 +747,19 @@ button.corner.mute.off { opacity: 0.5; }
     <div id="inv-list" class="inv-list"></div>
   </div>
 
-  <!-- 모바일 컨트롤 — 이동 조이스틱만. 채집·공격은 대상을 직접 탭한다. -->
+  <!-- 모바일 컨트롤 — 이동 조이스틱 + 근접 상호작용 버튼 + 막기/회피 버튼. 채집·공격은
+       대상을 직접 탭한다. 근접 상호작용(포탈 봉쇄·타워 탑승·동물 길들이기)은 데스크톱에서도
+       키를 누르는 방식이라 터치 대상이 없었다 — #prompt가 이미 매 프레임 "지금 뭘 할 수
+       있는지"를 계산해 두므로, 그 문구가 뜬 것에 한해 버튼 하나로 같은 동작을 하게 한다.
+       막기·회피 돌진은 "근처에 서는" 것과 무관해 그 방식이 안 맞으므로, 늘 떠 있는 별도
+       버튼 두 개로 뒀다(둘 다 데스크톱 키 입력을 그대로 흉내 낸다 — 새 게임 로직 없음). -->
   <div id="touch" class="hidden">
     <div id="stick"><i></i></div>
+    <div id="touch-buttons">
+      <button id="touch-action" class="hidden"></button>
+      <button id="touch-dash" title="회피 돌진">💨</button>
+      <button id="touch-block" title="막기(누르는 동안)">🛡️</button>
+    </div>
   </div>
 </div>
 
@@ -698,14 +787,17 @@ button.corner.mute.off { opacity: 0.5; }
       <tr><td>🚪 성문</td><td>벽처럼 몬스터의 길을 막지만(체력은 벽보다 낮다), <b>플레이어는 그대로 통과</b>할 수 있다. 방어선을 완전히 둘러싸도 채집하러 나갈 때마다 벽을 부쉈다 다시 짓는 수고 없이 성문 하나로 드나들면 된다</td></tr>
       <tr><td>🚩 전초기지</td><td><b>건설 가능 구역 자체를 넓히는</b> 유일한 건물이다. 방어선 밖(크리스탈에서 22 이상 떨어진 곳)에 세우면 그 주위 반경이 새 건설 구역이 되어, 포탈 쪽으로 방어선을 밀어내거나 자원이 몰린 쪽을 영역 안으로 끌어들일 수 있다. 레벨을 올리면 구역이 더 넓어진다. 다만 <b>깃발이 부서지면 그 구역은 사라진다</b> — 이미 지은 건물은 남지만 그 자리에 더는 새로 못 짓는다. 다른 전초기지와 16, 포탈과 9 이내에는 세울 수 없다</td></tr>
       <tr><td>🧺 채집기</td><td>다른 건물과 달리 <b>방어선 밖 어디든</b> 지을 수 있다 — 채집 노드 옆에 놓으면 반경 안 채집 노드를 스스로 캔다. 손으로 캐는 것보다 항상 느리지만 방치해도 알아서 채워진다. 대신 길을 막지 않고, 지나가는 몬스터(특히 건물을 노리는 🪓 약탈자)에게 부서질 수 있다</td></tr>
+      <tr><td>📯 허수아비 유인목</td><td>스스로 공격하지 않는다 — 대신 반경 안의 일반 몬스터가 크리스탈 대신 이것부터 노리게 만든다(보스·건물을 노리는 약탈자·자원을 노리는 도둑너구리처럼 이미 정해진 목표가 있는 부류, 날아다니거나 파묻히는 부류에는 안 통한다). 무리를 원하는 곳으로 끌어와 화력을 몰아 두들기거나, 손이 비는 약한 측면에 세워 시간을 버는 용도. 체력이 낮아 <b>오래 방치하면 부서진다</b> — 부서지면 묶여 있던 몬스터가 다시 크리스탈로 향한다</td></tr>
+      <tr><td>🏮 봉화대</td><td>유인목과 정반대다 — 스스로 공격하지 않고 <b>비행 몬스터(박쥐 등)에게만</b> 통한다(땅 위 몬스터·보스는 완전히 무시한다). 지금까지 비행 몬스터는 타워 화력으로만 막을 수 있었는데, 화력이 비는 방향에 봉화대를 세워 두면 그 경로 자체를 원하는 곳으로 접어 둘 수 있다. 체력이 낮아 <b>오래 방치하면 부서진다</b> — 부서지면 이끌리던 몬스터가 다시 크리스탈로 향한다</td></tr>
       <tr><td>📦 탄약</td><td>공격 타워는 쏠 때마다 <b>종류에 맞는 탄약</b>을 하나씩 쓴다 — 🏹 화살(화살탑·저격탑, <b>목재</b>로 제작대에서) · 💣 포탄(대포탑, <b>광물+철</b>을 화로에서, 발당 단가가 가장 비싸다) · 🧪 원소액(서리탑·독탑, <b>광물+철</b>을 화로에서). 새로 짓거나 업그레이드한 타워는 탄창이 <b>가득 찬 채로</b> 나오니 초반엔 신경 쓸 게 없지만, 바닥나면 남은 부품을 긁어 쏘는 셈이라 <b>피해와 연사가 크게 떨어진다</b>(멈추지는 않는다). 타워 머리 위 얇은 게이지가 남은 탄약이고, 비면 빨갛게 바뀐다. 그래서 "무엇을 짓느냐"가 건설 순간의 한 번짜리 선택이 아니라 <b>계속 먹여 살릴 수 있느냐</b>는 선택이 된다 — 화살탑 도배는 목재만 있으면 유지되지만, 대포탑은 한 방이 센 대신 철을 계속 먹는다</td></tr>
       <tr><td>🔁 재장전</td><td>탄약이 덜 찬 타워 <b>가까이에서</b> <kbd class="rebind" data-action="reload">\</kbd> — 재고에서 꺼내 그 타워 하나를 가득 채운다. 가장 가까운 <b>덜 찬</b> 타워를 고르므로 이미 꽉 찬 타워가 옆에 있어도 상관없다</td></tr>
+      <tr><td>🎯 타워 탑승</td><td>공격 타워 가까이에서 <kbd class="rebind" data-action="crew">`</kbd> 를 누르고 있는 동안 그 타워 하나에 탑승한다 — 공격력 +40%·사거리 +25%로 크게 세지는 대신, 탑승 중에는 <b>이동·공격·채집을 전혀 할 수 없다</b>(막기·회피 돌진도 못 한다). 위험한 순간에 특정 타워 하나를 밀어줄지, 직접 몸으로 싸울지 실시간으로 고르는 선택지 — 키를 떼면 즉시 해제된다</td></tr>
       <tr><td>🏭 병기창</td><td>스스로 공격하지 않지만, <b>반경 안 타워의 탄창을 저절로 채워 준다</b>(재고에서 꺼내 쓰므로 탄약은 계속 만들어 둬야 한다). 정비소가 체력을 자동으로 채우듯 이건 탄약을 채운다 — 덕분에 타워 배치에 축이 하나 늘어난다: 넓게 펴서 사거리를 벌면 손으로 재장전하러 뛰어다녀야 하고, 병기창 주변에 모으면 보급은 편하지만 커버리지가 좁아진다</td></tr>
       <tr><td>🔧 정비소</td><td>스스로 공격하지 않지만, 반경 안 손상된 건물을 <b>자원 없이</b> 초당 일정량씩 저절로 고쳐준다 — 전투 중 벽·타워를 일일이 찾아다니며 수리할 필요가 줄어든다. 여러 개를 겹쳐 지으면 회복량이 그대로 합산된다</td></tr>
       <tr><td>⛺ 치유소</td><td>스스로 공격하지 않지만, 반경 안 <b>플레이어</b>를 초당 일정량씩 회복시켜 준다 — 기본 회복과 달리 <b>전투 중에도, 방금 맞았어도</b> 계속 적용된다. 최전선 바로 뒤에 지어 두면 그 자리 자체가 안전지대가 된다</td></tr>
       <tr><td>🪤 함정</td><td>벽·타워와 달리 <b>길을 막지 않는다</b> — 적이 지나가는 길목 한복판에 심어 두면, 적이 밟는 순간 큰 피해+둔화를 주고 사라지는 1회용이다. 벽 뒤가 아니라 통로 위에 놓는 게 핵심. 🥾 수렁 함정은 같은 자리에 놓는 둘째 함정 — 피해는 적지만 대신 완전히 묶어 세운다(둔화 아님), 묶인 적을 다른 공격으로 마무리하면 추가 피해가 붙는다. 🧨 폭발 함정은 셋째 함정 — 밟은 한 마리가 아니라 반경 안 적 전부에게 피해를 준다, 뭉쳐서 오는 무리에 강하다</td></tr>
       <tr><td>🎯 저격탑</td><td>다른 타워보다 사거리가 훨씬 길고 발사는 느리지만, 사거리 안에서 <b>남은 체력이 가장 많은 적</b>(대개 보스)을 골라 큰 피해를 준다 — 물량은 다른 타워에 맡기고 가장 두꺼운 표적만 전담시키는 용도. 독탑 근처에 지으면 중독된 적에게 추가 피해가 붙는다</td></tr>
-      <tr><td>제작</td><td><b>제작대</b>를 지으면 인벤토리 <b>제작</b> 탭에서 ⛏️ 곡괭이 · 🗡️ 칼 · 🏹 활 · 🔱 창 · 🔨 망치 · 🔗 채찍 · 💣 폭탄가방 · 🛡️ 방패 · ❄️ 얼음도끼 · 🔪 단검을 만든다. 칼은 단단한 일격, <b>활은 실제로 화살을 쏘는 원거리</b>, 창은 좁고 긴 관통, 망치는 느리지만 사방을 강타, 채찍은 대미지 대신 맞은 적을 뒤로 밀쳐내고, 얼음도끼는 맞은 적을 서리탑처럼 잠깐 둔화시키며, 단검은 대미지가 약한 대신 입힌 피해의 일부를 그 자리에서 체력으로 돌려받는다. <b>화로</b>를 지으면 광물을 녹여 ⚙️ 철을 얻는다</td></tr>
+      <tr><td>제작</td><td><b>제작대</b>를 지으면 인벤토리 <b>제작</b> 탭에서 ⛏️ 곡괭이 · 🗡️ 칼 · 🏹 활 · 🔱 창 · 🔨 망치 · 🔗 채찍 · 💣 폭탄가방 · 🛡️ 방패 · ❄️ 얼음도끼 · 🔪 단검 · 📌 낙인침을 만든다. 칼은 단단한 일격, <b>활은 실제로 화살을 쏘는 원거리</b>, 창은 좁고 긴 관통, 망치는 느리지만 사방을 강타, 채찍은 대미지 대신 맞은 적을 뒤로 밀쳐내고, 얼음도끼는 맞은 적을 서리탑처럼 잠깐 둔화시키며, 단검은 대미지가 약한 대신 입힌 피해의 일부를 그 자리에서 체력으로 돌려받고, 낙인침은 대미지가 약한 대신 맞은 적에게 표식을 남겨 그동안 <b>타워를 포함한 모든 피해</b>가 커지게 한다. <b>화로</b>를 지으면 광물을 녹여 ⚙️ 철을 얻는다</td></tr>
       <tr><td>🛡️ 방패</td><td>공격력은 거의 없지만(맨손과 동일), 손에 쥔 채 <b>막기(Q)</b>를 쓰면 피해 경감(65%→80%)과 이동 속도(40%→60%)가 크게 좋아진다 — 다른 무기가 전부 "더 세게 때리는" 선택인 것과 반대로, 이건 "덜 때리고 훨씬 오래 버티는" 선택이다. 최대 강화하면 ⚗️ 특화로 더 단단한 철벽(경감 92%, 대신 더 느림)이나 움직이는 기동방패(경감 72%, 속도 85%)로 갈린다</td></tr>
       <tr><td>🧥 방어구</td><td>손에 든 무기와는 완전히 별개로 <b>몸에 걸치는 세 번째 슬롯</b> — 제작대에서 순서대로 사 입는다(건너뛸 수 없다). 🧥 누비옷(피해 -8%, 속도 그대로) → 🥋 사슬갑옷(피해 -16%, 속도 95%) → 🛡️ 판금갑옷(피해 -26%, 속도 88%) 순으로, 무거워질수록 몬스터의 <b>근접 접촉 공격</b>은 덜 아프지만 그만큼 느려진다(원거리·상태이상·운석 등 광역 피해는 못 막는다 — 막기와 같은 범위). 어떤 무기를 들었든 항상 같이 적용되니, 단검·방패처럼 이미 버티기에 특화된 무기와 겹치면 더 단단해진다</td></tr>
       <tr><td>🏹 활</td><td>손에 들면 공격이 근접 대신 <b>조준한 쪽으로 화살을 쏘는 것</b>으로 바뀐다(사거리 16). 폭탄가방과 달리 자원이 전혀 안 들지만 한 발에 한 마리만 맞고 피해도 낮다 — 안전한 거리에서 꾸준히 점사하는 용도</td></tr>
@@ -718,7 +810,7 @@ button.corner.mute.off { opacity: 0.5; }
       <tr><td>💥 치명타</td><td>근접·활·폭탄가방 공격은 12% 확률로 2배 피해를 낸다(진분홍색 "크리티컬!" 표시) — 협공과 달리 혼자 플레이해도 그대로 터지는 순수 확률 보너스다. 협공과 동시에 뜨면 "크리티컬 협공!"으로 둘 다 겹친다</td></tr>
       <tr><td>장비</td><td>인벤토리 <b>장비</b> 탭에서 고르면 손에 든다. ⛏️ 곡괭이도 쥐어야 바위·광맥을 캘 수 있다</td></tr>
       <tr><td>몬스터</td><td>🧙 주술사는 벽을 무시하고 멀리서 크리스탈을 저격 · 🪓 약탈자는 가장 가까운 건물로 직행해 부순다 · 🦝 도둑너구리(4웨이브부터)는 크리스탈이 아니라 <b>채집 노드</b>로 달려가 자원을 훔친다 — 전투력은 약하니 죽이면 훔친 만큼 그대로 돌려받는다, 못 잡으면 그 노드는 한동안 못 쓴다 · 🦇 박쥐(6웨이브부터)는 벽·함정을 전부 무시하고 하늘로 크리스탈까지 직선 비행한다 — 체력이 낮아 타워로 요격하는 게 사실상 유일한 대응 · 🧨 폭탄병(8웨이브부터)은 죽는 순간 주변에 폭발 피해를 남긴다 — 코앞에서 마무리하면 같이 맞으니 거리를 두고 처리할 것 · 🕳️ 굴착병(9웨이브부터)은 땅속에서 벽뿐 아니라 <b>타워의 조준까지</b> 피해 직선으로 파고든다 — 흙먼지 자국만 보이니 직접 쫓아가 끊거나, 크리스탈 가까이서 떠오르는 순간(그때부터 타워도 맞힐 수 있다)을 노려야 한다. 땅 위 함정은 파묻힌 채로도 그대로 맞는다 · 🥁 지휘관(10웨이브부터)은 주기적으로 진군의 함성을 울려 반경 안 무리 전체를 잠깐 크게 빠르게 만든다 — 체력은 낮으니 먼저 잡으면 뒤따르는 무리가 다시 느려진다</td></tr>
-      <tr><td>🏹 사냥과 요리</td><td><b>준비 시간에만</b> 맵 바깥쪽에 야생 동물이 돌아다닌다 — 🐇 토끼(빠르고 잘 도망친다) · 🦌 사슴 · 🐗 멧돼지(<b>도망치지 않고 때리면 오히려 달려들어 들이받는다</b>) · 🦊 여우 · 🐺 늑대(<b>도망치지 않고 오히려 나를 먼저 쫓아온다</b>, 죽이는 대신 길들일 수도 있다 — 아래 동물 길들이기 참고) · 🐻 곰(멧돼지처럼 맞아야 반격하지만 체력·공격력이 훨씬 세고 더 오래 쫓아온다) · 👑 전설의 사슴왕(9웨이브부터, <b>가장 희귀하다</b> — 여우처럼 도망치다가도 맞으면 곰보다 세게 반격한다, 죽이는 대신 길들일 수도 있다 — 아래 동물 길들이기 참고). 잡으면 자원이 아니라 <b>생고기</b>가 나오고, 생고기는 그대로는 쓸모가 없다 — <b>화로</b>에서 목재를 태워 구워 먹어야 <b>다음 웨이브 한 판</b> 동안 효과가 붙는다: 🍢 토끼 꼬치(이동 속도 +18%) · 🥩 사슴 스테이크(최대 체력 +40, 즉시 회복) · 🍖 멧돼지 구이(근접 공격력 +25%) · 🍲 여우 스튜(근접 피격 시 받은 피해의 25%를 공격자에게 반사) · 🍗 늑대 다리 구이(몬스터 근접 공격 피해 -15%) · 🥓 곰 훈제육(다음 웨이브 동안 <b>전투 중에도</b> 초당 체력 3 자동 회복) · 🍽️ 전설 사슴 구이(근접 치명타 확률 +15%p). 웨이브가 시작되면 동물은 전부 흩어져 사라지니, 짧은 준비 시간을 <b>채집·건설·업그레이드·사냥</b> 중 어디에 쓸지가 매번 선택이 된다</td></tr>
+      <tr><td>🏹 사냥과 요리</td><td><b>준비 시간에만</b> 맵 바깥쪽에 야생 동물이 돌아다닌다 — 🐇 토끼(빠르고 잘 도망친다) · 🦌 사슴 · 🐗 멧돼지(<b>도망치지 않고 때리면 오히려 달려들어 들이받는다</b>) · 🦊 여우 · 🐺 늑대(<b>도망치지 않고 오히려 나를 먼저 쫓아온다</b>, 죽이는 대신 길들일 수도 있다 — 아래 동물 길들이기 참고) · 🐻 곰(멧돼지처럼 맞아야 반격하지만 체력·공격력이 훨씬 세고 더 오래 쫓아온다) · 👑 전설의 사슴왕(9웨이브부터, <b>가장 희귀하다</b> — 여우처럼 도망치다가도 맞으면 곰보다 세게 반격한다, 죽이는 대신 길들일 수도 있다 — 아래 동물 길들이기 참고) · 🦅 매(5웨이브부터, <b>유일하게 하늘을 난다</b> — 도망 반경이 가장 길어 다섯 중 가장 접근하기 어렵다, 죽이는 대신 길들일 수도 있다 — 아래 동물 길들이기 참고). 잡으면 자원이 아니라 <b>생고기</b>가 나오고, 생고기는 그대로는 쓸모가 없다 — <b>화로</b>에서 목재를 태워 구워 먹어야 <b>다음 웨이브 한 판</b> 동안 효과가 붙는다: 🍢 토끼 꼬치(이동 속도 +18%) · 🥩 사슴 스테이크(최대 체력 +40, 즉시 회복) · 🍖 멧돼지 구이(근접 공격력 +25%) · 🍲 여우 스튜(근접 피격 시 받은 피해의 25%를 공격자에게 반사) · 🍗 늑대 다리 구이(몬스터 근접 공격 피해 -15%) · 🥓 곰 훈제육(다음 웨이브 동안 <b>전투 중에도</b> 초당 체력 3 자동 회복) · 🍽️ 전설 사슴 구이(근접 치명타 확률 +15%p) · 🍡 매 꼬치구이(다음 웨이브 동안 타워 사거리 +15%). 웨이브가 시작되면 동물은 전부 흩어져 사라지니, 짧은 준비 시간을 <b>채집·건설·업그레이드·사냥</b> 중 어디에 쓸지가 매번 선택이 된다</td></tr>
       <tr><td>🦀 보물게</td><td>3웨이브부터 전투 중 가끔 튀어나와 공격은 안 하고 도망만 다닌다. 시간 안에 못 잡으면 보상 없이 사라지니 지금 하던 걸 멈추고 쫓아갈지 판단해야 한다 — 잡으면 목재·광물을 두둑히 챙긴다</td></tr>
       <tr><td>🕵️ 정찰병</td><td>4웨이브부터 <b>준비 시간에만</b> 가끔 나타나 가장 가까운 포탈로 도망친다(공격은 안 한다). 포탈에 닿기 전에 처치하면 보상만 받지만, 놓치면 <b>다음 웨이브 전체가 살짝 강해진다</b>(체력·공격력 +12%) — 보물게와 반대로 "잡으면 이득"이 아니라 "놓치면 손해"라, 짓거나 캐던 걸 멈추고 쫓아갈지 판단해야 한다. 사냥감(wild)과 달리 타워도 자동으로 조준해 같이 잡아준다</td></tr>
       <tr><td>🪨 돌 파수꾼</td><td>5웨이브부터 <b>준비 시간에만</b>, 사냥감보다 훨씬 드물게 한 번에 하나만 나타난다. 다른 야생 동물과 달리 <b>전혀 움직이지 못한다</b> — 대신 다가가 때리면 사냥감 중 가장 세게 반격한다. 생고기가 아니라 그 자리에 쌓아둔 <b>목재·광물을 통째로</b> 주는 유일한 야생 동물 — "이번 웨이브 버프"가 아니라 "건설 자재"를 위해 체력을 걸지 판단하는 만남이다</td></tr>
@@ -737,8 +829,8 @@ button.corner.mute.off { opacity: 0.5; }
       <tr><td>♾️ 축복</td><td>엔드리스 모드에서 3웨이브마다 준비 시간이 멈추고 영구 버프 2개 중 하나를 고른다(공격력·타워 공격력·스킬 비용·즉시 회복). 표준 10웨이브에는 나오지 않는다</td></tr>
       <tr><td>🏺 유물</td><td>보스를 처치할 때마다(표준 10웨이브의 5·10웨이브 포함) 준비 시간이 멈추고 영구 유물 2개 중 하나를 고른다 — ⏳ 준비 시간 연장 · 💚 즉시 회복 · ☠️ 근접 공격 맹독 확률 · 💪 위기 시 피해 보너스 강화 · 👟 이동 속도 영구 증가 · 🔥 모든 타워 공격력 영구 증가 · ⏩ 무기 공격 속도 영구 증가 · 🎒 타워 발사 시 25% 확률로 탄약 미소모 · 🍀 근접 공격 치명타 확률 증가 · 🩹 쓰러졌을 때 부활 시간 40% 단축 · 🦅 모든 타워 사거리 영구 증가 · 🐾 길들인 동료 공격력 영구 증가(동료가 없으면 효과 없음) · 💀 근접 공격력 +35% 대신 크리스탈 최대 체력 -150(유일한 트레이드오프 유물, 중첩 가능) · 💠 웨이브 클리어 시 정수 +1(중첩 가능). 축복과 달리 표준 캠페인에서도 뜬다. 인벤토리 <b>유물</b> 탭에서 지금까지 이 판에서 고른 것을 전부 다시 볼 수 있다</td></tr>
       <tr><td>💎 크리스탈 강화</td><td>인벤토리 <b>크리스탈</b> 탭에서 정수(💠)로 크리스탈 자체를 영구히 키운다: 💪 강화(최대 체력 +150) · 💚 재생(초당 자동 회복) · ⚡ 오라(주변 적에게 주기 피해) · 🪞 반사(크리스탈을 때린 적에게 받은 피해 일부를 그대로 돌려줌) · 💀 심판(반경 안에서 체력 15% 이하로 떨어진 적을 즉시 처치, 보스는 면역) · 💥 충격파(8초마다 반경 안 적을 크리스탈 반대편으로 밀쳐냄, 레벨이 오를수록 더 멀리) · 🕊️ 가호(반경 안에서 직접 공격한 플레이어는 그 피해의 일부를 체력으로 돌려받는다 — 크리스탈 곁을 지키며 싸울수록 유리해진다) · 🔔 공명(반경 안에서 둔화·속박된 적에게만 1초마다 추가 피해 — 서리탑·얼음도끼·설원 지형처럼 묶어 두는 수단과 궁합이 좋다) · 🎯 군수(반경 안 타워는 공격력이 늘어난다 — 크리스탈 근처에 방어선을 두텁게 쌓을수록 유리해진다). 각 5레벨까지, 레벨이 오를수록 비용도 오른다 — 지킬 대상이 강해지면 후반에 방어선을 좁혀 버티는 선택지가 생긴다</td></tr>
-      <tr><td>특수 웨이브</td><td>3웨이브마다(보스 웨이브 제외) 성격이 다른 웨이브가 섞인다: 🏃 러시(러너 대량, 물량전) · 🏰 공성(브루트+약탈자, 건물이 표적) · ⭐ 정예전(수는 적지만 전부 정예) · 🌀 결계(전부 결계를 둘러 타워가 조준 못함) · 💉 치유단(치유사가 잔뜩 섞여 서로 회복, 먼저 솎아내야 함) · 🥁 돌격대(지휘관 여러 명이 러너 무리를 이끈다, 21웨이브부터 — 지휘관부터 끊지 않으면 무리 전체가 계속 빨라진다) · 🕳️ 땅굴 습격(굴착병 대거 파묻힌 채 접근, 24웨이브부터 — 보루 Lv.2 이상(또는 감시탑) 없이는 타워 화력 상당수가 못 맞춘다) · 🧙 저격전(주술사 대거 몰려온다, 27웨이브부터 — 벽 뒤에서도 사거리 안이면 크리스탈을 직접 저격한다) · 🩸 혈투(몬스터 전부가 흡혈 상태, 33웨이브부터 — 살짝살짝 때리면 오히려 회복하니 한 마리씩 확실히 끊어야 함) · 🛡️ 철벽 군단(전부 방패를 두르고 나온다, 36웨이브부터 — 정면 공격이 크게 줄어드니 측면·후방으로 돌거나 협공해야 한다) · 🦝 약탈(도둑너구리 무리가 크리스탈 대신 자원 노드로 흩어져 달려간다, 39웨이브부터 — 방어선을 지키고만 있으면 크리스탈은 안전해도 자원이 그대로 사라지니, 쫓아가서 잡아야 한다) · 🔒 면역 군단(전부 둔화·속박·중독을 무시한다, 42웨이브부터 — 서리탑·독탑·덫탑이 안 먹히니 화살탑·대포탑·저격탑 같은 순수 화력과 보루 버프로 밀어붙여야 한다) · 🦾 중장갑 군단(전부 중장갑을 둘렀다, 48웨이브부터 — 타워 피해가 30%로 줄어드니 근접·활·폭탄가방·정수 스킬로 직접 뚫어야 한다) · 👻 환영 군단(전부 환영에 씌워졌다, 51웨이브부터 — 정반대로 직접 조준한 근접·활·폭탄가방 공격이 크게 약해지니 타워·정수 스킬에 맡겨야 한다) · ➗ 분열 군단(전부 분열 상태로 나온다, 54웨이브부터 — 죽여도 더 약한 두 마리로 갈라지니, 눈에 보이는 수만 믿고 화력을 나누면 오히려 무리가 불어난다. 대포탑·독탑·폭탄가방·망치처럼 범위 공격이 확산을 억제하는 데 유리하다) · 🌵 가시 군단(전부 가시를 두르고 나온다, 57웨이브부터 — 근접으로 때릴 때마다 그 피해의 상당량을 그대로 돌려받는다, 무기 강화가 잘 됐을수록 더 아프니 이번만큼은 타워·활·폭탄가방 같은 원거리 위주로 막아야 한다) · 💚 재생 군단(전부 재생 상태로 나온다, 63웨이브부터 — 3초만 안 맞으면 체력이 도로 차오르니, 화력을 흩어놓지 말고 한 마리씩 확실히 끝내거나 광역기로 몰아쳐야 한다). 준비 시간 웨이브 예고에 노란 배지로 미리 알려준다</td></tr>
-      <tr><td>보스</td><td>5웨이브마다 💀 파괴자 · 🧊 서리 군주 · 🔇 침묵의 군주 · 🦂 갈취자 · 🗿 강철 수호자 · 🌘 정수 포식자 · 🌪️ 질풍 군주 · 🔮 저주의 군주 · 🌿 치유의 군주 · 🧲 자성 군주 · 🌑 칠흑 군주가 55웨이브 주기로 돌아가며 등장한다. 체력이 깎일 때마다 파괴자·서리 군주·치유의 군주는 <b>잡졸을 소환</b>하고(서리 군주는 전부 🛡️ 방패 변종), 침묵의 군주는 <b>발밑에 침묵 장판</b>을 깔아 반경 안 타워를 전부 멈추며, 갈취자는 <b>팀 자원을 훔쳐 체력을 회복</b>하고, 강철 수호자는 <b>자기 몸에 방벽을 둘러 받는 피해를 크게 줄이며</b>(캐스팅 중에 화력을 몰아야 손해를 줄인다), 정수 포식자는 <b>팀 정수를 훔친 만큼 체력을 회복</b>하고(정수가 없으면 회복도 없다), 질풍 군주는 소환·침묵·약탈 대신 <b>크리스탈 코앞으로 순간이동</b>하며(벽으로 짠 미로를 그대로 건너뛰므로 크리스탈 바로 옆도 반드시 지켜야 한다, 착지 지점 근처 플레이어는 충격파 피해를 입는다), 저주의 군주는 유일하게 <b>자기 위치와 무관하게</b> 방어선 어딘가의 공격 타워 하나를 무작위로 저주해 잠시 멈춘다 — 화력을 한곳에 몰아 지으면 그만큼 한 번에 잃는다. 치유의 군주는 소환에 더해 <b>상시로 주변 아군 전체를 서서히 회복</b>시킨다 — 무리를 그대로 두면 다 같이 안 죽으니, 광역기가 없다면 이 보스부터 끊어야 한다. 자성 군주는 <b>플레이어의 위치 자체를 끌어당긴다</b> — 반경 9 안에 있으면 근접 사거리까지 강제로 끌려온다(미리 벌어져 있거나 발동 직전 회피 돌진으로만 피할 수 있다). 칠흑 군주는 유일하게 <b>피해도 이동 강제도 없다</b> — 대신 어둠을 터뜨려 반경 안 플레이어의 미니맵에서 잠깐 몬스터 표시를 지운다, 다른 위협과 겹치면 대응할 방향을 놓치기 쉽다. 멀리 있으면 전부 <b>크리스탈로 돌진</b>해 지나는 건물을 부순다. 전부 <b>예고가 먼저 뜨니</b> 그때 대응할 것. <b>🔥 최후의 발악</b> — 종류를 가리지 않고 체력이 15% 아래로 떨어지면 모든 보스가 한 번씩 속도·공격력이 오르며 붉게 물든다 — 각자의 소환·침묵 같은 패턴과 별개로 걸리는 마지막 고비이니, 그 순간을 보면 화력을 몰아 빨리 끝내는 편이 낫다. <b>⚠️⚠️ 엔드리스로 11종을 한 바퀴(55웨이브) 다 돌고 나면</b>, 그다음 바퀴부터는 보스 웨이브마다 보스가 <b>둘씩</b> 함께 나온다(바퀴마다 다른 조합)</td></tr>
+      <tr><td>특수 웨이브</td><td>3웨이브마다(보스 웨이브 제외) 성격이 다른 웨이브가 섞인다: 🏃 러시(러너 대량, 물량전) · 🏰 공성(브루트+약탈자, 건물이 표적) · ⭐ 정예전(수는 적지만 전부 정예) · 🌀 결계(전부 결계를 둘러 타워가 조준 못함) · 💉 치유단(치유사가 잔뜩 섞여 서로 회복, 먼저 솎아내야 함) · 🥁 돌격대(지휘관 여러 명이 러너 무리를 이끈다, 21웨이브부터 — 지휘관부터 끊지 않으면 무리 전체가 계속 빨라진다) · 🕳️ 땅굴 습격(굴착병 대거 파묻힌 채 접근, 24웨이브부터 — 보루 Lv.2 이상(또는 감시탑) 없이는 타워 화력 상당수가 못 맞춘다) · 🧙 저격전(주술사 대거 몰려온다, 27웨이브부터 — 벽 뒤에서도 사거리 안이면 크리스탈을 직접 저격한다) · 🩸 혈투(몬스터 전부가 흡혈 상태, 33웨이브부터 — 살짝살짝 때리면 오히려 회복하니 한 마리씩 확실히 끊어야 함) · 🛡️ 철벽 군단(전부 방패를 두르고 나온다, 36웨이브부터 — 정면 공격이 크게 줄어드니 측면·후방으로 돌거나 협공해야 한다) · 🦝 약탈(도둑너구리 무리가 크리스탈 대신 자원 노드로 흩어져 달려간다, 39웨이브부터 — 방어선을 지키고만 있으면 크리스탈은 안전해도 자원이 그대로 사라지니, 쫓아가서 잡아야 한다) · 🔒 면역 군단(전부 둔화·속박·중독을 무시한다, 42웨이브부터 — 서리탑·독탑·덫탑이 안 먹히니 화살탑·대포탑·저격탑 같은 순수 화력과 보루 버프로 밀어붙여야 한다) · 🦾 중장갑 군단(전부 중장갑을 둘렀다, 48웨이브부터 — 타워 피해가 30%로 줄어드니 근접·활·폭탄가방·정수 스킬로 직접 뚫어야 한다) · 👻 환영 군단(전부 환영에 씌워졌다, 51웨이브부터 — 정반대로 직접 조준한 근접·활·폭탄가방 공격이 크게 약해지니 타워·정수 스킬에 맡겨야 한다) · ➗ 분열 군단(전부 분열 상태로 나온다, 54웨이브부터 — 죽여도 더 약한 두 마리로 갈라지니, 눈에 보이는 수만 믿고 화력을 나누면 오히려 무리가 불어난다. 대포탑·독탑·폭탄가방·망치처럼 범위 공격이 확산을 억제하는 데 유리하다) · 🌵 가시 군단(전부 가시를 두르고 나온다, 57웨이브부터 — 근접으로 때릴 때마다 그 피해의 상당량을 그대로 돌려받는다, 무기 강화가 잘 됐을수록 더 아프니 이번만큼은 타워·활·폭탄가방 같은 원거리 위주로 막아야 한다) · 💚 재생 군단(전부 재생 상태로 나온다, 63웨이브부터 — 3초만 안 맞으면 체력이 도로 차오르니, 화력을 흩어놓지 말고 한 마리씩 확실히 끝내거나 광역기로 몰아쳐야 한다) · 😡 광폭 군단(전부 체력이 절반 밑으로 떨어지는 순간 속도·공격력이 오른다, 66웨이브부터 — 되돌아가지 않으니 마무리를 못 짓고 끌면 이미 다친 놈들이 하나둘 동시에 빨라지고 세진다, 오래 끌지 말고 각개격파로 확실히 끝내야 한다) · 💨 질주 군단(전부 무작위 타이밍에 주기적으로 폭발적으로 튀어나간다, 69웨이브부터 — 서로 안 맞춰 튀어나오니 언제 누가 돌진할지 예측할 수 없다, 서리탑을 넓게 깔아 눌러 앉히거나 화력을 촘촘히 배치해야 한다). 준비 시간 웨이브 예고에 노란 배지로 미리 알려준다</td></tr>
+      <tr><td>보스</td><td>5웨이브마다 💀 파괴자 · 🧊 서리 군주 · 🔇 침묵의 군주 · 🦂 갈취자 · 🗿 강철 수호자 · 🌘 정수 포식자 · 🌪️ 질풍 군주 · 🔮 저주의 군주 · 🌿 치유의 군주 · 🧲 자성 군주 · 🌑 칠흑 군주 · 🕸️ 속박 군주 · 👯 분열 군주가 65웨이브 주기로 돌아가며 등장한다. 체력이 깎일 때마다 파괴자·서리 군주·치유의 군주·분열 군주는 <b>잡졸을 소환</b>하고(서리 군주는 전부 🛡️ 방패 변종), 침묵의 군주는 <b>발밑에 침묵 장판</b>을 깔아 반경 안 타워를 전부 멈추며, 갈취자는 <b>팀 자원을 훔쳐 체력을 회복</b>하고, 강철 수호자는 <b>자기 몸에 방벽을 둘러 받는 피해를 크게 줄이며</b>(캐스팅 중에 화력을 몰아야 손해를 줄인다), 정수 포식자는 <b>팀 정수를 훔친 만큼 체력을 회복</b>하고(정수가 없으면 회복도 없다), 질풍 군주는 소환·침묵·약탈 대신 <b>크리스탈 코앞으로 순간이동</b>하며(벽으로 짠 미로를 그대로 건너뛰므로 크리스탈 바로 옆도 반드시 지켜야 한다, 착지 지점 근처 플레이어는 충격파 피해를 입는다), 저주의 군주는 유일하게 <b>자기 위치와 무관하게</b> 방어선 어딘가의 공격 타워 하나를 무작위로 저주해 잠시 멈춘다 — 화력을 한곳에 몰아 지으면 그만큼 한 번에 잃는다. 치유의 군주는 소환에 더해 <b>상시로 주변 아군 전체를 서서히 회복</b>시킨다 — 무리를 그대로 두면 다 같이 안 죽으니, 광역기가 없다면 이 보스부터 끊어야 한다. 자성 군주는 <b>플레이어의 위치 자체를 끌어당긴다</b> — 반경 9 안에 있으면 근접 사거리까지 강제로 끌려온다(미리 벌어져 있거나 발동 직전 회피 돌진으로만 피할 수 있다). 칠흑 군주는 <b>피해도 이동 강제도 없다</b> — 대신 어둠을 터뜨려 반경 안 플레이어의 미니맵에서 잠깐 몬스터 표시를 지운다, 다른 위협과 겹치면 대응할 방향을 놓치기 쉽다. 속박 군주는 거미줄을 터뜨려 반경 안 플레이어 전원을 잠시 <b>제자리에 묶는다</b>(공격·채집은 그대로 가능, 발동 직전 회피 돌진으로만 피할 수 있다). 분열 군주는 유일하게 <b>죽는 순간이 진짜 끝이 아니다</b> — 체력이 다 떨어지면 사라지는 대신 더 약한 두 마리로 갈라져 계속 싸운다, 그 둘까지 마저 처치해야 웨이브가 끝난다. 멀리 있으면 전부 <b>크리스탈로 돌진</b>해 지나는 건물을 부순다. 전부 <b>예고가 먼저 뜨니</b> 그때 대응할 것. <b>🔥 최후의 발악</b> — 종류를 가리지 않고 체력이 15% 아래로 떨어지면 모든 보스가 한 번씩 속도·공격력이 오르며 붉게 물든다 — 각자의 소환·침묵 같은 패턴과 별개로 걸리는 마지막 고비이니, 그 순간을 보면 화력을 몰아 빨리 끝내는 편이 낫다. <b>⚠️⚠️ 엔드리스로 13종을 한 바퀴(65웨이브) 다 돌고 나면</b>, 그다음 바퀴부터는 보스 웨이브마다 보스가 <b>둘씩</b> 함께 나온다(바퀴마다 다른 조합)</td></tr>
       <tr><td>⚗️ 특화</td><td>최대 레벨(Lv.3)에 도달한 전투 타워를 <b>업그레이드 모드로 다시 클릭</b>하면, 또는 최대 레벨까지 강화한 무기를 인벤토리 <b>제작</b> 탭에서 클릭하면, 두 갈래 중 하나를 골라 성격을 영구히 바꾼다(되돌릴 수 없다) — 같은 타워·무기라도 특화에 따라 역할이 크게 갈린다</td></tr>
       <tr><td>업그레이드</td><td><kbd class="rebind" data-action="upgrade">U</kbd> 후 건물 클릭</td></tr>
       <tr><td>수리</td><td><kbd class="rebind" data-action="repair">G</kbd> 후 건물 클릭 (손상 비례 자원 소모)</td></tr>
@@ -750,8 +842,9 @@ button.corner.mute.off { opacity: 0.5; }
       <tr><td>🌋 코어 폭주</td><td><kbd class="rebind" data-action="skillOverload">;</kbd> — 다른 여섯 정수 스킬과 달리 고정 비용이 없다. <b>지금 가진 정수를 한 톨도 남김없이 전부 태워</b>, 그 개수만큼 위력이 커지는 거대한 범위 폭발을 일으킨다(최소 정수 5 필요). 아껴서 크리스탈 강화·서리탑에 쓸지, 지금 위기를 이걸로 넘길지 — 정수를 쓰는 다른 모든 것과 저울질하게 만드는 유일한 "전부 걸기" 스킬</td></tr>
       <tr><td>🌌 중력 균열</td><td>다른 스킬과 달리 내 발밑이 아니라 <b>조준한 지점</b>에 3.5초간 열린다. 반경 안의 적을 중심으로 끌어당기지만 <b>피해는 0</b> — 혼자서는 아무것도 못 죽인다. 흩어진 무리를 한 덩어리로 뭉쳐 놓고 💣 대포탑·🎇 융단폭격·폭탄가방·☄️ 운석 같은 범위 공격을 겹치는 용도다. 보스는 면역이고, 한 번에 하나만 열 수 있다</td></tr>
       <tr><td>🧚 정령 소환</td><td>즉발이 아니라 <b>10초간 지속</b>되는 유일한 스킬 — 나를 따라다니며 근처 적을 알아서 찾아가 공격한다. 타워와 똑같은 규칙이 적용돼(🌀 결계 몹·파묻힌 🕳️ 굴착병은 못 때린다) 그런 상대는 직접 처리해야 한다. 팀 전체 1마리까지만 부를 수 있다</td></tr>
-      <tr><td>🐾 동물 길들이기</td><td>🦊 여우·🐺 늑대·🐻 곰·👑 전설의 사슴왕 근처에서 <kbd class="rebind" data-action="tame">Z</kbd> — 🐇 토끼·🦌 사슴·🐗 멧돼지 생고기 2개를 미끼로 써서 시도한다(성공 확률은 동물마다 다르고, 마주치는 것부터 가장 드문 사슴왕이 성공률도 가장 낮다 — 실패해도 미끼는 사라진다). 성공하면 그 동물이 <b>영구 동료</b>가 되어 정령처럼 나를 따라다니며 알아서 근처 적을 공격한다 — 정수도, 재시전도 필요 없다. 팀 전체 1마리까지만 둘 수 있다. 이미 동료가 있으면 같은 <kbd class="rebind" data-action="tame">Z</kbd>가 대신 <b>먹이주기</b>가 된다 — 생고기 3개로 레벨을 올려(최대 3) 공격력·공격속도를 키우고 몸집도 조금씩 커진다. 다른 동물로 바꾸고 싶으면 <kbd class="rebind" data-action="releasePet">]</kbd>로 놓아줄 수 있다(레벨은 사라지고 다시 빈 슬롯이 된다)</td></tr>
+      <tr><td>🐾 동물 길들이기</td><td>🦊 여우·🐺 늑대·🐻 곰·👑 전설의 사슴왕·🦅 매 근처에서 <kbd class="rebind" data-action="tame">Z</kbd> — 🐇 토끼·🦌 사슴·🐗 멧돼지 생고기 2개를 미끼로 써서 시도한다(성공 확률은 동물마다 다르고, 마주치는 것부터 가장 드문 사슴왕이 성공률도 가장 낮다 — 실패해도 미끼는 사라진다). 성공하면 그 동물이 <b>영구 동료</b>가 되어 정령처럼 나를 따라다니며 알아서 근처 적을 공격한다 — 매만 유일하게 목표에서 거리를 두고 쏘는 원거리 동료다. 정수도, 재시전도 필요 없다. 팀 전체 1마리까지만 둘 수 있다. 이미 동료가 있으면 같은 <kbd class="rebind" data-action="tame">Z</kbd>가 대신 <b>먹이주기</b>가 된다 — 생고기 3개로 레벨을 올려(최대 3) 공격력·공격속도를 키우고 몸집도 조금씩 커진다. 다른 동물로 바꾸고 싶으면 <kbd class="rebind" data-action="releasePet">0</kbd>로 놓아줄 수 있다(레벨은 사라지고 다시 빈 슬롯이 된다)</td></tr>
       <tr><td>🪨 포탈 봉쇄</td><td><b>준비 시간에만</b> 열려 있는 포탈 옆에서 <kbd class="rebind" data-action="sealPortal">/</kbd> — 목재·광물을 태워 그 포탈을 <b>다음 웨이브 한 판 동안</b> 막는다. 몬스터 총수는 그대로지만 나머지 포탈에 더 몰리므로, 방어선을 넓게 펼 여유가 없을 때 한쪽을 확실히 틀어막는 대신 다른 쪽이 더 거세지는 선택이 된다. 비용은 웨이브가 오를수록 오르고, 마지막 남은 포탈은 막을 수 없다 — 다음 웨이브가 지나면 자동으로 풀리니 계속 쓰려면 매번 다시 자원을 써야 한다</td></tr>
+      <tr><td>⚠️ 위험 계약</td><td>웨이브 패널의 "위험 계약" 버튼을 <b>준비 시간에만</b> 눌러 켜고 끌 수 있다 — 자원 소모 없이, 켜진 채로 웨이브가 시작되면 <b>그 한 판에만</b> 몬스터 체력·공격력이 늘고 자원·정수 보상도 그만큼 커진다. 웨이브가 시작되는 순간 자동으로 꺼지므로 계속 걸려면 매 웨이브 다시 켜야 한다 — 방어선이 여유로운 판을 골라 위험을 자청하는 선택지</td></tr>
       <tr><td>카메라</td><td>우클릭 드래그 회전 · 휠 확대/축소</td></tr>
       <tr><td>취소</td><td><kbd class="rebind" data-action="cancel">Esc</kbd> 또는 우클릭</td></tr>
       <tr><td>🎵 배경음악</td><td>준비 시간엔 잔잔하게, 전투엔 긴박하게, 보스 웨이브엔 더 무겁게 — 웨이브 흐름에 맞춰 자동으로 바뀐다. 아래에서 효과음과 별도로 음량 조절 가능</td></tr>
@@ -895,11 +988,6 @@ button.corner.mute.off { opacity: 0.5; }
     <button id="btn-again" class="ghost">다시 하기</button>
   </div>
 </div>
-
-
-
-
-
 <script>
 (() => {
   // vendor/three.module.js
@@ -10351,7 +10439,7 @@ button.corner.mute.off { opacity: 0.5; }
     hunter: { name: "\uC0AC\uB0E5\uAFBC", icon: "\u{1F356}", desc: "\uC57C\uC0DD \uB3D9\uBB3C\uC744 10\uB9C8\uB9AC \uC0AC\uB0E5\uD588\uB2E4" },
     legendaryHunter: { name: "\uC804\uC124\uC758 \uC0AC\uB0E5\uAFBC", icon: "\u{1F451}", desc: "\uC804\uC124\uC758 \uC0AC\uC2B4\uC655\uC744 \uCC98\uCE58\uD588\uB2E4" },
     gourmet: { name: "\uBBF8\uC2DD\uAC00", icon: "\u{1F37D}\uFE0F", desc: "\uBAA8\uB4E0 \uC0AC\uB0E5\uAC10 \uC694\uB9AC\uB97C \uC804\uBD80 \uB9CC\uB4E4\uC5B4\uBD24\uB2E4" },
-    tamer: { name: "\uC870\uB828\uC0AC", icon: "\u{1F43E}", desc: "\uC5EC\uC6B0\xB7\uB291\uB300\xB7\uACF0\xB7\uC804\uC124\uC758 \uC0AC\uC2B4\uC655 \uC911 \uD558\uB098\uB97C \uAE38\uB4E4\uC5EC \uB3D9\uB8CC\uB85C \uC0BC\uC558\uB2E4" },
+    tamer: { name: "\uC870\uB828\uC0AC", icon: "\u{1F43E}", desc: "\uC5EC\uC6B0\xB7\uB291\uB300\xB7\uACF0\xB7\uC804\uC124\uC758 \uC0AC\uC2B4\uC655\xB7\uB9E4 \uC911 \uD558\uB098\uB97C \uAE38\uB4E4\uC5EC \uB3D9\uB8CC\uB85C \uC0BC\uC558\uB2E4" },
     legendaryTamer: { name: "\uC804\uC124\uC758 \uC870\uB828\uC0AC", icon: "\u{1F98C}", desc: "\uAC00\uC7A5 \uD76C\uADC0\uD55C \uC804\uC124\uC758 \uC0AC\uC2B4\uC655\uC744 \uAE38\uB4E4\uC5EC \uB3D9\uB8CC\uB85C \uC0BC\uC558\uB2E4" },
     interceptor: { name: "\uCC28\uB2E8\uC790", icon: "\u{1F575}\uFE0F", desc: "\uC815\uCC30\uBCD1\uC744 \uD3EC\uD0C8\uC5D0 \uB2FF\uAE30 \uC804\uC5D0 3\uBC88 \uCC98\uCE58\uD588\uB2E4" },
     loyalCompanion: { name: "\uCDA9\uC9C1\uD55C \uB3D9\uB8CC", icon: "\u{1F9B4}", desc: "\uAE38\uB4E4\uC778 \uB3D9\uB8CC\uC5D0\uAC8C \uBA39\uC774\uB97C \uC918\uC11C \uCD5C\uB300 \uB808\uBCA8\uAE4C\uC9C0 \uD0A4\uC6E0\uB2E4" },
@@ -10369,6 +10457,7 @@ button.corner.mute.off { opacity: 0.5; }
     fullyArmored: { name: "\uC644\uC804 \uBB34\uC7A5", icon: "\u{1F6E1}\uFE0F", desc: "\uD310\uAE08\uAC11\uC637\uAE4C\uC9C0 \uBC29\uC5B4\uAD6C\uB97C \uCD5C\uACE0 \uB2E8\uACC4\uB85C \uAC16\uCDB0 \uC785\uC5C8\uB2E4" },
     allTenBosses: { name: "\uC2ED\uC7A5\uC0DD", icon: "\u{1F422}", desc: "\uD55C \uD310\uC5D0\uC11C \uC5F4 \uBCF4\uC2A4(\uD30C\uAD34\uC790\xB7\uC11C\uB9AC \uAD70\uC8FC\xB7\uCE68\uBB35\uC758 \uAD70\uC8FC\xB7\uAC08\uCDE8\uC790\xB7\uAC15\uCCA0 \uC218\uD638\uC790\xB7\uC815\uC218 \uD3EC\uC2DD\uC790\xB7\uC9C8\uD48D \uAD70\uC8FC\xB7\uC800\uC8FC\uC758 \uAD70\uC8FC\xB7\uCE58\uC720\uC758 \uAD70\uC8FC\xB7\uC790\uC131 \uAD70\uC8FC)\uB97C \uC804\uBD80 \uCC98\uCE58\uD588\uB2E4 \u2014 \uC5D4\uB4DC\uB9AC\uC2A4\uB85C 50\uC6E8\uC774\uBE0C \uC774\uC0C1 \uBC84\uD168\uC57C \uD55C\uB2E4" },
     allElevenBosses: { name: "\uB9CC\uC2E0\uC804", icon: "\u{1F3DB}\uFE0F", desc: "\uD55C \uD310\uC5D0\uC11C \uC5F4\uD55C \uBCF4\uC2A4(\uD30C\uAD34\uC790\xB7\uC11C\uB9AC \uAD70\uC8FC\xB7\uCE68\uBB35\uC758 \uAD70\uC8FC\xB7\uAC08\uCDE8\uC790\xB7\uAC15\uCCA0 \uC218\uD638\uC790\xB7\uC815\uC218 \uD3EC\uC2DD\uC790\xB7\uC9C8\uD48D \uAD70\uC8FC\xB7\uC800\uC8FC\uC758 \uAD70\uC8FC\xB7\uCE58\uC720\uC758 \uAD70\uC8FC\xB7\uC790\uC131 \uAD70\uC8FC\xB7\uCE60\uD751 \uAD70\uC8FC)\uB97C \uC804\uBD80 \uCC98\uCE58\uD588\uB2E4 \u2014 \uC5D4\uB4DC\uB9AC\uC2A4\uB85C 55\uC6E8\uC774\uBE0C \uC774\uC0C1 \uBC84\uD168\uC57C \uD55C\uB2E4" },
+    allTwelveBosses: { name: "\uC2ED\uC774\uC2E0\uC7A5", icon: "\u26E9\uFE0F", desc: "\uD55C \uD310\uC5D0\uC11C \uC5F4\uB450 \uBCF4\uC2A4(\uD30C\uAD34\uC790\xB7\uC11C\uB9AC \uAD70\uC8FC\xB7\uCE68\uBB35\uC758 \uAD70\uC8FC\xB7\uAC08\uCDE8\uC790\xB7\uAC15\uCCA0 \uC218\uD638\uC790\xB7\uC815\uC218 \uD3EC\uC2DD\uC790\xB7\uC9C8\uD48D \uAD70\uC8FC\xB7\uC800\uC8FC\uC758 \uAD70\uC8FC\xB7\uCE58\uC720\uC758 \uAD70\uC8FC\xB7\uC790\uC131 \uAD70\uC8FC\xB7\uCE60\uD751 \uAD70\uC8FC\xB7\uC18D\uBC15 \uAD70\uC8FC)\uB97C \uC804\uBD80 \uCC98\uCE58\uD588\uB2E4 \u2014 \uC5D4\uB4DC\uB9AC\uC2A4\uB85C 60\uC6E8\uC774\uBE0C \uC774\uC0C1 \uBC84\uD168\uC57C \uD55C\uB2E4" },
     hellConqueror: { name: "\uC9C0\uC625 \uC815\uBCF5", icon: "\u{1F479}", desc: "\uC9C0\uC625 \uB09C\uC774\uB3C4\uB85C 10\uC6E8\uC774\uBE0C\uB97C \uB9C9\uC544\uB0C8\uB2E4" },
     teamEffort: { name: "\uC804\uC6D0 \uCC38\uC804", icon: "\u{1F465}", desc: "2\uC778 \uC774\uC0C1 \uBA40\uD2F0\uD50C\uB808\uC774\uC5D0\uC11C \uC2B9\uB9AC\uD588\uACE0, \uCC38\uAC00\uC790 \uC804\uC6D0\uC774 \uC9C1\uC811 \uC801\uC5B4\uB3C4 \uD55C \uB9C8\uB9AC\uC529 \uCC98\uCE58\uD588\uB2E4" },
     harvestKing: { name: "\uCC44\uC9D1\uC655", icon: "\u{1F33E}", desc: "\uD55C \uD310\uC5D0\uC11C \uC790\uC6D0(\uBAA9\uC7AC\xB7\uAD11\uBB3C\xB7\uAD6C\uB9AC\xB7\uC11D\uD0C4)\uC744 1000\uAC1C \uC774\uC0C1 \uCC44\uC9D1\uD588\uB2E4" },
@@ -10389,7 +10478,36 @@ button.corner.mute.off { opacity: 0.5; }
     // 각자 짝이 있는데, 정작 판을 넘나드는 영구 성장 축인 원정 준비(9개 퍽)만 완주 업적이 없었다.
     // 로비에서 조건이 다 채워지는 순간 바로 확인할 수 있어야 하므로(판 안이 아니라 로비 화면
     // 자체가 조건 판정 지점) firstWin·veteran과 같은 "로비/결과 화면 전용" 계열로 분류한다.
-    expeditionMaster: { name: "\uB9CC\uBC18\uC758 \uC900\uBE44", icon: "\u{1F392}", desc: "\uC6D0\uC815 \uC900\uBE44 9\uAC1C \uD37D\uC744 \uC804\uBD80 \uCD5C\uB300 \uB808\uBCA8\uAE4C\uC9C0 \uCC44\uC6E0\uB2E4" }
+    expeditionMaster: { name: "\uB9CC\uBC18\uC758 \uC900\uBE44", icon: "\u{1F392}", desc: "\uC6D0\uC815 \uC900\uBE44 9\uAC1C \uD37D\uC744 \uC804\uBD80 \uCD5C\uB300 \uB808\uBCA8\uAE4C\uC9C0 \uCC44\uC6E0\uB2E4" },
+    // 상인 물약 9종을 전수 점검하니 나머지 8개는 전부 결과를 사기 전에 정확히 알 수 있는데
+    // 미스터리 상자만 유일한 도박 품목이다(꽝 40%·행운 35%·대박 25%) — 그런데 정작 상인
+    // 시스템 전체를 통틀어 업적이 하나도 없었다. `_applyMysteryBox`가 대박을 뽑는 그 자리에서
+    // 바로 `_unlockAchievement`를 부르면 되는, 다른 일회성 업적(flawlessBoss 등)과 같은 패턴이라
+    // 새 스탯 카운터가 필요 없었다.
+    jackpot: { name: "\uB300\uBC15", icon: "\u{1F3B0}", desc: "\uB5A0\uB3CC\uC774 \uC0C1\uC778\uC758 \uBBF8\uC2A4\uD130\uB9AC \uC0C1\uC790\uC5D0\uC11C \uB300\uBC15\uC744 \uBF51\uC558\uB2E4" },
+    // 새로 추가한 "타워 탑승"(백틱을 눌러 근처 타워에 탑승, 화력은 오르지만 그동안 못 움직이고
+    // 못 싸운다)에도 다른 새 메커닉들과 같은 짝이 있어야 한다. 완벽한 방어처럼 순간의 판정이
+    // 아니라 "버틴 시간"이 핵심이라 parryCount와 같은 누적 카운터 패턴을 그대로 쓰되, 여러
+    // 클라이언트가 각자 자기 탑승 시간만 추적하도록 게임 공유 `stats`(스냅샷으로 동기화돼
+    // 참가자 값을 덮어쓴다)가 아니라 클라이언트별 인스턴스 필드에 둬서 멀티플레이에서도 실제로
+    // 탑승한 그 사람에게만 정확히 걸리게 했다.
+    towerCrewer: { name: "\uD3EC\uD0D1\uACFC \uD55C\uBAB8", icon: "\u{1F3AF}", desc: "\uD0C0\uC6CC\uC5D0 \uD0D1\uC2B9\uD55C \uCC44\uB85C \uB204\uC801 30\uCD08\uB97C \uBC84\uD17C\uB2E4" },
+    // 허수아비 유인목과 타워 탑승은 같은 세션에 함께 들어온 두 신규 메커닉인데도 서로 아무
+    // 접점이 없었다 — 하나는 "적의 시선을 돌린다", 하나는 "화력을 몰아준다"로 방향이 반대라
+    // 실제로는 잘 어울리는 조합(유인목으로 무리를 한곳에 묶어 두고 탑승한 타워로 그 자리를
+    // 집중 사격)인데 그 사실을 알아차릴 계기가 없었다. 팀 스탯(`everBuiltDecoy`, everBuiltWall·
+    // everBuiltTower와 완전히 같은 host-only 플래그 패턴)과 로컬 탑승 상태(`local.crewing`)를
+    // 동시에 만족하는 순간 잠기게 해서, 두 낯선 기능을 한 판 안에서 실제로 같이 써 봤을 때만
+    // 뜬다 — towerCrewer처럼 playerId 없이 불러 그 순간 실제로 탑승 중인 사람에게만 걸린다.
+    tactician: { name: "\uBBF8\uB07C\uC640 \uD654\uB825", icon: "\u{1FAA2}", desc: "\uD5C8\uC218\uC544\uBE44 \uC720\uC778\uBAA9\uC744 \uC9C0\uC5B4 \uB454 \uCC44\uB85C \uD0C0\uC6CC\uC5D0 \uD0D1\uC2B9\uD588\uB2E4" },
+    // 열두 보스(allTwelveBosses)에 이어 열세 번째(분열 군주)까지 더한 마지막 문턱 — 분열 군주는
+    // 체력이 다 떨어져도 갈라진 자식 둘을 마저 잡아야 진짜 처치로 집계되므로(bossKillsSeen은
+    // 원본이 죽는 순간 이미 기록되지만, 그 전에 자식들에게 다시 밀릴 수 있어 실제로는 세 번의
+    // 교전을 다 버텨야 한다), 이 achievement는 지금까지 목록 중 가장 늦게 열린다.
+    allThirteenBosses: { name: "\uBCF4\uC2A4\uB3C4\uAC10 \uC644\uC131", icon: "\u{1F4D6}", desc: "\uD55C \uD310\uC5D0\uC11C \uC5F4\uC138 \uBCF4\uC2A4(\uD30C\uAD34\uC790\xB7\uC11C\uB9AC \uAD70\uC8FC\xB7\uCE68\uBB35\uC758 \uAD70\uC8FC\xB7\uAC08\uCDE8\uC790\xB7\uAC15\uCCA0 \uC218\uD638\uC790\xB7\uC815\uC218 \uD3EC\uC2DD\uC790\xB7\uC9C8\uD48D \uAD70\uC8FC\xB7\uC800\uC8FC\uC758 \uAD70\uC8FC\xB7\uCE58\uC720\uC758 \uAD70\uC8FC\xB7\uC790\uC131 \uAD70\uC8FC\xB7\uCE60\uD751 \uAD70\uC8FC\xB7\uC18D\uBC15 \uAD70\uC8FC\xB7\uBD84\uC5F4 \uAD70\uC8FC)\uB97C \uC804\uBD80 \uCC98\uCE58\uD588\uB2E4 \u2014 \uC5D4\uB4DC\uB9AC\uC2A4\uB85C 65\uC6E8\uC774\uBE0C \uC774\uC0C1 \uBC84\uD168\uC57C \uD55C\uB2E4" },
+    // ⚠️ 위험 계약을 걸고 웨이브를 클리어하면 그 자리에서(onWaveClear) 열린다 — 위험을 "감수"하는
+    // 게 아니라 "실제로 버텨낸" 순간에만 주는 보상이라, 계약만 걸고 지는 판은 카운트되지 않는다.
+    gambler: { name: "\uB3C4\uBC15\uC0AC", icon: "\u{1F3B2}", desc: "\u26A0\uFE0F \uC704\uD5D8 \uACC4\uC57D\uC744 \uAC78\uACE0 \uADF8 \uC6E8\uC774\uBE0C\uB97C \uD074\uB9AC\uC5B4\uD588\uB2E4" }
   };
   var STORE_KEY = "cd.achievements";
   function loadUnlocked() {
@@ -10956,6 +11074,8 @@ button.corner.mute.off { opacity: 0.5; }
     grovelord: { cat: "boss", desc: "\uC544\uD649 \uBC88\uC9F8 \uBCF4\uC2A4. \uCCB4\uB825\uC774 \uAE4E\uC77C \uB54C\uB9C8\uB2E4 \uC7A1\uC878\uC744 \uC18C\uD658\uD558\uACE0, \uC0C1\uC2DC\uB85C \uC8FC\uBCC0 \uC544\uAD70 \uC804\uCCB4\uB97C \uC11C\uC11C\uD788 \uD68C\uBCF5\uC2DC\uD0A8\uB2E4." },
     magnetlord: { cat: "boss", desc: "\uC5F4 \uBC88\uC9F8 \uBCF4\uC2A4. \uCCB4\uB825\uC774 \uAE4E\uC77C \uB54C\uB9C8\uB2E4 \uC778\uB825\uC744 \uD130\uB728\uB824 \uBC18\uACBD \uC548 \uD50C\uB808\uC774\uC5B4 \uC804\uC6D0\uC744 \uC790\uAE30 \uCABD\uC73C\uB85C \uB04C\uC5B4\uB2F9\uAE34\uB2E4." },
     shadowlord: { cat: "boss", desc: "\uC5F4\uD55C \uBC88\uC9F8 \uBCF4\uC2A4. \uCCB4\uB825\uC774 \uAE4E\uC77C \uB54C\uB9C8\uB2E4 \uC5B4\uB460\uC744 \uD130\uB728\uB824 \uBC18\uACBD \uC548 \uD50C\uB808\uC774\uC5B4\uC758 \uBBF8\uB2C8\uB9F5\uC5D0\uC11C \uC7A0\uC2DC \uBAAC\uC2A4\uD130\uAC00 \uC548 \uBCF4\uC774\uAC8C \uB9CC\uB4E0\uB2E4." },
+    weblord: { cat: "boss", desc: "\uC5F4\uB450 \uBC88\uC9F8 \uBCF4\uC2A4. \uCCB4\uB825 \uBB38\uD131\uB9C8\uB2E4 \uAC70\uBBF8\uC904\uC744 \uD130\uB728\uB824 \uBC18\uACBD \uC548 \uD50C\uB808\uC774\uC5B4 \uC804\uC6D0\uC744 \uC7A0\uC2DC \uC81C\uC790\uB9AC\uC5D0 \uBB36\uB294\uB2E4 \u2014 \uACF5\uACA9\xB7\uCC44\uC9D1\uC740 \uADF8\uB300\uB85C \uD560 \uC218 \uC788\uB2E4." },
+    splitlord: { cat: "boss", desc: "\uC5F4\uC138 \uBC88\uC9F8 \uBCF4\uC2A4. \uCCB4\uB825\uC774 \uB2E4 \uB5A8\uC5B4\uC838\uB3C4 \uC0AC\uB77C\uC9C0\uC9C0 \uC54A\uACE0 \uB354 \uC57D\uD55C \uB450 \uB9C8\uB9AC\uB85C \uAC08\uB77C\uC838 \uACC4\uC18D \uC2F8\uC6B4\uB2E4 \u2014 \uC9C4\uC9DC \uB05D\uC740 \uADF8 \uB458\uAE4C\uC9C0 \uB9C8\uC800 \uCC98\uCE58\uD574\uC57C \uC628\uB2E4." },
     // ── 변종 (몬스터에 붙는 접두사) ──
     shield: { cat: "variant", desc: "\uC815\uBA74 \uD53C\uD574\uAC00 \uD06C\uAC8C \uC904\uC5B4\uB4E0\uB2E4 \u2014 \uB4F1 \uB4A4\uB85C \uB3CC\uC544\uAC00\uC11C \uCCD0\uC57C \uD55C\uB2E4." },
     split: { cat: "variant", desc: "\uC8FD\uC73C\uBA74 \uADF8 \uC790\uB9AC\uC5D0\uC11C \uC57D\uD55C \uAC1C\uCCB4 2\uB9C8\uB9AC\uB85C \uAC08\uB77C\uC9C4\uB2E4." },
@@ -10976,6 +11096,7 @@ button.corner.mute.off { opacity: 0.5; }
     wolf: { cat: "wild", desc: "\uBA3C\uC800 \uAC74\uB4DC\uB9AC\uC9C0 \uC54A\uC544\uB3C4 \uAC00\uAE4C\uC774 \uAC00\uBA74 \uC2A4\uC2A4\uB85C \uCAD3\uC544\uC628\uB2E4 \u2014 \uBB34\uC7A5 \uC5C6\uC774 \uBC29\uC2EC\uD558\uBA74 \uC704\uD5D8\uD558\uB2E4. \uAE38\uB4E4\uC77C \uC218 \uC788\uB2E4." },
     bear: { cat: "wild", desc: "\uAC00\uC7A5 \uB2A6\uAC8C(6\uC6E8\uC774\uBE0C\uBD80\uD130) \uB098\uD0C0\uB098\uB294 \uB9F9\uC218 \u2014 \uBC18\uACA9\uC774 \uB291\uB300\uBCF4\uB2E4\uB3C4 \uC544\uD504\uB2E4. \uAE38\uB4E4\uC77C \uC218 \uC788\uB2E4." },
     stagking: { cat: "wild", desc: "\uAC00\uC7A5 \uD76C\uADC0\uD55C \uC0AC\uB0E5\uAC10(9\uC6E8\uC774\uBE0C\uBD80\uD130) \u2014 \uC5EC\uC6B0\uCC98\uB7FC \uB3C4\uB9DD\uCE58\uB2E4\uAC00\uB3C4 \uB9DE\uD788\uBA74 \uACF0\uBCF4\uB2E4 \uC138\uAC8C \uBC18\uACA9\uD55C\uB2E4." },
+    hawk: { cat: "wild", desc: "\uC720\uC77C\uD558\uAC8C \uD558\uB298\uC744 \uB098\uB294 \uC0AC\uB0E5\uAC10(5\uC6E8\uC774\uBE0C\uBD80\uD130) \u2014 \uB3C4\uB9DD \uBC18\uACBD\uC774 \uAC00\uC7A5 \uAE38\uC5B4 \uAC00\uC7A5 \uC811\uADFC\uD558\uAE30 \uC5B4\uB835\uB2E4. \uAE38\uB4E4\uC774\uBA74 \uC720\uC77C\uD55C \uC6D0\uAC70\uB9AC \uB3D9\uB8CC\uAC00 \uB41C\uB2E4." },
     treasure: { cat: "wild", desc: "\uC804\uD22C \uC911 \uB3C5\uB9BD\uC801\uC73C\uB85C \uB098\uD0C0\uB098\uB294 \uBCF4\uBB3C\uAC8C \u2014 \uACF5\uACA9\uC740 \uC548 \uD558\uACE0 \uB3C4\uB9DD\uB9CC \uB2E4\uB2CC\uB2E4. \uB193\uCE58\uBA74 \uC0AC\uB77C\uC9C4\uB2E4." },
     golem: { cat: "wild", desc: "\uAC00\uC7A5 \uB4DC\uBB3C\uAC8C \uB098\uD0C0\uB098\uB294 \uB9CC\uB0A8 \u2014 \uC6C0\uC9C1\uC774\uC9C0 \uBABB\uD558\uC9C0\uB9CC \uAC74\uB4DC\uB9AC\uBA74 \uAC00\uC7A5 \uC138\uAC8C \uBC18\uACA9\uD55C\uB2E4. \uC4F0\uB7EC\uB728\uB9AC\uBA74 \uBAA9\uC7AC\xB7\uAD11\uBB3C\uC744 \uB450\uB451\uC774 \uC5BB\uB294\uB2E4." }
   };
@@ -10998,6 +11119,197 @@ button.corner.mute.off { opacity: 0.5; }
     return true;
   }
 
+  // js/fx.js
+  var SPARK_GEO = new Zu(0.12, 6, 5);
+  var Fx = class {
+    constructor(sm2, layerEl) {
+      this.sm = sm2;
+      this.layer = layerEl;
+      this.sparks = [];
+      this.floats = [];
+      this.rings = [];
+      this.pings = [];
+      this._pool = [];
+    }
+    _spark(color) {
+      let m2 = this._pool.pop();
+      if (!m2) {
+        m2 = new Xs(SPARK_GEO, new es({ color }));
+        this.sm.scene.add(m2);
+      }
+      m2.material.color.setHex(color);
+      m2.visible = true;
+      return m2;
+    }
+    burst(x2, y2, z2, color = 16763989, count = 8, power = 4) {
+      for (let i = 0; i < count; i++) {
+        const m2 = this._spark(color);
+        m2.position.set(x2, y2, z2);
+        m2.scale.setScalar(0.6 + Math.random() * 0.8);
+        this.sparks.push({
+          mesh: m2,
+          life: 0.45 + Math.random() * 0.3,
+          t: 0,
+          vx: (Math.random() - 0.5) * power,
+          vy: Math.random() * power * 0.9 + 1,
+          vz: (Math.random() - 0.5) * power
+        });
+      }
+    }
+    ring(x2, z2, color = 6545663, radius = 3) {
+      const m2 = new Xs(
+        new qu(radius * 0.2, radius * 0.26, 24),
+        new es({ color, transparent: true, opacity: 0.9, side: p })
+      );
+      m2.rotation.x = -Math.PI / 2;
+      m2.position.set(x2, 0.2, z2);
+      this.sm.scene.add(m2);
+      this.rings.push({ mesh: m2, t: 0, life: 0.5, radius });
+    }
+    // 미니맵 핑 — 일반 ring()보다 훨씬 오래(3.5초) 남고, 땅 위 고리뿐 아니라 하늘로 뻗는 기둥도
+    // 같이 세워서 나무·건물에 가려도 멀리서부터 눈에 띈다. 협동 플레이에서 "여기로 와" 신호로 쓴다.
+    pingMarker(x2, z2, color = 16763904, css = "#ffcc55") {
+      const ring = new Xs(
+        new qu(0.15, 0.24, 28),
+        new es({ color, transparent: true, opacity: 0.95, side: p })
+      );
+      ring.rotation.x = -Math.PI / 2;
+      ring.position.set(x2, 0.15, z2);
+      this.sm.scene.add(ring);
+      const beam = new Xs(
+        new su(0.1, 0.1, 6, 8, 1, true),
+        new es({ color, transparent: true, opacity: 0.55, side: p })
+      );
+      beam.position.set(x2, 3, z2);
+      this.sm.scene.add(beam);
+      this.pings.push({ ring, beam, t: 0, life: 3.5, css });
+    }
+    // 3D 좌표 위에 뜨는 데미지/획득 텍스트
+    float(text, x2, y2, z2, cls = "") {
+      const el2 = document.createElement("div");
+      el2.className = `float ${cls}`;
+      el2.textContent = text;
+      this.layer.appendChild(el2);
+      this.floats.push({ el: el2, x: x2, y: y2, z: z2, t: 0, life: 1 });
+    }
+    update(dt2) {
+      for (let i = this.sparks.length - 1; i >= 0; i--) {
+        const s2 = this.sparks[i];
+        s2.t += dt2;
+        if (s2.t >= s2.life) {
+          s2.mesh.visible = false;
+          this._pool.push(s2.mesh);
+          this.sparks.splice(i, 1);
+          continue;
+        }
+        s2.vy -= 14 * dt2;
+        s2.mesh.position.x += s2.vx * dt2;
+        s2.mesh.position.y += s2.vy * dt2;
+        s2.mesh.position.z += s2.vz * dt2;
+        if (s2.mesh.position.y < 0.05) {
+          s2.mesh.position.y = 0.05;
+          s2.vy *= -0.3;
+          s2.vx *= 0.6;
+          s2.vz *= 0.6;
+        }
+        s2.mesh.scale.setScalar(Math.max(0.05, 1 - s2.t / s2.life));
+      }
+      for (let i = this.rings.length - 1; i >= 0; i--) {
+        const r = this.rings[i];
+        r.t += dt2;
+        const k2 = r.t / r.life;
+        if (k2 >= 1) {
+          this.sm.scene.remove(r.mesh);
+          r.mesh.geometry.dispose();
+          r.mesh.material.dispose();
+          this.rings.splice(i, 1);
+          continue;
+        }
+        r.mesh.scale.setScalar(0.4 + k2 * r.radius * 1.2);
+        r.mesh.material.opacity = 0.9 * (1 - k2);
+      }
+      for (let i = this.pings.length - 1; i >= 0; i--) {
+        const p2 = this.pings[i];
+        p2.t += dt2;
+        const k2 = p2.t / p2.life;
+        if (k2 >= 1) {
+          this.sm.scene.remove(p2.ring);
+          this.sm.scene.remove(p2.beam);
+          p2.ring.geometry.dispose();
+          p2.ring.material.dispose();
+          p2.beam.geometry.dispose();
+          p2.beam.material.dispose();
+          this.pings.splice(i, 1);
+          continue;
+        }
+        p2.ring.scale.setScalar(0.4 + k2 * 5);
+        p2.ring.material.opacity = 0.95 * (1 - k2);
+        const pulse = 0.4 + Math.abs(Math.sin(p2.t * 6)) * 0.3;
+        p2.beam.material.opacity = pulse * (1 - k2);
+      }
+      const v2 = new Ui();
+      for (let i = this.floats.length - 1; i >= 0; i--) {
+        const f = this.floats[i];
+        f.t += dt2;
+        if (f.t >= f.life) {
+          f.el.remove();
+          this.floats.splice(i, 1);
+          continue;
+        }
+        v2.set(f.x, f.y + f.t * 1.6, f.z);
+        const p2 = this.sm.worldToScreen(v2);
+        if (!p2.visible) {
+          f.el.style.display = "none";
+          continue;
+        }
+        f.el.style.display = "";
+        f.el.style.transform = `translate(-50%,-50%) translate(${p2.x}px, ${p2.y}px)`;
+        f.el.style.opacity = String(1 - Math.pow(f.t / f.life, 2));
+      }
+    }
+  };
+  var ProjectilePool = class {
+    constructor(sm2) {
+      this.sm = sm2;
+      this.items = [];
+      this.pool = [];
+      this.geo = new Zu(0.22, 8, 6);
+    }
+    fire(from, to2, speed, color, onHit) {
+      let m2 = this.pool.pop();
+      if (!m2) {
+        m2 = new Xs(this.geo, new es({ color }));
+        this.sm.scene.add(m2);
+      }
+      m2.material.color.setHex(color);
+      m2.visible = true;
+      m2.position.copy(from);
+      this.items.push({
+        mesh: m2,
+        from: from.clone(),
+        to: to2.clone(),
+        t: 0,
+        dur: Math.max(0.06, from.distanceTo(to2) / speed),
+        onHit
+      });
+    }
+    update(dt2) {
+      for (let i = this.items.length - 1; i >= 0; i--) {
+        const p2 = this.items[i];
+        p2.t += dt2;
+        const k2 = Math.min(1, p2.t / p2.dur);
+        p2.mesh.position.lerpVectors(p2.from, p2.to, k2);
+        p2.mesh.position.y += Math.sin(k2 * Math.PI) * 1.1;
+        if (k2 >= 1) {
+          p2.onHit?.(p2.mesh.position);
+          p2.mesh.visible = false;
+          this.pool.push(p2.mesh);
+          this.items.splice(i, 1);
+        }
+      }
+    }
+  };
+
   // js/keymap.js
   var DEFAULTS = {
     inventory: "i",
@@ -11019,7 +11331,8 @@ button.corner.mute.off { opacity: 0.5; }
     skillSummon: "n",
     skillOverload: ";",
     tame: "z",
-    releasePet: "]",
+    releasePet: "0",
+    crew: "`",
     sealPortal: "/",
     reload: "\\",
     startWave: "enter",
@@ -11048,6 +11361,7 @@ button.corner.mute.off { opacity: 0.5; }
     skillOverload: "\uC815\uC218 \uC2A4\uD0AC: \uCF54\uC5B4 \uD3ED\uC8FC",
     tame: "\uB3D9\uBB3C \uAE38\uB4E4\uC774\uAE30",
     releasePet: "\uB3D9\uB8CC \uB193\uC544\uC8FC\uAE30",
+    crew: "\uD0C0\uC6CC \uD0D1\uC2B9(\uB204\uB974\uB294 \uB3D9\uC548)",
     sealPortal: "\uD3EC\uD0C8 \uBD09\uC1C4",
     reload: "\uD0C0\uC6CC \uC7AC\uC7A5\uC804",
     startWave: "\uC6E8\uC774\uBE0C \uC2DC\uC791",
@@ -11363,7 +11677,7 @@ button.corner.mute.off { opacity: 0.5; }
             const ec = CFG.elite;
             statMult = { hp: ec.hpMult, scale: ec.scaleMult, dmg: ec.dmgMult, bounty: ec.bountyMult, elite: true };
           } else if (!isBossType) {
-            variant = this._specialKind === "ward" ? "ward" : this._specialKind === "frenzy" ? "vampire" : this._specialKind === "bulwark" ? "shield" : this._specialKind === "immune" ? "resist" : this._specialKind === "armorlegion" ? "armored" : this._specialKind === "phantomlegion" ? "phantom" : this._specialKind === "splitlegion" ? "split" : this._specialKind === "thornlegion" ? "thorn" : this._specialKind === "regenlegion" ? "regen" : rollVariant(this.wave + 1);
+            variant = this._specialKind === "ward" ? "ward" : this._specialKind === "frenzy" ? "vampire" : this._specialKind === "bulwark" ? "shield" : this._specialKind === "immune" ? "resist" : this._specialKind === "armorlegion" ? "armored" : this._specialKind === "phantomlegion" ? "phantom" : this._specialKind === "splitlegion" ? "split" : this._specialKind === "thornlegion" ? "thorn" : this._specialKind === "regenlegion" ? "regen" : this._specialKind === "berserklegion" ? "berserk" : this._specialKind === "dashlegion" ? "dash" : rollVariant(this.wave + 1);
           }
           if (this._thisWavePenalty && !isBossType) {
             const sc = CFG.scoutEvent;
@@ -11471,7 +11785,7 @@ button.corner.mute.off { opacity: 0.5; }
 
   // js/ui.js
   var $2 = (id) => document.getElementById(id);
-  var RESERVED_KEYS = /* @__PURE__ */ new Set(["w", "a", "s", "d", "arrowup", "arrowdown", "arrowleft", "arrowright"]);
+  var RESERVED_KEYS = /* @__PURE__ */ new Set(["w", "a", "s", "d", "arrowup", "arrowdown", "arrowleft", "arrowright", "e"]);
   var TUTORIAL_STEPS = [
     "\u{1F333} \uB098\uBB34\uB97C \uC9C1\uC811 \uD074\uB9AD\uD558\uBA74 \uCEA1\uB2C8\uB2E4 (\uBC14\uC704\uB294 \uACE1\uAD2D\uC774\uB97C \uB9CC\uB4E4\uC5B4 \uC950\uC5B4\uC57C \uCE98 \uC218 \uC788\uC5B4\uC694)",
     "\u{1F392} \uBAA9\uC7AC 20\uC744 \uBAA8\uC558\uC73C\uBA74 <kbd>I</kbd> \uB85C \uC778\uBCA4\uD1A0\uB9AC\uB97C \uC5F4\uC5B4 \u{1FA9A} \uC81C\uC791\uB300\uB97C \uC9C0\uC73C\uC138\uC694 (\uBCBD\xB7\uD0C0\uC6CC\uB294 \uADF8 \uB2E4\uC74C)",
@@ -11502,6 +11816,7 @@ button.corner.mute.off { opacity: 0.5; }
         crystalFill: $2("crystal-fill"),
         crystalText: $2("crystal-text"),
         crystalWarning: $2("crystal-warning"),
+        riskVignette: $2("risk-vignette"),
         blindOverlay: $2("blind-overlay"),
         waveLabel: $2("wave-label"),
         waveState: $2("wave-state"),
@@ -11515,6 +11830,11 @@ button.corner.mute.off { opacity: 0.5; }
         dashWrap: $2("dash-wrap"),
         dashFill: $2("dash-fill"),
         dashText: $2("dash-text"),
+        rootWrap: $2("root-wrap"),
+        rootFill: $2("root-fill"),
+        rootText: $2("root-text"),
+        crewWrap: $2("crew-wrap"),
+        crewText: $2("crew-text"),
         prompt: $2("prompt"),
         buildHint: $2("build-hint"),
         invBtn: $2("btn-inv"),
@@ -11528,12 +11848,18 @@ button.corner.mute.off { opacity: 0.5; }
         fxLayer: $2("fx-layer"),
         help: $2("help"),
         touch: $2("touch"),
+        touchAction: $2("touch-action"),
+        touchDash: $2("touch-dash"),
+        touchBlock: $2("touch-block"),
+        skillBar: $2("skill-bar"),
+        riskToggle: $2("risk-toggle"),
         mute: $2("btn-mute"),
         pauseOverlay: $2("pause-overlay"),
         wavePanel: $2("wave-panel"),
         wavePreview: $2("wave-preview"),
         merchantPanel: $2("merchant-panel"),
         merchantOffers: $2("merchant-offers"),
+        merchantHead: $2("merchant-head"),
         btnContinue: $2("btn-continue"),
         tutorial: $2("tutorial"),
         resPanel: $2("res-panel"),
@@ -12199,10 +12525,11 @@ button.corner.mute.off { opacity: 0.5; }
           return;
         }
         this.el.result.classList.add("hidden");
-        const seed = Math.random() * 1e9 | 0;
+        const daily = g22.daily;
+        const seed = daily ? dateSeed() : Math.random() * 1e9 | 0;
         const difficulty = g22.difficulty || "normal";
-        if (g22.net.online) g22.net.send("startGame", { seed, shared: g22.shared, difficulty });
-        g22.begin({ seed, shared: g22.shared, difficulty });
+        if (g22.net.online) g22.net.send("startGame", { seed, shared: g22.shared, difficulty, daily });
+        g22.begin({ seed, shared: g22.shared, difficulty, daily });
         g22._syncRosterIntoGame();
       };
     }
@@ -12230,6 +12557,7 @@ button.corner.mute.off { opacity: 0.5; }
       const g2 = this.game;
       this.el.waveBtn.onclick = () => g2.requestStartWave();
       this.el.hupBtn.onclick = () => g2.requestHarvestUpgrade();
+      this.el.riskToggle.onclick = () => g2.requestRiskContract();
       this.el.invBtn.onclick = () => {
         g2.sfx.click();
         this.toggleInventory();
@@ -12432,6 +12760,88 @@ button.corner.mute.off { opacity: 0.5; }
       };
       stick.addEventListener("pointerup", release);
       stick.addEventListener("pointercancel", release);
+      const actionBtn = this.el.touchAction;
+      actionBtn.addEventListener("pointerdown", (e) => {
+        e.preventDefault();
+        const kind = actionBtn.dataset.kind;
+        if (kind === "crew") {
+          this.game.input.keys.add(this.game.km.get("crew"));
+          actionBtn.classList.add("holding");
+        } else if (kind === "seal") {
+          this.game.requestSealPortal();
+        } else if (kind === "tame") {
+          this.game.requestTame();
+        } else if (kind === "reload") {
+          this.game.requestReload();
+        }
+      });
+      const releaseAction = () => {
+        if (actionBtn.dataset.kind === "crew") this.game.input.keys.delete(this.game.km.get("crew"));
+        actionBtn.classList.remove("holding");
+      };
+      actionBtn.addEventListener("pointerup", releaseAction);
+      actionBtn.addEventListener("pointercancel", releaseAction);
+      const blockBtn = this.el.touchBlock;
+      blockBtn.addEventListener("pointerdown", (e) => {
+        e.preventDefault();
+        this.game.input.keys.add(this.game.km.get("block"));
+        blockBtn.classList.add("holding");
+      });
+      const releaseBlock = () => {
+        this.game.input.keys.delete(this.game.km.get("block"));
+        blockBtn.classList.remove("holding");
+      };
+      blockBtn.addEventListener("pointerup", releaseBlock);
+      blockBtn.addEventListener("pointercancel", releaseBlock);
+      this.el.touchDash.addEventListener("pointerdown", (e) => {
+        e.preventDefault();
+        if (!this.game.local.crewing && !this.game.local.rooted) this.game._tryDash();
+      });
+    }
+    // 정수 스킬 7종을 화면 버튼으로도 쓸 수 있게 한다 — 지금까지 데스크톱도 키보드 단축키뿐이라
+    // 화면에 아무 단서가 없었고(도움말을 안 읽으면 존재 자체를 모른다), 모바일은 누를 방법조차
+    // 없었다. 클릭/탭이 각 request* 메서드를 그대로 호출하므로 비용 판정·토스트 등은 전부 기존
+    // 로직 그대로다 — 여기선 표시와 입력만 추가한다. 한 번만 만들고 이후 세션 재시작에도 재사용한다.
+    _buildSkillBar() {
+      if (this._skillBarBuilt) return;
+      this._skillBarBuilt = true;
+      const order = [
+        ["heal", "shard", "requestShard"],
+        ["blast", "skillBlast", "requestSkillBlast"],
+        ["chill", "skillChill", "requestSkillChill"],
+        ["barrier", "skillBarrier", "requestSkillBarrier"],
+        ["rift", "skillRift", "requestSkillRift"],
+        ["summon", "skillSummon", "requestSkillSummon"],
+        ["overload", "skillOverload", "requestSkillOverload"]
+      ];
+      for (const [key, actionKey, fnName] of order) {
+        const s2 = CFG.skills[key];
+        const btn = document.createElement("button");
+        btn.className = "skill-btn";
+        btn.dataset.skill = key;
+        const costLabel = s2.cost != null ? s2.cost : `${s2.minCost}+`;
+        btn.innerHTML = `<span class="ic">${s2.icon}</span><b>${costLabel}</b>`;
+        btn.title = `${s2.name} (${keyLabel(this.game.km.get(actionKey))}) \u2014 ${s2.desc}`;
+        btn.addEventListener("pointerdown", (e) => {
+          e.preventDefault();
+          if (key === "rift") {
+            const p2 = this.game.local, r2 = CFG.skills.rift;
+            const ar2 = r2.aimRange * 0.6;
+            this.game.requestSkillRift({ x: p2.x + Math.sin(p2.rot) * ar2, z: p2.z + Math.cos(p2.rot) * ar2 });
+          } else {
+            this.game[fnName]();
+          }
+        });
+        this.el.skillBar.appendChild(btn);
+      }
+    }
+    _updateSkillBar() {
+      const pool = this.game.myPool;
+      for (const btn of this.el.skillBar.children) {
+        const s2 = CFG.skills[btn.dataset.skill];
+        const cost = s2.cost != null ? s2.cost : s2.minCost;
+        btn.classList.toggle("lack", (pool.shard || 0) < cost);
+      }
     }
     // ---------------------------------------------------------------- 라이프사이클
     onGameStart(resumed = false) {
@@ -12444,6 +12854,7 @@ button.corner.mute.off { opacity: 0.5; }
       this._invTab = "build";
       this._invRendered = null;
       this._crystalWarned = false;
+      this._buildSkillBar();
       this.el.crystalWarning.classList.add("hidden");
       this.closeInventory();
       this.refreshBuildBar();
@@ -12599,6 +13010,7 @@ button.corner.mute.off { opacity: 0.5; }
 <li>\uCC98\uCE58\uD55C \uBAAC\uC2A4\uD130 <b>${stats.kills}</b></li>
 <li>\uCC44\uC9D1\uD55C \uC790\uC6D0 <b>${stats.harvested}</b></li>
 <li>\u{1F4A0} \uD68D\uB4DD\uD55C \uC815\uC218 <b>${stats.shardEarned || 0}</b></li>
+${stats.riskWavesCleared ? `<li>\u26A0\uFE0F \uC704\uD5D8 \uACC4\uC57D \uC2B9\uB9AC <b>${stats.riskWavesCleared}</b>\uD68C</li>` : ""}
 <li>\uC18C\uBAA8\uD55C \uC790\uC6D0 <b>${this._spentSummary(stats)}</b>${this._spendBreakdown(stats)}</li>
 <li>\uAC74\uC124\uD55C \uAD6C\uC870\uBB3C <b>${stats.built}</b></li>`;
       this._renderMvp(stats);
@@ -12749,7 +13161,8 @@ button.corner.mute.off { opacity: 0.5; }
         time: stats.time,
         kills: stats.kills,
         biome: this.game.world?.biome || null,
-        difficulty: this.game.difficulty || "normal"
+        difficulty: this.game.difficulty || "normal",
+        daily: !!this.game.daily
       });
       hist = hist.slice(0, 10);
       safeSetItem("cd.history", JSON.stringify(hist));
@@ -12802,7 +13215,7 @@ button.corner.mute.off { opacity: 0.5; }
       list.innerHTML = hist.map((h2) => {
         const biome2 = h2.biome && CFG.biomes[h2.biome] ? CFG.biomes[h2.biome] : null;
         const diffName = DIFFICULTIES[h2.difficulty]?.label || h2.difficulty;
-        const left = `${h2.win ? "\u{1F3C6} \uC2B9\uB9AC" : "\u{1F4A5} \uD328\uBC30"} \xB7 \uC6E8\uC774\uBE0C ${h2.wave}`;
+        const left = `${h2.win ? "\u{1F3C6} \uC2B9\uB9AC" : "\u{1F4A5} \uD328\uBC30"} \xB7 \uC6E8\uC774\uBE0C ${h2.wave}${h2.daily ? " \xB7 \u{1F5D3}\uFE0F" : ""}`;
         const right = `${fmtTime(h2.time)} \xB7 \uCC98\uCE58 ${h2.kills}${biome2 ? ` \xB7 ${biome2.icon}${biome2.name}` : ""} \xB7 ${diffName}`;
         return `<li class="${h2.win ? "win" : ""}"><span class="h-left">${left}</span><span>${right}</span></li>`;
       }).join("");
@@ -12812,12 +13225,24 @@ button.corner.mute.off { opacity: 0.5; }
       el2.className = `toast ${kind}`;
       el2.textContent = text;
       this.el.toasts.appendChild(el2);
-      setTimeout(() => {
-        el2.style.transition = "opacity 0.4s";
-        el2.style.opacity = "0";
-        setTimeout(() => el2.remove(), 400);
-      }, 2400);
-      while (this.el.toasts.children.length > 4) this.el.toasts.firstChild.remove();
+      const fadeOut = (node2) => {
+        if (!node2 || node2.dataset.fading) return;
+        node2.dataset.fading = "1";
+        node2.style.transition = "opacity 0.4s";
+        node2.style.opacity = "0";
+        setTimeout(() => node2.remove(), 400);
+      };
+      setTimeout(() => fadeOut(el2), 2400);
+      let excess = this.el.toasts.children.length - 8;
+      let node = this.el.toasts.firstChild;
+      while (excess > 0 && node) {
+        const next = node.nextSibling;
+        if (!node.dataset.fading) {
+          fadeOut(node);
+          excess--;
+        }
+        node = next;
+      }
     }
     onPauseChange(paused) {
       this.el.pauseOverlay.classList.toggle("hidden", !paused);
@@ -12836,6 +13261,7 @@ button.corner.mute.off { opacity: 0.5; }
       this.el.wood.textContent = Math.floor(pool.wood);
       this.el.stone.textContent = Math.floor(pool.stone);
       this.el.shard.textContent = Math.floor(pool.shard || 0);
+      this._updateSkillBar();
       this.el.poolMode.textContent = g2.shared ? "\uD300 \uACF5\uC720 \uC790\uC6D0" : "\uAC1C\uC778 \uC790\uC6D0";
       const nextUp = CFG.harvest.upgrade[g2.local.harvestLv];
       this.el.hupLv.textContent = `Lv.${g2.local.harvestLv}`;
@@ -12902,16 +13328,25 @@ button.corner.mute.off { opacity: 0.5; }
         this.el.waveBtn.classList.remove("hidden");
         this._showWavePreview(nextWave);
         this._updateMerchantPanel();
+        const rc = CFG.risk;
+        this.el.riskToggle.classList.remove("hidden");
+        this.el.riskToggle.classList.toggle("armed", g2._riskArmed);
+        this.el.riskToggle.textContent = g2._riskArmed ? `\u26A0\uFE0F \uC704\uD5D8 \uACC4\uC57D: \uAC78\uB824 \uC788\uC74C (\uCCB4\uB825\xB7\uACF5\uACA9\uB825 +${Math.round((rc.hpMult - 1) * 100)}%, \uBCF4\uC0C1 +${Math.round((rc.rewardMult - 1) * 100)}%) \u2014 \uB20C\uB7EC\uC11C \uCDE8\uC18C` : `\u26A0\uFE0F \uC704\uD5D8 \uACC4\uC57D \u2014 \uB2E4\uC74C \uC6E8\uC774\uBE0C\uB9CC \uBAAC\uC2A4\uD130\uB97C \uB354 \uC138\uAC8C, \uBCF4\uC0C1\uB3C4 \uB354 \uD06C\uAC8C`;
+        this.el.riskVignette.classList.add("hidden");
       } else if (w2.phase === PHASE.COMBAT) {
         this.el.waveState.textContent = `\uB0A8\uC740 \uBAAC\uC2A4\uD130 ${w2.remaining}`;
         this.el.waveBtn.classList.add("hidden");
         this.el.wavePreview.classList.add("hidden");
         this.el.merchantPanel.classList.add("hidden");
+        this.el.riskToggle.classList.add("hidden");
+        this.el.riskVignette.classList.toggle("hidden", !(CFG.wave.riskHpMult > 1));
       } else {
+        this.el.riskVignette.classList.add("hidden");
         this.el.waveState.textContent = w2.phase === PHASE.WON ? "\uBC29\uC5B4 \uC131\uACF5" : "\uD328\uBC30";
         this.el.waveBtn.classList.add("hidden");
         this.el.wavePreview.classList.add("hidden");
         this.el.merchantPanel.classList.add("hidden");
+        this.el.riskToggle.classList.add("hidden");
       }
       const waveBottom = this.el.wavePanel.getBoundingClientRect().bottom;
       this.el.toasts.style.top = `${Math.round(waveBottom + 8)}px`;
@@ -12941,7 +13376,27 @@ button.corner.mute.off { opacity: 0.5; }
       } else {
         this.el.dashWrap.classList.add("hidden");
       }
+      const rootLeft = p2.rootedUntil - performance.now() / 1e3;
+      if (rootLeft > 0) {
+        this.el.rootWrap.classList.remove("hidden");
+        this.el.rootFill.style.transform = `scaleX(${clamp(rootLeft / CFG.bossPattern.webDuration, 0, 1)})`;
+        this.el.rootText.textContent = `\u{1F578}\uFE0F \uC18D\uBC15! ${rootLeft.toFixed(1)}s`;
+      } else {
+        this.el.rootWrap.classList.add("hidden");
+      }
+      if (p2.crewing) {
+        this.el.crewWrap.classList.remove("hidden");
+        const tw = g2.buildMgr.buildings.get(p2.crewing);
+        const twName = tw ? tw.def.name : "\uD0C0\uC6CC";
+        const dmgPct = Math.round((CFG.crew.dmgMult - 1) * 100);
+        const rangePct = Math.round((CFG.crew.rangeMult - 1) * 100);
+        this.el.crewText.textContent = `\u{1F3AF} ${twName} \uD0D1\uC2B9 \uC911 (+${dmgPct}%/+${rangePct}%)`;
+      } else {
+        this.el.crewWrap.classList.add("hidden");
+      }
       const near = g2.world.nearestNode(p2.x, p2.z, CFG.harvest.range);
+      const tameTarget = !g2.buildMgr.mode && !g2._pet ? g2._nearestTameable(p2.x, p2.z) : null;
+      const reloadTarget = !g2.buildMgr.mode && !tameTarget ? g2._nearestReloadable(p2.x, p2.z) : null;
       if (near && !g2.buildMgr.mode) {
         this.el.prompt.classList.remove("hidden");
         if (needsPickaxe(near.type) && !p2.holdingPickaxe) {
@@ -12951,6 +13406,19 @@ button.corner.mute.off { opacity: 0.5; }
           const label = near.type === "tree" ? "\u{1F333} \uB098\uBB34" : near.type === "copper" ? "\u{1F7E0} \uAD6C\uB9AC \uAD11\uB9E5" : near.type === "coal" ? "\u26AB \uC11D\uD0C4\uCE35" : "\u{1FAA8} \uBC14\uC704";
           this.el.prompt.innerHTML = `${label} \u2014 <b>\uB20C\uB7EC\uC11C \uCC44\uC9D1</b> (\uB0A8\uC740 ${near.charges})`;
         }
+        this._hideTouchAction();
+      } else if (tameTarget) {
+        const tc2 = CFG.tame[tameTarget.type];
+        this.el.prompt.classList.remove("hidden");
+        this.el.prompt.innerHTML = `${tc2.icon} ${tc2.name} \u2014 <kbd>${keyLabel(g2.km.get("tame"))}</kbd>\uB85C \uAE38\uB4E4\uC774\uAE30 \uC2DC\uB3C4 (\uCD08\uC2DD\uB3D9\uBB3C \uC0DD\uACE0\uAE30 ${CFG.tame.baitCost}\uAC1C \uD544\uC694, \uC131\uACF5 \uD655\uB960 ${Math.round(tc2.chance * 100)}%)`;
+        this._showTouchAction("tame", tc2.icon, "\uAE38\uB4E4\uC774\uAE30");
+      } else if (reloadTarget) {
+        const a2 = CFG.ammo.types[reloadTarget.ammoType];
+        const pool2 = g2.myPool;
+        const have = g2._ammoOf(pool2)[reloadTarget.ammoType] || 0;
+        this.el.prompt.classList.remove("hidden");
+        this.el.prompt.innerHTML = have > 0 ? `${reloadTarget.def.icon} ${reloadTarget.def.name} \u2014 <kbd>${keyLabel(g2.km.get("reload"))}</kbd>\uB85C ${a2.icon} \uC7AC\uC7A5\uC804 (\uC7AC\uACE0 ${have})` : `${reloadTarget.def.icon} ${reloadTarget.def.name} \u2014 ${a2.icon} ${a2.name} \uC7AC\uACE0\uAC00 \uC5C6\uB2E4`;
+        this._showTouchAction("reload", a2.icon, "\uC7AC\uC7A5\uC804");
       } else if (!g2.buildMgr.mode && g2.wave.phase === PHASE.PREP) {
         const openPortals = g2.world.portals.filter((po2) => !po2.sealed);
         const portal = openPortals.find((po2) => dist(p2.x, p2.z, po2.x, po2.z) <= CFG.portalSeal.radius);
@@ -12958,11 +13426,15 @@ button.corner.mute.off { opacity: 0.5; }
           const cost = portalSealCost(g2.wave.wave + 1);
           this.el.prompt.classList.remove("hidden");
           this.el.prompt.innerHTML = `\u{1F300} \uD3EC\uD0C8 \u2014 <kbd>${keyLabel(g2.km.get("sealPortal"))}</kbd>\uB85C \uBD09\uC1C4 (${costText(cost)}, \uB2E4\uC74C \uC6E8\uC774\uBE0C \uB3D9\uC548 \uC774\uCABD\uC5D0\uC11C \uC801\uC774 \uC548 \uB098\uC628\uB2E4)`;
+          this._showTouchAction("seal", "\u{1F300}", "\uBD09\uC1C4");
         } else {
-          this.el.prompt.classList.add("hidden");
+          this._promptCrewOrHide(g2, p2);
         }
+      } else if (!g2.buildMgr.mode) {
+        this._promptCrewOrHide(g2, p2);
       } else {
         this.el.prompt.classList.add("hidden");
+        this._hideTouchAction();
       }
       this.el.netStatus.textContent = g2.net.online ? g2.isHost ? "\uD638\uC2A4\uD2B8" : "\uCC38\uAC00\uC790" : "\uC2F1\uAE00";
       this._updateTutorial();
@@ -12971,6 +13443,37 @@ button.corner.mute.off { opacity: 0.5; }
       this._updateEnemyTags();
       this._drawMinimap();
       this.refreshBuildBar();
+    }
+    // 채집 노드·포탈 프롬프트가 둘 다 없을 때의 마지막 자리 — 근처에 탑승 가능한 공격 타워가
+    // 있으면 그 대신 안내한다. 도움말을 안 읽은 플레이어도 타워 옆을 지나가다 이 문구를 보고
+    // 타워 탑승을 처음 발견하게 하려는 용도라, 이미 탑승 중일 때는(글로우·토스트로 이미 충분히
+    // 알렸으므로) 다시 뜨지 않는다.
+    _promptCrewOrHide(g2, p2) {
+      const tw = !p2.crewing ? g2._nearestCrewableTower(p2.x, p2.z) : null;
+      if (tw) {
+        this.el.prompt.classList.remove("hidden");
+        const crewDmgPct = Math.round((CFG.crew.dmgMult - 1) * 100);
+        const crewRangePct = Math.round((CFG.crew.rangeMult - 1) * 100);
+        this.el.prompt.innerHTML = `${tw.def.icon} ${tw.def.name} \u2014 <kbd>${keyLabel(g2.km.get("crew"))}</kbd>\uB97C \uB20C\uB7EC \uD0D1\uC2B9 (\uACF5\uACA9\uB825 +${crewDmgPct}%\xB7\uC0AC\uAC70\uB9AC +${crewRangePct}%, \uB300\uC2E0 \uC774\uB3D9\xB7\uACF5\uACA9 \uBD88\uAC00)`;
+        this._showTouchAction("crew", "\u{1F3AF}", "\uD0D1\uC2B9");
+      } else {
+        this.el.prompt.classList.add("hidden");
+        if (p2.crewing) this._showTouchAction("crew", "\u{1F3AF}", "\uD574\uC81C\uD558\uB824\uBA74 \uB5BC\uAE30");
+        else this._hideTouchAction();
+      }
+    }
+    _showTouchAction(kind, icon, label) {
+      const btn = this.el.touchAction;
+      if (btn.classList.contains("holding") && btn.dataset.kind !== kind) return;
+      btn.dataset.kind = kind;
+      btn.innerHTML = `<b>${icon}</b>${label}`;
+      btn.classList.remove("hidden");
+    }
+    _hideTouchAction() {
+      const btn = this.el.touchAction;
+      if (btn.dataset.kind === "crew" && btn.classList.contains("holding")) return;
+      btn.classList.add("hidden");
+      btn.dataset.kind = "";
     }
     // 보스·원거리형처럼 색만으로 구분하기 어려운 몬스터 위에 종류 아이콘을, 슬로우·중독 상태에는
     // 상태 아이콘을 띄운다 (색약 접근성 + 일반 플레이어의 순간 판단을 모두 돕는다).
@@ -13065,6 +13568,8 @@ button.corner.mute.off { opacity: 0.5; }
       const sig = m.offers.join(",");
       if (this._merchantSig !== sig) {
         this._merchantSig = sig;
+        const isMoonlit = m.offers.some((key) => CFG.merchant.pool[key]?.night);
+        this.el.merchantHead.textContent = isMoonlit ? "\u{1F319} \uB2EC\uBE5B \uC0C1\uC778 \u2014 \uC624\uB298 \uBC24\uC5D0\uB9CC" : "\u{1F9F3} \uB5A0\uB3CC\uC774 \uC0C1\uC778 \u2014 \uC774\uBC88 \uC900\uBE44 \uC2DC\uAC04\uC5D0\uB9CC";
         this.el.merchantOffers.innerHTML = m.offers.map((key) => {
           const o = CFG.merchant.pool[key];
           return `<button type="button" class="merchant-card" data-offer="${key}">
@@ -13860,6 +14365,53 @@ button.corner.mute.off { opacity: 0.5; }
           { hp: 190, dmg: 190, range: 22.5, rate: 0.28, mag: 18, cost: { wood: 110, stone: 160, iron: 8 } },
           { hp: 280, dmg: 300, range: 25, rate: 0.32, mag: 26, cost: { wood: 180, stone: 260, iron: 14 } }
         ]
+      },
+      // 지금까지 모든 방어 수단은 "적을 죽이는 것"(타워·함정) 아니면 "적의 길을 막는 것"(벽·성문)
+      // 둘 중 하나였다. 이 건물은 처음으로 셋째 축을 연다 — 적을 죽이지도 막지도 않고, 대신
+      // 자기 쪽으로 시선을 돌린다. 일반 몬스터는 크리스탈로 직진하는 경로 계산(`grid.nextStep`)만
+      // 따르는데, 이 건물이 반경 안에 있으면 그 직진을 버리고 이 허수아비부터 문다 — 화력이 쏠린
+      // 진짜 방어선 앞으로 무리를 미리 끌어와 한꺼번에 두들길 수도 있고, 반대로 손이 비는 약한
+      // 측면에 세워 두면 그쪽으로 새는 소수를 여기서 붙잡아 시간을 번다. 이미 벽에 막혀 싸우는
+      // 중이거나(그 자리 공격이 우선), 건물을 노리는 약탈자·정수를 캐는 도둑너구리처럼 이미 정해진
+      // target이 있는 부류, 그리고 날아다니거나(박쥐) 땅에 파묻히는(굴착병) 부류는 애초에 이 분기를
+      // 안 타므로 영향을 받지 않는다 — 순전히 "크리스탈로 그냥 걸어가던" 잡몹 전용 카운터다.
+      // 보스는 자기 패턴이 있어 면역(다른 유인·속박 효과와 같은 원칙).
+      decoy: {
+        name: "\uD5C8\uC218\uC544\uBE44 \uC720\uC778\uBAA9",
+        icon: "\u{1F4EF}",
+        hotkey: "=",
+        cost: { wood: 25 },
+        hp: 70,
+        blocks: false,
+        tauntRadius: 8,
+        desc: "\uACF5\uACA9\uD558\uC9C0 \uC54A\uB294\uB2E4 \u2014 \uB300\uC2E0 \uBC18\uACBD \uC548\uC758 \uC77C\uBC18 \uBAAC\uC2A4\uD130\uAC00 \uD06C\uB9AC\uC2A4\uD0C8 \uB300\uC2E0 \uC774\uAC83\uBD80\uD130 \uB178\uB9AC\uAC8C \uB9CC\uB4E0\uB2E4. \uBB34\uB9AC\uB97C \uC6D0\uD558\uB294 \uACF3\uC73C\uB85C \uB04C\uC5B4\uC624\uB294 \uBBF8\uB07C.",
+        levels: [
+          { hp: 70, tauntRadius: 8 },
+          { hp: 130, tauntRadius: 10, cost: { wood: 45, stone: 20 } }
+        ]
+      },
+      // 허수아비 유인목은 정확히 반대의 사각지대를 남겼다 — 위 주석대로 비행 몬스터(박쥐)는 그
+      // 분기를 아예 안 타서 영향을 못 받는다(비행은 벽·경로와 무관하게 크리스탈로 직선 비행하기
+      // 때문). 그렇다고 유인목의 판정을 비행에도 그냥 적용하면 "같은 미끼를 하늘에도 쓴다"는
+      // 리스킨이 되므로, 반대로 설계했다 — 봉화대는 오직 비행 몬스터"만" 반응하고(땅 위 잡몹은
+      // 완전히 무시), 그마저도 굴착병처럼 파묻혀 하늘을 볼 수 없는 부류는 대상이 아니다. 유인목이
+      // "길을 걷는 무리를 원하는 곳으로 튼다"라면 봉화대는 "직선으로 날아오는 위협에도 처음으로
+      // 방향을 줄 수 있게" 한다 — 지금까지 비행 대응은 순수하게 타워 화력(2026-08-23 측정: 정상
+      // 배치만으로 100% 요격)뿐이었는데, 이제 화력이 비는 방향으로 봉화대 하나를 세워 비행 경로
+      // 자체를 그쪽으로 접어 둘 수 있다.
+      beacon: {
+        name: "\uBD09\uD654\uB300",
+        icon: "\u{1F3EE}",
+        hotkey: "k",
+        cost: { stone: 30, copper: 5 },
+        hp: 60,
+        blocks: false,
+        tauntRadius: 9,
+        desc: "\uACF5\uACA9\uD558\uC9C0 \uC54A\uB294\uB2E4 \u2014 \uB300\uC2E0 \uBC18\uACBD \uC548\uC758 \uBE44\uD589 \uBAAC\uC2A4\uD130(\uBC15\uC950 \uB4F1)\uAC00 \uD06C\uB9AC\uC2A4\uD0C8 \uB300\uC2E0 \uC774\uAC83\uBD80\uD130 \uB178\uB9AC\uAC8C \uB9CC\uB4E0\uB2E4. \uB545 \uC704 \uBAAC\uC2A4\uD130\uC5D0\uAC8C\uB294 \uC548 \uD1B5\uD55C\uB2E4.",
+        levels: [
+          { hp: 60, tauntRadius: 9 },
+          { hp: 110, tauntRadius: 12, cost: { stone: 55, copper: 10 } }
+        ]
       }
     },
     // 시설에 다가가 클릭하면 열리는 작업창. range 는 상호작용 가능 거리.
@@ -13920,7 +14472,9 @@ button.corner.mute.off { opacity: 0.5; }
         frostaxe: { dmg: 7 },
         // 다른 무기는 전부 dmg만 오르지만, 단검은 레벨마다 흡혈률도 같이 오른다 — 대미지와 생존을
         // 동시에 키우는 게 이 무기의 정체성이라 강화도 그 축을 그대로 따라간다.
-        dagger: { dmg: 3, lifesteal: 0.03 }
+        dagger: { dmg: 3, lifesteal: 0.03 },
+        // 단검과 같은 이유로 낙인침도 레벨마다 표식 배율이 같이 오른다(1.25 → 최대 1.40).
+        mark: { dmg: 2, mark: 0.05 }
       }
     },
     // 방어구 — 지금까지 생존은 무기 선택(단검 흡혈)·막기·회피 돌진·크리스탈 강화(가호)뿐이었고,
@@ -14037,6 +14591,20 @@ button.corner.mute.off { opacity: 0.5; }
         cost: { wood: 10, iron: 3 },
         effect: { dmg: 4, lifesteal: 0.3 },
         desc: "\uADFC\uC811 \uACF5\uACA9\uB825 +4(\uCE7C\uBCF4\uB2E4 \uC57D\uD568), \uB300\uC2E0 \uC785\uD78C \uD53C\uD574\uC758 30%\uB97C \uADF8 \uC790\uB9AC\uC5D0\uC11C \uCCB4\uB825\uC73C\uB85C \uB3CC\uB824\uBC1B\uB294\uB2E4 \u2014 \uBB34\uB9AC \uC18D\uC5D0\uC11C \uACC4\uC18D \uB54C\uB9AC\uBA74\uC11C \uBC84\uD2F8 \uC218 \uC788\uB2E4."
+      },
+      // 지금까지 근접 무기 9종은 전부 "내 공격이 얼마나 세냐/어떻게 맞느냐"만 겨뤘다 — 그
+      // 공격이 다른 화력원(타워)에 영향을 주는 무기는 하나도 없었다. 낙인침은 처음으로 "표식"을
+      // 남긴다 — 대미지 자체는 낮지만(단검과 같은 급), 맞은 적은 잠시 모든 피해원(타워 포함)에게
+      // 더 크게 맞는다. 저격탑처럼 화력을 한 놈에 집중하는 타워와 특히 궁합이 좋고, 방어선을
+      // 스스로 못 뚫는 상황(포위됐거나 이동 중)에서도 "표식만 찍어 두고 타워가 마무리하게" 하는
+      // 새로운 협업 축을 만든다. mark/markTime/markRadius는 slow/lifesteal과 같은 이유로
+      // player.js attackStats의 out 객체에 기본값 0을 먼저 추가해 둬야 한다.
+      mark: {
+        name: "\uB099\uC778\uCE68",
+        icon: "\u{1F4CC}",
+        cost: { wood: 12, iron: 5 },
+        effect: { dmg: 3, mark: 1.25, markTime: 3.5 },
+        desc: "\uADFC\uC811 \uACF5\uACA9\uB825 +3(\uC57D\uD568), \uB300\uC2E0 \uB9DE\uC740 \uC801\uC5D0\uAC8C \uD45C\uC2DD\uC744 \uB0A8\uAE34\uB2E4 \u2014 \uD45C\uC2DD\uC774 \uAC78\uB9B0 3.5\uCD08 \uB3D9\uC548\uC740 \uD0C0\uC6CC\uB97C \uD3EC\uD568\uD55C \uBAA8\uB4E0 \uD53C\uD574\uC6D0\uC5D0\uAC8C 25% \uB354 \uD06C\uAC8C \uB9DE\uB294\uB2E4."
       }
     },
     // 몬스터 종류 (일반형 / 빠른형 / 탱커형 / 원거리형 / 건물추적형 / 보스)
@@ -14127,6 +14695,26 @@ button.corner.mute.off { opacity: 0.5; }
       // 이동 강제도 없어 다른 열 보스와 달리 그 자체로는 위험하지 않지만, 다른 위협(잡몹 무리·
       // 다른 보스 근접)과 겹치면 대응할 방향을 놓치게 만든다.
       shadowlord: { name: "\uCE60\uD751 \uAD70\uC8FC", icon: "\u{1F311}", hp: 1600, speed: 1.8, dmg: 56, rate: 0.65, radius: 1.5, color: 3355443, bounty: { wood: 50, stone: 50 }, scale: 2.45, boss: true, blindBoss: true },
+      // 열두 번째 보스 — 자성 군주(위치를 강제로 옮김)·칠흑 군주(아무것도 못 빼앗지만 시야를
+      // 가림)에 이어, 속박 군주는 처음으로 "위치도 시야도 그대로 두고 움직임 자체만" 막는다.
+      // 체력 문턱마다 거미줄을 터뜨려(webBoss, bossPattern.webRadius 안) 반경 안 플레이어 전원을
+      // webDuration초 동안 제자리에 묶는다 — 자성 군주처럼 회피 돌진(V)으로 발동 순간만 피하면
+      // 걸리지 않는다(같은 대응 창구 재사용). 다만 완전한 무력화는 아니다: 묶여도 공격·채집은
+      // 그대로 할 수 있어 "제자리에서 계속 싸울지, 다음 발동 전에 미리 벌어질지"를 판단하게
+      // 만드는 게 목적 — 다른 위협과 겹치면(잡몹 무리가 접근 중일 때 등) 묶인 채로 버텨야 하는
+      // 순간이 온다.
+      weblord: { name: "\uC18D\uBC15 \uAD70\uC8FC", icon: "\u{1F578}\uFE0F", hp: 1650, speed: 1.85, dmg: 57, rate: 0.65, radius: 1.5, color: 11163118, bounty: { wood: 52, stone: 52 }, scale: 2.5, boss: true, webBoss: true },
+      // 열세 번째 보스 — 지금까지 열두 보스는 전부 "싸우는 동안" 어떻게 위협하느냐(소환·침묵·
+      // 약탈·방벽·흡수·순간이동·저주·인력·시야 차단·속박)만 서로 달랐지, 정작 "죽는 순간"은 전부
+      // 똑같았다(그 자리에서 사라지고 끝). 분열 군주는 처음으로 죽음 자체를 뒤집는다 — 체력이
+      // 0이 되면 사라지는 대신 더 약한 두 마리로 갈라져 계속 싸운다(splitBoss, 일반 몬스터의
+      // 분열(split) 변종과 완전히 같은 원리를 보스 스케일로 옮겼을 뿐이라 새 시스템이 필요
+      // 없었다 — enemyMgr.spawnSplit()과 나란한 spawnSplitBoss()만 추가). 그래서 "체력바가
+      // 없어졌다"가 곧 "끝났다"가 아니게 되는 유일한 보스전이다 — 자식 둘은 서로 다른 방향으로
+      // 흩어질 수 있어 마지막 순간에 방어선을 두 갈래로 나눠야 할 수 있다. summonAt 계열
+      // 전용 발동 플래그(silenceBoss 등)를 하나도 안 줘서 평소엔 다른 보스처럼 잡졸 소환으로만
+      // 위협하다가, 진짜 반전은 죽는 순간에 온다.
+      splitlord: { name: "\uBD84\uC5F4 \uAD70\uC8FC", icon: "\u{1F46F}", hp: 1700, speed: 1.9, dmg: 58, rate: 0.7, radius: 1.5, color: 16755277, bounty: { wood: 54, stone: 54 }, scale: 2.5, boss: true, splitBoss: true, splitChildCount: 2, splitChildHpMult: 0.4, splitChildScaleMult: 0.72 },
       // 체력이 낮아 금방 죽지만, 죽는 순간(어떻게 죽었든) 그 자리에서 폭발해 주변 크리스탈·건물·플레이어에게
       // 피해를 준다 — 근접으로 마지막 일격을 넣으면 그 폭발을 그대로 맞는다. "닥치고 근접"이 항상 안전하지
       // 않게 만드는 가시(thorn) 변종과 목적은 비슷하지만, 이쪽은 변종이 아니라 종류 자체라 항상 그렇다.
@@ -14167,6 +14755,13 @@ button.corner.mute.off { opacity: 0.5; }
       // 위험한 상대인 만큼 보상도 특별하게 — 생고기가 아니라 전용 조리법(CFG.cook.stagking)으로
       // 이어져 이번 세션 신규 요리 효과(치명타 확률)의 유일한 재료가 된다.
       stagking: { name: "\uC804\uC124\uC758 \uC0AC\uC2B4\uC655", icon: "\u{1F451}", hp: 220, speed: 6.3, dmg: 24, rate: 0.75, radius: 0.7, color: 16765240, bounty: { wood: 0, stone: 0 }, scale: 1.4, wild: true, event: true, flees: true, retaliates: true, aggroTime: 5, fleeRange: 15, meat: "stagking" },
+      // 지금까지 길들일 수 있는 넷(여우·늑대·곰·사슴왕)은 전부 땅 위를 달리는 근접 동료였다 — 동료가
+      // 되어도 결국 플레이어 옆까지 붙어야만 싸운다는 점은 넷 다 같았다. 매는 처음으로 하늘을 나는
+      // 사냥감이다(flies:true, 다른 야생 동물과 달리 렌더 높이가 뜬다). 야생일 때는 다른 flees 부류와
+      // 똑같이 도망만 치지만, fleeRange를 여우(15)보다도 길게 잡아 다섯 중 가장 접근하기 어렵게 했다 —
+      // 하늘에서 내려다보는 만큼 더 일찍 플레이어를 알아챈다는 설정. minWave는 곰(6)보다는 이르고
+      // 늑대(3)보다는 늦은 5로 잡아, 회귀 위치 자체가 "중간 난이도" 임을 보여준다.
+      hawk: { name: "\uB9E4", icon: "\u{1F985}", hp: 20, speed: 6.8, dmg: 0, rate: 0, radius: 0.35, color: 9127200, bounty: { wood: 0, stone: 0 }, scale: 0.6, wild: true, event: true, flees: true, flies: true, fleeRange: 17, meat: "hawk" },
       // shardChance(정수 확률 지급)는 정수를 웨이브 클리어 전용 보상으로 개편하면서(2026-08-30)
       // 같이 없앴다 — 전투 중에 잡을 때마다 정수가 나오면 그 개편의 핵심 의도가 무너진다.
       treasure: { name: "\uBCF4\uBB3C\uAC8C", icon: "\u{1F980}", hp: 16, speed: 5.4, dmg: 0, rate: 0, radius: 0.4, color: 16766720, bounty: { wood: 16, stone: 12 }, scale: 0.85, flees: true, event: true },
@@ -14282,6 +14877,12 @@ button.corner.mute.off { opacity: 0.5; }
       // 붙여 지으면 한 발이 닿는 범위 자체가 넓어져, 무리를 흩어 놓고 싸울 이유가 하나 늘어난다.
       cannonCluster: { radius: 7, splashMultPerNeighbor: 0.15, max: 0.6 }
     },
+    // 타워 탑승 — 지금까지 모든 타워는 한 번 지으면 100% 자동이라, "지금 이 순간 어디에 화력을
+    // 몰아줄까"를 플레이어가 실시간으로 결정할 방법이 없었다. 탑승 중인 타워 근처에 서서 키를
+    // 누르고 있으면 그 타워 하나에 크게 힘을 실어주는 대신, 그동안 플레이어 자신은 완전히
+    // 움직이지도 공격하지도 못한다(맞으면 그대로 맞는다) — "내 몸으로 직접 싸울까, 아니면
+    // 위험한 순간에 특정 타워 하나를 밀어줄까"라는 실시간 선택지를 만드는 게 목적이다.
+    crew: { radius: 1.8, dmgMult: 1.4, rangeMult: 1.25 },
     // 타워 특화 — 최대 레벨에 도달한 전투 타워는 딱 한 번, 두 갈래 중 하나를 골라 성격을 바꾼다.
     // 되돌릴 수 없다(철거하고 새로 지어야 한다). 업그레이드가 "같은 타워를 더 세게"였다면 이건
     // "같은 타워를 다르게" — 같은 화살탑이라도 저격형이냐 연사형이냐에 따라 방어선 구성이 달라진다.
@@ -14385,6 +14986,14 @@ button.corner.mute.off { opacity: 0.5; }
       dagger: {
         bloodfang: { name: "\uD761\uD608\uC544", icon: "\u{1FA78}", desc: "\uB300\uBBF8\uC9C0\uB97C \uB354 \uB0AE\uCD94\uB294 \uB300\uC2E0 \uB3CC\uB824\uBC1B\uB294 \uD68C\uBCF5\uB7C9\uC774 \uD06C\uAC8C \uB298\uC5B4\uB09C\uB2E4 \u2014 \uB9DE\uC544\uAC00\uBA70 \uACC4\uC18D \uBC84\uD2F0\uB294 \uD0F1\uCEE4\uD615 \uADFC\uC811", mods: { dmg: 0.6, lifesteal: 1.8 } },
         swiftfang: { name: "\uCF8C\uB3C4", icon: "\u26A1", desc: "\uD68C\uBCF5\uC744 \uC904\uC774\uB294 \uB300\uC2E0 \uD6E8\uC52C \uBE60\uB974\uACE0 \uC138\uAC8C \uBCA4\uB2E4 \u2014 \uC9E7\uAC8C \uCE58\uACE0 \uBE60\uC9C0\uB294 \uD788\uD2B8\uC564\uB7F0\uD615", mods: { dmg: 1.4, cd: 0.65, lifesteal: 0.5 } }
+      },
+      // 낙인 강화는 다른 특화처럼 "더 세게 vs 더 빠르게/넓게"가 아니라 "더 세게 vs 더 넓게"로
+      // 갈린다 — 낙인은 원래 속도(cd)를 안 건드리는 무기라 다른 무기의 흔한 이지선다 축이 안
+      // 맞물린다. 확산은 markRadius라는 새 필드를 add로 얹는데, hostAttack이 이미 그 필드를
+      // 조건부로 확인하도록 짜여 있어(a.markRadius) 특화 쪽에는 새 로직이 필요 없다.
+      mark: {
+        brand: { name: "\uB099\uC778 \uAC15\uD654", icon: "\u{1F525}", desc: "\uD45C\uC2DD \uBC30\uC728\uC774 \uB354 \uAC15\uD574\uC9C0\uC9C0\uB9CC \uC9C0\uC18D\uC2DC\uAC04\uC740 \uC904\uC5B4\uB4E0\uB2E4 \u2014 \uC9E7\uACE0 \uAD75\uAC8C \uBAB0\uC544\uCE60 \uB54C \uC4F4\uB2E4", mods: { mark: 1.12, markTime: 0.75 } },
+        spread: { name: "\uB099\uC778 \uD655\uC0B0", icon: "\u{1F578}\uFE0F", desc: "\uD45C\uC2DD \uBC30\uC728\uC740 \uC904\uC9C0\uB9CC \uB9DE\uC740 \uC801 \uC8FC\uBCC0\uC758 \uB2E4\uB978 \uC801\uC5D0\uAC8C\uB3C4 \uD568\uAED8 \uBC88\uC9C4\uB2E4 \u2014 \uBB34\uB9AC \uC804\uCCB4\uC5D0 \uD45C\uC2DD\uC744 \uAC78\uC5B4 \uD0C0\uC6CC \uD654\uB825\uC744 \uBAB0\uC544\uC900\uB2E4", mods: { mark: 0.9 }, add: { markRadius: 3.5 } }
       }
     },
     // 보급품 투하 — 전투 중(웨이브 2부터) 가끔 지도 위에 상자가 떨어진다. 한 번에 최대 1개만 떠 있고,
@@ -14473,12 +15082,13 @@ button.corner.mute.off { opacity: 0.5; }
       // 초반 몇 판은 사냥이 완전히 안전하게 둔다.
       // 전설의 사슴왕은 곰보다도 절반만 나오는 최희귀 등급 — 여덟 판에 한 번 볼까 말까 한 정도로
       // 잡아 "봤다면 잡아볼 만한" 수준을 유지한다.
-      weights: { rabbit: 5, deer: 3, boar: 2, fox: 2, wolf: 2, bear: 1, stagking: 0.5 },
+      weights: { rabbit: 5, deer: 3, boar: 2, fox: 2, wolf: 2, hawk: 0.8, bear: 1, stagking: 0.5 },
       // this.wave.wave(완료한 웨이브 수)가 이 값 이상이어야 해당 종이 가중치 목록에 들어간다 —
       // 늑대는 4웨이브 준비 시간부터(다른 신규 몬스터들의 "N웨이브부터" 관례와 맞춤), 곰은 그보다도
       // 한참 늦은 7웨이브 준비 시간부터라 초반엔 셋 중 가장 위험한 맹수를 마주칠 일이 아예 없다.
       // 전설의 사슴왕은 곰보다도 늦은 9웨이브 준비 시간부터 — 가장 늦게, 가장 드물게 등장한다.
-      minWave: { wolf: 3, bear: 6, stagking: 8 }
+      // 매는 늑대(3)와 곰(6) 사이인 5부터 — 위험하지는 않지만(dmg:0) 가장 잡기 어려운 축에 든다.
+      minWave: { wolf: 3, hawk: 5, bear: 6, stagking: 8 }
     },
     // 여우·늑대·곰은 죽여서 생고기를 얻는 대신 길들여 영구 동료로 삼을 수도 있다 — 초식동물
     // (토끼·사슴·멧돼지) 생고기를 미끼로 써야 해서, 사냥으로 모은 재료를 "굽어서 한 판짜리 버프로
@@ -14505,6 +15115,19 @@ button.corner.mute.off { opacity: 0.5; }
       // 성공하면 여우의 속도와 곰에 버금가는 화력을 동시에 갖춘 유일한 동료가 되어 "가장 어렵게
       // 얻은 만큼 가장 강하다"는 보상 구조를 완성한다.
       stagking: { name: "\uC804\uC124\uC758 \uC0AC\uC2B4\uC655", icon: "\u{1F451}", chance: 0.12, dmg: 20, rate: 0.85, range: 12, atkRange: 2.3, speed: 7.2, color: 16765240 },
+      // 다섯째이자 처음으로 근접이 아닌 동료 — 나머지 넷은 전부 atkRange가 2~2.4로, 목표에 붙어야만
+      // 때린다. 매는 atkRange를 7로 훨씬 길게 잡아 `_updatePet`의 "bestD <= atkRange면 그 자리에서
+      // 공격, 아니면 접근" 분기가 그대로 "목표에서 7 거리를 두고 맴돌며 쏜다"는 동작으로 자연히
+      // 바뀐다 — 새 전투 로직 없이 기존 배관(추격·정지·공격)의 숫자 하나만으로 완전히 다른 플레이
+      // 패턴(안전거리 사격)을 만든다. 대신 한 방 피해는 넷 중 가장 낮게 잡아(dps는 늑대와 비슷한
+      // 수준으로만) "안전한 대신 화력이 특출나지는 않다"는 균형을 맞췄다.
+      // ranged:true — game.js의 _updatePet이 이 플래그를 보고 다른 넷(맞닿아야 때리는 근접)과
+      // 달리 매 공격 시 실제로 화살처럼 날아가는 투사체(플레이어의 활·타워와 같은 ProjectilePool)를
+      // 쏘게 한다. 원래는 넷과 똑같이 명중 이펙트만 대상 위치에 즉석으로 띄웠는데, 매는 7칸 밖에서
+      // 쏘다 보니 자기와 아무 연결 없이 먼 곳에서 갑자기 이펙트만 터지는 것처럼 보였다 — 화면만
+      // 보면 "왜 저기서 터지지"싶은 게 실제 버그처럼 읽힌다. 피해 적용도 명중 시점으로 미뤄 다른
+      // 발사체 공격(활·타워)과 완전히 같은 타이밍 규칙을 따르게 했다.
+      hawk: { name: "\uB9E4", icon: "\u{1F985}", chance: 0.28, dmg: 14, rate: 0.9, range: 13, atkRange: 7, speed: 7, color: 9127200, ranged: true },
       // 최대 레벨(3)까지 먹여 키운 동료는 평소의 단일 표적 공격 사이사이에, 주기적으로 자기 주변
       // 전체를 한 번에 후려치는 "포효"를 곁들인다 — 지금까지 먹이주기는 그저 숫자(공격력·속도)만
       // 키워왔는데, 최대 레벨을 찍으면 처음으로 공격 방식 자체가 하나 늘어나는 걸로 성장의 마지막
@@ -14541,7 +15164,14 @@ button.corner.mute.off { opacity: 0.5; }
       // 손대지 않은 새 수치(치명타 확률)를 처음으로 연다 — 행운의 유물(critChanceDelta)과 정확히
       // 같은 배관을 타므로 근접 치명타 판정 한 곳에만 더하면 된다. 기본 12%에 이 요리(+15%p)만
       // 더해도 27%로, 유물까지 겹치면 훨씬 짜릿한 치명타 러시를 노려볼 수 있다.
-      stagking: { name: "\uC804\uC124 \uC0AC\uC2B4 \uAD6C\uC774", icon: "\u{1F37D}\uFE0F", wood: 12, desc: "\uB2E4\uC74C \uC6E8\uC774\uBE0C \uB3D9\uC548 \uADFC\uC811 \uACF5\uACA9 \uCE58\uBA85\uD0C0 \uD655\uB960 +15%p", kind: "crit", value: 0.15 }
+      stagking: { name: "\uC804\uC124 \uC0AC\uC2B4 \uAD6C\uC774", icon: "\u{1F37D}\uFE0F", wood: 12, desc: "\uB2E4\uC74C \uC6E8\uC774\uBE0C \uB3D9\uC548 \uADFC\uC811 \uACF5\uACA9 \uCE58\uBA85\uD0C0 \uD655\uB960 +15%p", kind: "crit", value: 0.15 },
+      // 지금까지 일곱 요리(속도·최대체력·근접공격력·반사·방어력·재생·치명타)는 전부 플레이어
+      // 자신의 생존·전투를 겨눴다 — 타워를 직접 강화하는 요리는 하나도 없었다(그건 상인의 포격
+      // 물약·유물의 몫이었다). 매 요리는 처음으로 타워 사거리를 늘린다 — "매의 눈"이라는 소재와
+      // 그대로 맞아떨어진다. `game.js`의 `feastRangeMult` getter 하나만 새로 만들어 기존
+      // `rangeMult`(안개 날씨·유물과 이미 곱해지고 있던 자리) 계산식에 곱하는 것만으로 끝나서,
+      // 타워 사거리 판정·건설 미리보기(고스트 링) 양쪽에 새 배관 없이 동시에 반영된다.
+      hawk: { name: "\uB9E4 \uAF2C\uCE58\uAD6C\uC774", icon: "\u{1F361}", wood: 10, desc: "\uB2E4\uC74C \uC6E8\uC774\uBE0C \uB3D9\uC548 \uD0C0\uC6CC \uC0AC\uAC70\uB9AC +15%", kind: "range", value: 1.15 }
     },
     // 보물게 — 전투 중(3웨이브부터) 가끔 튀어나와 도망만 다니는 몬스터. 웨이브 구성에 안 끼는 독립
     // 이벤트라 운석·보급품과 같은 패턴(호스트 전용 타이머)으로 처리한다. lifetime 안에 못 잡으면
@@ -14559,6 +15189,12 @@ button.corner.mute.off { opacity: 0.5; }
     // 남은 포탈은 봉쇄할 수 없다(적이 나올 곳이 없어지면 웨이브가 영원히 안 끝난다). 비용은
     // 웨이브가 오를수록 같이 오른다 — 후반에도 여전히 자원의 상당량을 써야 하는 선택으로 남긴다.
     portalSeal: { radius: 3.5, costWood: 15, costStone: 10, costWoodPerWave: 3, costStonePerWave: 2 },
+    // ⚠️ 위험 계약 — 준비 시간에 팀이 자유롭게 켜고 끌 수 있는 스위치. 켜진 채로 웨이브가 시작되면
+    // 그 한 판에만 몬스터 체력·공격력이 늘고 보상(자원·정수)도 그만큼 커진다. 포탈 봉쇄·전초기지·
+    // 타워 탑승·유인목처럼 "장소"에 매인 구조적 선택이 아니라, 처음으로 "이번 판을 얼마나 세게
+    // 받을지"를 순수하게 팀이 직접 정하는 축이다 — 자원 소모도 없어(자원을 태우는 대신 위험 그
+    // 자체를 건다) 언제든 자유롭게 껐다 켰다 저울질할 수 있다.
+    risk: { hpMult: 1.25, dmgMult: 1.2, rewardMult: 1.4 },
     // 🌀 균열 습격 — 지금까지 전투 중 새로 나타나는 몬스터는 전부 포탈에서만 왔다(포탈 봉쇄를
     // 막 추가한 참이라 그 대칭이 더 도드라져 보였다 — 포탈을 다 막아도 이건 못 막는다는 게
     // 핵심 차이). 6웨이브부터 가끔 방어선 안쪽(코어와 건설 반경 사이, 운석이 떨어지는 것과
@@ -14615,7 +15251,25 @@ button.corner.mute.off { opacity: 0.5; }
         // 있으면 되지만 대포·서리·독·번개탑은 화로에서 광물+철을 태워야 하는데, 화로가 아직
         // 없거나 멀리 있으면 그 자리에서 못 채운다 — 상인은 화로 없이도 세 종류를 한꺼번에
         // 채워주는 대신, 정직하게 크래프팅하는 것보다 목재·광물 단가를 더 받는다(편의의 대가).
-        ammoBox: { name: "\uD0C4\uC57D \uBCF4\uAE09 \uC0C1\uC790", icon: "\u{1F4E6}", desc: "\uD654\uC0B416\xB7\uD3EC\uD0C44\xB7\uC6D0\uC18C\uC5618\uC744 \uD654\uB85C \uC5C6\uC774 \uC989\uC2DC \uCC44\uC6B4\uB2E4", cost: { wood: 40, stone: 35 }, kind: "ammoBox", value: { arrow: 16, shell: 4, elixir: 8 } }
+        ammoBox: { name: "\uD0C4\uC57D \uBCF4\uAE09 \uC0C1\uC790", icon: "\u{1F4E6}", desc: "\uD654\uC0B416\xB7\uD3EC\uD0C44\xB7\uC6D0\uC18C\uC5618\uC744 \uD654\uB85C \uC5C6\uC774 \uC989\uC2DC \uCC44\uC6B4\uB2E4", cost: { wood: 40, stone: 35 }, kind: "ammoBox", value: { arrow: 16, shell: 4, elixir: 8 } },
+        // 힘의 물약(공격력)·포격 물약(타워)·질풍의 물약(이동)은 전부 "한 판짜리 맛보기" — 나중에
+        // 나오는 보스 유물(제련의 유물 forge, 질주의 유물 haste)의 영구 버전보다 배율은 크지만
+        // 그 판만 간다. 방금 채집에도 처음으로 영구 유물(채굴자의 유물)이 생겼는데, 그 축만
+        // 초반부터 목재·광물로 맛볼 수 있는 한 판짜리 버전이 없었다 — 정작 채집은 자원의 시작점이라
+        // 초반(보스 유물을 아직 하나도 못 고른 시점)에 확실히 당겨쓰고 싶은 순간이 가장 잦은데도
+        // 그럴 수단이 상인에게 없었다. 25%는 다른 세 물약(40%/25%/30%)과 같은 급의 "한 판 맛보기"
+        // 강도로 잡았다(영구 유물의 15%보다는 세게).
+        harvestTonic: { name: "\uCC44\uC9D1 \uCD09\uC9C4\uC81C", icon: "\u23F1\uFE0F", desc: "\uB2E4\uC74C \uC6E8\uC774\uBE0C \uB3D9\uC548 \uCC44\uC9D1 \uC2DC\uAC04\uC774 25% \uC904\uC5B4\uB4E0\uB2E4", cost: { wood: 30, stone: 20 }, kind: "tempHarvest", value: 0.75 },
+        // 🌙 밤 웨이브(7웨이브마다)는 지금까지 "위험한 대신 보상이 30% 후하다"는 수동적인 배율
+        // 하나로만 다른 웨이브와 구분됐다 — 상인은 그 순간과 아무 접점이 없었다. 이 품목은 밤에만
+        // (night:true — 아래 _maybeSpawnMerchant가 평소 무작위 풀에서는 제외하고 밤에만 강제로
+        // 끼워 넣는다) 뜨는 유일한 상인 품목이라, "밤이 왔다"가 위험 신호일 뿐 아니라 이번 준비
+        // 시간에만 살 수 있는 것이 있다는 신호도 된다. 정수 감정은 명시적으로 없앤 시스템이지만
+        // (위 ironTrade 주석 참고) 그 원칙은 "정수가 부족하면 아무 때나 캐거나 사서 채울 수 있다"를
+        // 막는 것이었지, "밤이라는 흔치 않은 순간에 한정된 값비싼 교환"까지 막을 필요는 없다고
+        // 판단했다 — 단가를 ironTrade(철 3개에 목재60·광물40)보다 훨씬 비싸게 잡아(정수 2개에
+        // 목재100·광물80) 매 웨이브 반복 가능한 수입원이 되지 않게 했다.
+        moonBundle: { name: "\uB2EC\uBE5B \uBB34\uC5ED\uC0C1 \uD2B9\uC120", icon: "\u{1F319}", desc: "\uBAA9\uC7AC\xB7\uAD11\uBB3C\uC744 \uC815\uC218 2\uAC1C\uB85C \uAD50\uD658\uD55C\uB2E4 \u2014 \uBC24\uC5D0\uB9CC \uD30C\uB294 \uD2B9\uBCC4\uD55C \uBB3C\uAC74", cost: { wood: 100, stone: 80 }, kind: "shard", value: 2, night: true }
       }
     },
     // 엔드리스 축복 — 10웨이브 승리 이후(엔드리스)에만 등장한다. 표준 캠페인 밸런스에는 영향이 없다.
@@ -14729,7 +15383,18 @@ button.corner.mute.off { opacity: 0.5; }
       // 값은 waveReward가 각 웨이브에 매기는 값(1~3)에 그대로 더해지는 정수 1개 — 초반엔 소소하지만
       // 표준 캠페인 5웨이브 보스만 넘겨도 그 뒤 모든 웨이브에 영구히 붙고, 엔드리스로 오래 버틸수록
       // (여러 개 중첩까지 가능) 그만큼 정수 의존 시스템 전체가 점점 헐거워진다.
-      resonantshard: { name: "\uC2EC\uC5F0\uC758 \uACB0\uC815", icon: "\u{1F4A0}", desc: "\uC6E8\uC774\uBE0C\uB97C \uD074\uB9AC\uC5B4\uD560 \uB54C\uB9C8\uB2E4 \uC815\uC218\uB97C 1\uAC1C \uB354 \uBC1B\uB294\uB2E4(\uC911\uCCA9 \uAC00\uB2A5)", trigger: "boss", kind: "delta", key: "shardBonus", value: 1 }
+      resonantshard: { name: "\uC2EC\uC5F0\uC758 \uACB0\uC815", icon: "\u{1F4A0}", desc: "\uC6E8\uC774\uBE0C\uB97C \uD074\uB9AC\uC5B4\uD560 \uB54C\uB9C8\uB2E4 \uC815\uC218\uB97C 1\uAC1C \uB354 \uBC1B\uB294\uB2E4(\uC911\uCCA9 \uAC00\uB2A5)", trigger: "boss", kind: "delta", key: "shardBonus", value: 1 },
+      // 유물 14개를 전수 점검하니 생존·전투력·유지비 절감·소득(정수)은 전부 하나 이상 있는데,
+      // 이 게임의 첫 번째 순환 단계인 "채집"만은 어떤 유물도 건드리지 않았다 — 채집 속도를
+      // 올리는 수단은 준비 시간에 사는 업그레이드(채집속도 Lv)·원정 준비 퍽(베테랑 채집꾼)·
+      // 맑음 날씨(우연) 셋뿐이었고, 셋 다 판마다 다시 확보해야 하거나(업그레이드) 손이 안 닿는
+      // 값(맑음)이었다. 이 유물은 그 채집 시간에 처음으로 "보스를 잡은 대가"로 곱연산 보너스를
+      // 얹는다 — 기존 채집 속도 업그레이드·맑음 날씨가 이미 걸려 있는 자리(`player.js`의
+      // `beginHarvest`/`tickHarvest`가 계산하는 `need` 시간)에 배율 하나만 더 곱했을 뿐이라
+      // 세 소스가 전부 자연스럽게 곱연산으로 쌓인다(순서 무관). game.js가 이미 atkSpeedMult·
+      // moveSpeedMult를 `this.boonMult`에서 읽어 플레이어 메서드에 인자로 넘겨주는 것과 완전히
+      // 같은 배관이라 player.js는 새 코드가 필요 없었다.
+      prospector: { name: "\uCC44\uAD74\uC790\uC758 \uC720\uBB3C", icon: "\u26CF\uFE0F", desc: "\uCC44\uC9D1\uC5D0 \uAC78\uB9AC\uB294 \uC2DC\uAC04\uC774 \uC601\uAD6C\uD788 15% \uC904\uC5B4\uB4E0\uB2E4(\uB2E4\uB978 \uCC44\uC9D1 \uC18D\uB3C4 \uBCF4\uB108\uC2A4\uC640 \uC911\uCCA9)", trigger: "boss", kind: "mult", key: "harvestTimeMult", value: 0.85 }
     },
     // 보스 전용 패턴. 예고 시간을 반드시 두어서 플레이어가 반응할 수 있게 한다.
     bossPattern: {
@@ -14808,7 +15473,14 @@ button.corner.mute.off { opacity: 0.5; }
       // 강제가 없는 유일한 보스 패턴이라, 다른 위협과 겹칠 때만 진짜 위험해진다.
       blindCast: 1.1,
       blindRadius: 9,
-      blindDuration: 6
+      blindDuration: 6,
+      // 속박 군주 전용 — summonAt 임계값마다 소환 대신 거미줄을 터뜨려 반경 안 플레이어 전원을
+      // webDuration초 동안 제자리에 묶는다(나머지 전부와 배타적). 자성 군주(위치 강제 이동)·
+      // 칠흑 군주(시야만 가림)에 이어 셋 다 "직접 빼앗지 않고 강제"하는 계열이지만, 이건 위치도
+      // 시야도 그대로 두고 순수하게 움직임만 막는다 — 공격·채집은 묶인 채로도 그대로 할 수 있다.
+      webCast: 1.1,
+      webRadius: 9,
+      webDuration: 4
     },
     wave: {
       goal: 10,
@@ -14929,7 +15601,7 @@ button.corner.mute.off { opacity: 0.5; }
     // 추가해서(기존 rush~rally 여섯 웨이브가 이미 차지한 3·6·9·12·18·21웨이브 자리를 그대로
     // 보존) 처음 등장은 occurrence 7번째, 즉 24웨이브부터라 굴착병이 정상적으로 처음 나오는
     // 9웨이브보다 한참 뒤다 — "정체 모를 몬스터가 특수 웨이브로 먼저 쏟아진다"는 순서 역전을 피한다.
-    burrow: { name: "\uB545\uAD74 \uC2B5\uACA9", icon: "\u{1F573}\uFE0F", desc: "\uAD74\uCC29\uBCD1\uC774 \uB300\uAC70 \uD30C\uBB3B\uD78C \uCC44 \uC811\uADFC\uD55C\uB2E4 \u2014 \uAC10\uC2DC\uD0D1 \uC5C6\uC774\uB294 \uD0C0\uC6CC \uD654\uB825\uC758 \uC0C1\uB2F9\uC218\uAC00 \uC544\uC608 \uC870\uC900\uD558\uC9C0 \uBABB\uD55C\uB2E4" },
+    burrow: { name: "\uB545\uAD74 \uC2B5\uACA9", icon: "\u{1F573}\uFE0F", desc: "\uAD74\uCC29\uBCD1\uC774 \uB300\uAC70 \uD30C\uBB3B\uD78C \uCC44 \uC811\uADFC\uD55C\uB2E4 \u2014 \uBCF4\uB8E8 Lv.2 \uC774\uC0C1 \uC5C6\uC774\uB294 \uD0C0\uC6CC \uD654\uB825\uC758 \uC0C1\uB2F9\uC218\uAC00 \uC544\uC608 \uC870\uC900\uD558\uC9C0 \uBABB\uD55C\uB2E4" },
     // 주술사(shooter)는 평소엔 한둘만 섞여 나와 "벽으로 못 막는 원거리 공격"이라는 정체성이 잘 안
     // 드러났다 — 벽만 두르면 대부분의 위협을 막을 수 있다는 인식을 이 웨이브가 뒤집는다. burrow가
     // "타워가 안 보인다"는 축이었다면 이건 "벽이 안 막는다"는 축이다: 주술사는 사거리 안이면 벽 뒤에서도
@@ -15020,7 +15692,28 @@ button.corner.mute.off { opacity: 0.5; }
     // (타워가 얕고 넓게 때리는 평소 습관) 다들 숨 돌릴 틈을 얻어 그대로 다시 차오른다. 한 마리씩
     // 완전히 끝장내고 넘어가거나 광역기로 동시에 몰아쳐야 한다. SPECIAL_WAVES 맨 끝에 추가해
     // 기존 열여섯 웨이브가 이미 차지한 자리는 그대로 두고, occurrence 17번째부터 처음 등장한다.
-    regenlegion: { name: "\uC7AC\uC0DD \uAD70\uB2E8", icon: "\u{1F49A}", desc: "\uBAAC\uC2A4\uD130 \uC804\uBD80\uAC00 \uC7AC\uC0DD \uC0C1\uD0DC\uB85C \uB098\uC628\uB2E4 \u2014 3\uCD08\uB9CC \uC548 \uB9DE\uC73C\uBA74 \uCCB4\uB825\uC774 \uB3C4\uB85C \uCC28\uC624\uB974\uB2C8, \uD654\uB825\uC744 \uD769\uC5B4\uB193\uC9C0 \uB9D0\uACE0 \uD55C \uB9C8\uB9AC\uC529 \uD655\uC2E4\uD788 \uB05D\uB0B4\uAC70\uB098 \uAD11\uC5ED\uAE30\uB85C \uBAB0\uC544\uCCD0\uC57C \uD55C\uB2E4" }
+    regenlegion: { name: "\uC7AC\uC0DD \uAD70\uB2E8", icon: "\u{1F49A}", desc: "\uBAAC\uC2A4\uD130 \uC804\uBD80\uAC00 \uC7AC\uC0DD \uC0C1\uD0DC\uB85C \uB098\uC628\uB2E4 \u2014 3\uCD08\uB9CC \uC548 \uB9DE\uC73C\uBA74 \uCCB4\uB825\uC774 \uB3C4\uB85C \uCC28\uC624\uB974\uB2C8, \uD654\uB825\uC744 \uD769\uC5B4\uB193\uC9C0 \uB9D0\uACE0 \uD55C \uB9C8\uB9AC\uC529 \uD655\uC2E4\uD788 \uB05D\uB0B4\uAC70\uB098 \uAD11\uC5ED\uAE30\uB85C \uBAB0\uC544\uCCD0\uC57C \uD55C\uB2E4" },
+    // 11종 변종 중 광폭(berserk)만 마지막까지 전용 웨이브가 없었다 — 다른 열 종은 전부 "고정된
+    // 성격"(등장부터 죽을 때까지 같은 방식)인데, 광폭은 유일하게 전투 중 상태가 바뀐다: 체력이
+    // triggerPct(50%) 밑으로 떨어지는 순간 속도·공격력이 오르고 다시 돌아가지 않는다(enemy.js
+    // simulate()). 그래서 이 웨이브는 다른 열일곱 개와 성격이 다르다 — 스폰 시점엔 평범해 보이다가,
+    // 전투가 길어질수록(화력이 부족해 마무리를 못 짓고 있을수록) 이미 절반 넘게 깎인 개체들이
+    // 하나둘 동시에 빨라지고 세져서 방어선이 점점 더 위험해진다. 다른 열일곱 웨이브의 위협은
+    // 스폰 순간 정해지지만, 이 웨이브의 위협은 전투 진행 자체가 키운다 — 오래 끌지 말고 각개
+    // 격파로 확실히 끝장내는 쪽이 유리해진다. SPECIAL_WAVES 맨 끝에 추가해 기존 열일곱 웨이브가
+    // 이미 차지한 자리는 그대로 두고, occurrence 18번째부터(66웨이브) 처음 등장한다.
+    berserklegion: { name: "\uAD11\uD3ED \uAD70\uB2E8", icon: "\u{1F621}", desc: "\uBAAC\uC2A4\uD130 \uC804\uBD80\uAC00 \uCCB4\uB825\uC774 \uC808\uBC18 \uBC11\uC73C\uB85C \uB5A8\uC5B4\uC9C0\uB294 \uC21C\uAC04 \uC18D\uB3C4\xB7\uACF5\uACA9\uB825\uC774 \uC624\uB978\uB2E4(\uB418\uB3CC\uC544\uAC00\uC9C0 \uC54A\uB294\uB2E4) \u2014 \uB9C8\uBB34\uB9AC\uB97C \uBABB \uC9D3\uACE0 \uB04C\uBA74 \uC774\uBBF8 \uB2E4\uCE5C \uB188\uB4E4\uC774 \uD558\uB098\uB458 \uB3D9\uC2DC\uC5D0 \uBE68\uB77C\uC9C0\uACE0 \uC138\uC9C0\uB2C8, \uC624\uB798 \uB04C\uC9C0 \uB9D0\uACE0 \uAC01\uAC1C\uACA9\uD30C\uB85C \uD655\uC2E4\uD788 \uB05D\uB0B4\uC57C \uD55C\uB2E4" },
+    // 11종 변종 중 마지막 남은 질주(dash)까지 채워 이제 전부(11/11) 전용 웨이브를 갖췄다. 질주는
+    // 각자 무작위 위상(enemy.js `dashCd = interval * (0.4~1.0)`)으로 자기 타이머를 돌려 3.5초마다
+    // 1.1초씩 2.4배로 튀어나가므로, 같은 시각에 스폰돼도 서로 안 맞아 떨어진다 — 그래서 이 웨이브는
+    // 광폭 군단(전투가 길어질수록 예측 가능하게 위험해짐)과 정반대로 처음부터 끝까지 "언제 누가
+    // 튀어나올지 예측할 수 없는" 웨이브다. 평소 확률에 실려 한둘만 섞이면 서리탑 한 대가 그 순간만
+    // 잡아주면 그만이지만, 무리 전체가 이 상태면 화면 여기저기서 불규칙하게 돌진이 겹쳐 터져
+    // 방어선 전체가 계속 술렁인다 — 서리탑을 넓게 깔아 튀어나오는 족족 즉시 눌러 앉히거나,
+    // 아예 화력을 촘촘히 배치해 튀어나온 개체가 크리스탈에 닿기 전에 항상 잡히게 만들어야 한다.
+    // SPECIAL_WAVES 맨 끝에 추가해 기존 열여덟 웨이브가 이미 차지한 자리는 그대로 두고,
+    // occurrence 19번째(69웨이브)부터 처음 등장한다.
+    dashlegion: { name: "\uC9C8\uC8FC \uAD70\uB2E8", icon: "\u{1F4A8}", desc: "\uBAAC\uC2A4\uD130 \uAC01\uC790\uAC00 \uBB34\uC791\uC704 \uD0C0\uC774\uBC0D\uC5D0 3.5\uCD08\uB9C8\uB2E4 1.1\uCD08\uC529 2.4\uBC30\uB85C \uD280\uC5B4\uB098\uAC04\uB2E4 \u2014 \uC11C\uB85C \uC548 \uB9DE\uCDB0 \uD280\uC5B4\uB098\uC624\uB2C8 \uC5B8\uC81C \uB204\uAC00 \uB3CC\uC9C4\uD560\uC9C0 \uC608\uCE21\uD560 \uC218 \uC5C6\uB2E4, \uC11C\uB9AC\uD0D1\uC744 \uB113\uAC8C \uAE54\uC544 \uD280\uC5B4\uB098\uC624\uB294 \uC871\uC871 \uB20C\uB7EC \uC549\uD788\uAC70\uB098 \uD654\uB825\uC744 \uCD18\uCD18\uD788 \uBC30\uCE58\uD574\uC57C \uD55C\uB2E4" }
   };
   var SPECIAL_KEYS = Object.keys(SPECIAL_WAVES);
   function specialWaveKind(w2) {
@@ -15028,7 +15721,7 @@ button.corner.mute.off { opacity: 0.5; }
     const occurrence = Math.floor(w2 / 3) - Math.floor(w2 / 15);
     return SPECIAL_KEYS[(occurrence - 1) % SPECIAL_KEYS.length];
   }
-  var BOSS_CYCLE = ["boss", "frostlord", "warden", "looter", "colossus", "wraith", "galelord", "curselord", "grovelord", "magnetlord", "shadowlord"];
+  var BOSS_CYCLE = ["boss", "frostlord", "warden", "looter", "colossus", "wraith", "galelord", "curselord", "grovelord", "magnetlord", "shadowlord", "weblord", "splitlord"];
   function _specialComposition(w2, kind) {
     const total = _standardTotal(w2);
     if (kind === "rush") {
@@ -15193,8 +15886,8 @@ button.corner.mute.off { opacity: 0.5; }
   }
   function enemyStats(type, wave) {
     const base = CFG.enemies[type];
-    const hpMul = Math.pow(CFG.wave.hpScale, wave - 1) * (CFG.wave.difficultyHpMult || 1);
-    const dmgMul = Math.pow(CFG.wave.dmgScale, wave - 1) * (CFG.wave.difficultyDmgMult || 1);
+    const hpMul = Math.pow(CFG.wave.hpScale, wave - 1) * (CFG.wave.difficultyHpMult || 1) * (CFG.wave.riskHpMult || 1);
+    const dmgMul = Math.pow(CFG.wave.dmgScale, wave - 1) * (CFG.wave.difficultyDmgMult || 1) * (CFG.wave.riskDmgMult || 1);
     return {
       ...base,
       type,
@@ -15323,7 +16016,15 @@ button.corner.mute.off { opacity: 0.5; }
     outpostFlag: new sd({ color: 15229002, roughness: 0.7, side: p, emissive: 3804678, emissiveIntensity: 0.25 }),
     outpostBase: new sd({ color: 8028296, roughness: 0.95 }),
     outpostZone: new es({ color: 15229002, transparent: true, opacity: 0.42, side: p }),
-    buffRing: new es({ color: 14061311, transparent: true, opacity: 0.5, side: p })
+    buffRing: new es({ color: 14061311, transparent: true, opacity: 0.5, side: p }),
+    decoyPost: new sd({ color: 9136964, roughness: 0.9 }),
+    decoyStraw: new sd({ color: 14267484, roughness: 1 }),
+    decoyCloth: new sd({ color: 11552314, roughness: 0.8 }),
+    decoyZone: new es({ color: 16763989, transparent: true, opacity: 0.16, side: p }),
+    beaconStone: new sd({ color: 6710950, roughness: 0.95 }),
+    beaconBasket: new sd({ color: 2565927, roughness: 0.6, metalness: 0.3 }),
+    beaconFlame: new sd({ color: 16738816, emissive: 16729088, emissiveIntensity: 1.3, roughness: 0.4 }),
+    beaconZone: new es({ color: 16729088, transparent: true, opacity: 0.15, side: p })
   };
   function barLayer(bg, fg) {
     bg.renderOrder = 5;
@@ -15420,6 +16121,12 @@ button.corner.mute.off { opacity: 0.5; }
     get isOutpost() {
       return this.key === "outpost";
     }
+    get isDecoy() {
+      return this.key === "decoy";
+    }
+    get isBeacon() {
+      return this.key === "beacon";
+    }
     // 다가가서 클릭하면 작업창이 열리는 시설이면 그 종류("craft"/"smelt")
     get stationKind() {
       return this.def.station || null;
@@ -15428,7 +16135,7 @@ button.corner.mute.off { opacity: 0.5; }
       return this.key === "trap" || this.key === "mire" || this.key === "blast";
     }
     get isTower() {
-      return this.key !== "wall" && this.key !== "gate" && !this.isTrap && !this.isSupport && !this.isHarvester && !this.isRepairPost && !this.isHealCamp && !this.isArmory && !this.isOutpost && !this.stationKind;
+      return this.key !== "wall" && this.key !== "gate" && !this.isTrap && !this.isSupport && !this.isHarvester && !this.isRepairPost && !this.isHealCamp && !this.isArmory && !this.isOutpost && !this.isDecoy && !this.isBeacon && !this.stationKind;
     }
     get nextCost() {
       const nxt = this.def.levels[this.level];
@@ -15441,7 +16148,7 @@ button.corner.mute.off { opacity: 0.5; }
       fg.position.z = 0.01;
       barLayer(bg, fg);
       g2.add(bg, fg);
-      g2.position.y = this.key === "wall" || this.key === "gate" ? 2.7 : this.key === "workbench" ? 1.6 : this.isTrap ? 0.7 : this.key === "harvester" ? 1.9 : this.key === "outpost" ? 3.2 : 3.4;
+      g2.position.y = this.key === "wall" || this.key === "gate" ? 2.7 : this.key === "workbench" ? 1.6 : this.isTrap ? 0.7 : this.key === "harvester" ? 1.9 : this.key === "outpost" ? 3.2 : this.isDecoy ? 2.5 : this.isBeacon ? 2.6 : 3.4;
       g2.visible = false;
       g2.renderOrder = 5;
       this.mesh.add(g2);
@@ -15521,6 +16228,25 @@ button.corner.mute.off { opacity: 0.5; }
       this.specRing.visible = true;
       this.specRing.material.color.setHex(sp2.ring);
       this.specRing.material.opacity = 0.62;
+    }
+    // 탑승 중 표시 — 나머지 넷(0.06/0.13/0.2/0.27)보다 한 단 위(0.34)에, 탑승한 플레이어 몸에
+    // 입히는 것과 같은 금빛으로 띄운다 — 몸과 타워가 같은 색으로 빛나야 "이 둘이 지금 연결돼
+    // 있다"는 게 멀리서도 바로 읽힌다.
+    showCrew(active) {
+      if (!active) {
+        if (this.crewRing) this.crewRing.visible = false;
+        return;
+      }
+      if (!this.crewRing) {
+        const r = new Xs(GEO2.buffRing, MAT2.buffRing.clone());
+        r.rotation.x = -Math.PI / 2;
+        r.position.y = 0.34;
+        this.mesh.add(r);
+        this.crewRing = r;
+      }
+      this.crewRing.visible = true;
+      this.crewRing.material.color.setHex(16763989);
+      this.crewRing.material.opacity = 0.75;
     }
     // 우선순위 표시 — 나머지 셋(0.06/0.13/0.2)보다 한 단 위(0.27)에 띄운다. 대부분의 타워는
     // 기본값(threat, 저격탑만 strongest)을 그대로 쓰므로 고리가 안 뜨는 게 정상이다 — 실제로
@@ -15691,6 +16417,55 @@ button.corner.mute.off { opacity: 0.5; }
       ring.rotation.x = -Math.PI / 2;
       ring.position.y = 0.04;
       g2.add(ring);
+      return g2;
+    }
+    if (key === "decoy") {
+      const post = new Xs(new su(0.09, 0.11, 2, 6), MAT2.decoyPost);
+      post.position.y = 1;
+      post.castShadow = true;
+      g2.add(post);
+      const arm = new Xs(new su(0.06, 0.06, 1.3, 6), MAT2.decoyPost);
+      arm.rotation.z = Math.PI / 2;
+      arm.position.y = 1.55;
+      arm.castShadow = true;
+      g2.add(arm);
+      const head = new Xs(new Zu(0.28, 8, 8), MAT2.decoyStraw);
+      head.position.y = 2.1;
+      head.castShadow = true;
+      g2.add(head);
+      const cloth = new Xs(new au(0.45, 0.9, 6), MAT2.decoyCloth);
+      cloth.position.y = 1.25;
+      cloth.castShadow = true;
+      g2.add(cloth);
+      const r2 = CFG.builds.decoy.levels[level - 1].tauntRadius;
+      const zone = new Xs(new qu(r2 - 0.15, r2, 48), MAT2.decoyZone);
+      zone.rotation.x = -Math.PI / 2;
+      zone.position.y = 0.04;
+      g2.add(zone);
+      return g2;
+    }
+    if (key === "beacon") {
+      const cairn = new Xs(new su(0.5, 0.6, 0.5, 8), MAT2.beaconStone);
+      cairn.position.y = 0.25;
+      cairn.castShadow = true;
+      cairn.receiveShadow = true;
+      g2.add(cairn);
+      const pole = new Xs(new su(0.08, 0.11, 2.4, 6), MAT2.decoyPost);
+      pole.position.y = 1.6;
+      pole.castShadow = true;
+      g2.add(pole);
+      const basket = new Xs(new su(0.32, 0.24, 0.4, 8, 1, true), MAT2.beaconBasket);
+      basket.position.y = 2.85;
+      basket.castShadow = true;
+      g2.add(basket);
+      const flame = new Xs(new Zu(0.24, 8, 8), MAT2.beaconFlame);
+      flame.position.y = 2.95;
+      g2.add(flame);
+      const r3 = CFG.builds.beacon.levels[level - 1].tauntRadius;
+      const zone2 = new Xs(new qu(r3 - 0.15, r3, 48), MAT2.beaconZone);
+      zone2.rotation.x = -Math.PI / 2;
+      zone2.position.y = 0.04;
+      g2.add(zone2);
       return g2;
     }
     if (key === "camp") {
@@ -16083,7 +16858,7 @@ button.corner.mute.off { opacity: 0.5; }
           if (b.turret) b.turret.rotation.y += dt2 * 0.4;
           continue;
         }
-        const target = this._acquire(b, enemies, st.range * rangeMult);
+        const target = this._acquire(b, enemies, st.range * rangeMult * (b.crewedBy ? CFG.crew.rangeMult : 1));
         if (target && b.turret) {
           const ang = Math.atan2(target.x - b.x, target.z - b.z);
           b.turret.rotation.y = ang;
@@ -16207,7 +16982,7 @@ button.corner.mute.off { opacity: 0.5; }
     // 투사체 발사 연출 → 명중 시 onImpact (데미지 적용은 호스트에서만)
     shoot(b, target, empty = false) {
       const st = b.stats;
-      const mult = this.supportBuffMult(b);
+      const mult = this.supportBuffMult(b) * (b.crewedBy ? CFG.crew.dmgMult : 1);
       let effStats = mult !== 1 ? { ...st, dmg: Math.round(st.dmg * mult) } : st;
       if (b.key === "poison" && st.poisonDps) {
         const pm = this.poisonSynergyMult(b);
@@ -16253,7 +17028,10 @@ button.corner.mute.off { opacity: 0.5; }
         this._buffTimer = 0.25;
         for (const b of this.buildings.values()) {
           if (b.ammoBar) b.refreshAmmoBar();
-          if (b.isTower) b.showBuff(this.supportBuffMult(b));
+          if (b.isTower) {
+            b.showBuff(this.supportBuffMult(b) * (b.crewedBy ? CFG.crew.dmgMult : 1));
+            b.showCrew(!!b.crewedBy);
+          }
           if (b.key === "arrow") {
             const active = this.hasNearbyFrost(b);
             b.showSynergy(active, 5891071);
@@ -16396,6 +17174,7 @@ button.corner.mute.off { opacity: 0.5; }
         if (statMult.dmg) st.dmg = Math.round(st.dmg * statMult.dmg);
         if (statMult.dmg && st.explode) st.explode = { ...st.explode, dmg: Math.round(st.explode.dmg * statMult.dmg), playerDmg: Math.round(st.explode.playerDmg * statMult.dmg) };
         if (statMult.bounty) st.bounty = { wood: Math.round(st.bounty.wood * statMult.bounty), stone: Math.round(st.bounty.stone * statMult.bounty) };
+        if (statMult.noSplit) st.splitBoss = false;
       }
       this.id = id || nextId2++;
       this.type = type;
@@ -16417,6 +17196,8 @@ button.corner.mute.off { opacity: 0.5; }
       this.slowUntil = 0;
       this.slowFactor = 1;
       this.rootUntil = 0;
+      this.markedUntil = 0;
+      this.markMult = 1;
       this.poisonDps = 0;
       this.poisonUntil = 0;
       this.poisonTickCd = 0;
@@ -16629,6 +17410,24 @@ button.corner.mute.off { opacity: 0.5; }
         );
       }
     }
+    // 분열 군주(splitlord) 전용 — spawnSplit과 완전히 같은 원리지만 자식이 다시 분열하면
+    // 안 되므로 noSplit을 같이 넘긴다(Enemy 생성자가 이 플래그를 보고 자식의 splitBoss를 끈다).
+    spawnSplitBoss(parent) {
+      const count = parent.st.splitChildCount;
+      for (let i = 0; i < count; i++) {
+        const a = Math.PI * 2 * i / count + Math.random() * 0.6;
+        const r = parent.st.radius + 0.8;
+        this.spawn(
+          parent.type,
+          parent.wave,
+          parent.x + Math.cos(a) * r,
+          parent.z + Math.sin(a) * r,
+          void 0,
+          null,
+          { hp: parent.st.splitChildHpMult, scale: parent.st.splitChildScaleMult, noSplit: true }
+        );
+      }
+    }
     byId(id) {
       return this.list.find((e) => e.id === id);
     }
@@ -16788,6 +17587,32 @@ button.corner.mute.off { opacity: 0.5; }
           this._applyPosition(e, dt2, now);
           continue;
         }
+        if (e.st.flies && !e.st.boss) {
+          const beacon = this._nearestBeacon(buildMgr, e.x, e.z);
+          if (beacon) {
+            const d2 = dist(e.x, e.z, beacon.x, beacon.z);
+            if (d2 < 1.7 + e.st.radius) {
+              if (e.attackCd <= 0) {
+                e.attackCd = 1 / e.st.rate;
+                this.onBuildingHit?.(e, beacon);
+              }
+              this._face(e, beacon.x, beacon.z, dt2);
+              this._applyPosition(e, dt2, now);
+              continue;
+            }
+            const dx2 = beacon.x - e.x, dz2 = beacon.z - e.z;
+            const len2 = Math.hypot(dx2, dz2) || 1;
+            let mx2 = dx2 / len2 * speed, mz2 = dz2 / len2 * speed;
+            const sep2 = this._separation(e);
+            mx2 += sep2.x * speed * 0.6;
+            mz2 += sep2.z * speed * 0.6;
+            e.x += mx2 * dt2;
+            e.z += mz2 * dt2;
+            this._face(e, e.x + mx2, e.z + mz2, dt2);
+            this._applyPosition(e, dt2, now);
+            continue;
+          }
+        }
         if (e.st.flies || e.st.burrows) {
           const dx2 = -e.x, dz2 = -e.z;
           const len2 = Math.hypot(dx2, dz2) || 1;
@@ -16880,6 +17705,32 @@ button.corner.mute.off { opacity: 0.5; }
             }
           }
         }
+        if (!e.st.boss) {
+          const decoy = this._nearestDecoy(buildMgr, e.x, e.z);
+          if (decoy) {
+            const d2 = dist(e.x, e.z, decoy.x, decoy.z);
+            if (d2 < 1.7 + e.st.radius) {
+              if (e.attackCd <= 0) {
+                e.attackCd = 1 / e.st.rate;
+                this.onBuildingHit?.(e, decoy);
+              }
+              this._face(e, decoy.x, decoy.z, dt2);
+              this._applyPosition(e, dt2, now);
+              continue;
+            }
+            const dx2 = decoy.x - e.x, dz2 = decoy.z - e.z;
+            const len2 = Math.hypot(dx2, dz2) || 1;
+            let mx2 = dx2 / len2 * speed, mz2 = dz2 / len2 * speed;
+            const sep2 = this._separation(e);
+            mx2 += sep2.x * speed * 0.6;
+            mz2 += sep2.z * speed * 0.6;
+            e.x += mx2 * dt2;
+            e.z += mz2 * dt2;
+            this._face(e, e.x + mx2, e.z + mz2, dt2);
+            this._applyPosition(e, dt2, now);
+            continue;
+          }
+        }
         const dx = tx - e.x, dz = tz - e.z;
         const len = Math.hypot(dx, dz) || 1;
         let mx = dx / len * speed, mz = dz / len * speed;
@@ -16913,6 +17764,7 @@ button.corner.mute.off { opacity: 0.5; }
         else if (kind === "curse") this._bossCurse(e);
         else if (kind === "pull") this._bossPull(e);
         else if (kind === "blind") this._bossBlind(e);
+        else if (kind === "web") this._bossWeb(e);
         else this._bossBeginCharge(e);
         return true;
       }
@@ -16942,10 +17794,11 @@ button.corner.mute.off { opacity: 0.5; }
         const curse = !!e.st.curseBoss;
         const pull = !!e.st.pullBoss;
         const blind = !!e.st.blindBoss;
-        const kind2 = silence ? "silence" : drain ? "drain" : fortify ? "fortify" : siphon ? "siphon" : blink ? "blink" : curse ? "curse" : pull ? "pull" : blind ? "blind" : "summon";
+        const web = !!e.st.webBoss;
+        const kind2 = silence ? "silence" : drain ? "drain" : fortify ? "fortify" : siphon ? "siphon" : blink ? "blink" : curse ? "curse" : pull ? "pull" : blind ? "blind" : web ? "web" : "summon";
         e.castKind = kind2;
-        e.castUntil = silence ? P2.silenceCast : drain ? P2.drainCast : fortify ? P2.fortifyCast : siphon ? P2.siphonCast : blink ? P2.blinkCast : curse ? P2.curseCast : pull ? P2.pullCast : blind ? P2.blindCast : P2.summonCast;
-        const color = silence ? 8011711 : drain ? 16766720 : fortify ? 8945076 : siphon ? 9321645 : blink ? 10217727 : curse ? 10181046 : pull ? 12592851 : blind ? 3355443 : 16733525;
+        e.castUntil = silence ? P2.silenceCast : drain ? P2.drainCast : fortify ? P2.fortifyCast : siphon ? P2.siphonCast : blink ? P2.blinkCast : curse ? P2.curseCast : pull ? P2.pullCast : blind ? P2.blindCast : web ? P2.webCast : P2.summonCast;
+        const color = silence ? 8011711 : drain ? 16766720 : fortify ? 8945076 : siphon ? 9321645 : blink ? 10217727 : curse ? 10181046 : pull ? 12592851 : blind ? 3355443 : web ? 11163118 : 16733525;
         this.fx.ring(e.x, e.z, color, 5);
         this.onBossTelegraph?.(e, kind2);
         return true;
@@ -17028,6 +17881,12 @@ button.corner.mute.off { opacity: 0.5; }
       this.fx.ring(e.x, e.z, 3355443, CFG.bossPattern.blindRadius);
       this.onBossBlind?.(e);
     }
+    // 속박 군주 전용 — 위 여섯 콜백과 같은 이유(팀 전체 플레이어 목록 접근 필요)로 실제 대상
+    // 판정과 rootedUntil 설정은 game.js 콜백이 처리한다.
+    _bossWeb(e) {
+      this.fx.ring(e.x, e.z, 11163118, CFG.bossPattern.webRadius);
+      this.onBossWeb?.(e);
+    }
     _bossBeginCharge(e) {
       const P2 = CFG.bossPattern;
       const len = Math.hypot(e.x, e.z) || 1;
@@ -17058,6 +17917,38 @@ button.corner.mute.off { opacity: 0.5; }
         }
       }
       return { x: clamp(sx, -1, 1), z: clamp(sz, -1, 1) };
+    }
+    // 허수아비 유인목(decoy) 전용 — 일반 건물과 달리 "반경 안에 있어야만" 유효한 표적이다
+    // (다른 건물은 거리 무관하게 후보가 되고 경로가 알아서 데려간다).
+    _nearestDecoy(buildMgr, x2, z2) {
+      let best = null, bd2 = Infinity;
+      for (const b of buildMgr.buildings.values()) {
+        if (b.key !== "decoy") continue;
+        const r2 = CFG.builds.decoy.levels[b.level - 1].tauntRadius;
+        const d2 = (b.x - x2) ** 2 + (b.z - z2) ** 2;
+        if (d2 > r2 * r2) continue;
+        if (d2 < bd2) {
+          bd2 = d2;
+          best = b;
+        }
+      }
+      return best;
+    }
+    // 봉화대(beacon) 전용 — 유인목과 완전히 같은 "반경 안에서만 유효한 표적" 판정이지만
+    // 호출부(비행 분기)에서 이미 flies만 걸러 넘기므로 여기서는 반경만 본다.
+    _nearestBeacon(buildMgr, x2, z2) {
+      let best = null, bd2 = Infinity;
+      for (const b of buildMgr.buildings.values()) {
+        if (b.key !== "beacon") continue;
+        const r2 = CFG.builds.beacon.levels[b.level - 1].tauntRadius;
+        const d2 = (b.x - x2) ** 2 + (b.z - z2) ** 2;
+        if (d2 > r2 * r2) continue;
+        if (d2 < bd2) {
+          bd2 = d2;
+          best = b;
+        }
+      }
+      return best;
     }
     // 야생 동물 전용 이동. 셋 다 크리스탈에는 관심이 없다.
     //  - 도망형(토끼·사슴): 사거리 안에 사람이 보이면 반대로 달아나고, 없으면 느긋하게 배회한다.
@@ -17356,197 +18247,6 @@ button.corner.mute.off { opacity: 0.5; }
         e._bob += dt2 * 8;
         if (e.instanced) this._writeInstance(e);
         else e.body.position.y = 0.75 + Math.abs(Math.sin(e._bob)) * 0.12;
-      }
-    }
-  };
-
-  // js/fx.js
-  var SPARK_GEO = new Zu(0.12, 6, 5);
-  var Fx = class {
-    constructor(sm2, layerEl) {
-      this.sm = sm2;
-      this.layer = layerEl;
-      this.sparks = [];
-      this.floats = [];
-      this.rings = [];
-      this.pings = [];
-      this._pool = [];
-    }
-    _spark(color) {
-      let m2 = this._pool.pop();
-      if (!m2) {
-        m2 = new Xs(SPARK_GEO, new es({ color }));
-        this.sm.scene.add(m2);
-      }
-      m2.material.color.setHex(color);
-      m2.visible = true;
-      return m2;
-    }
-    burst(x2, y2, z2, color = 16763989, count = 8, power = 4) {
-      for (let i = 0; i < count; i++) {
-        const m2 = this._spark(color);
-        m2.position.set(x2, y2, z2);
-        m2.scale.setScalar(0.6 + Math.random() * 0.8);
-        this.sparks.push({
-          mesh: m2,
-          life: 0.45 + Math.random() * 0.3,
-          t: 0,
-          vx: (Math.random() - 0.5) * power,
-          vy: Math.random() * power * 0.9 + 1,
-          vz: (Math.random() - 0.5) * power
-        });
-      }
-    }
-    ring(x2, z2, color = 6545663, radius = 3) {
-      const m2 = new Xs(
-        new qu(radius * 0.2, radius * 0.26, 24),
-        new es({ color, transparent: true, opacity: 0.9, side: p })
-      );
-      m2.rotation.x = -Math.PI / 2;
-      m2.position.set(x2, 0.2, z2);
-      this.sm.scene.add(m2);
-      this.rings.push({ mesh: m2, t: 0, life: 0.5, radius });
-    }
-    // 미니맵 핑 — 일반 ring()보다 훨씬 오래(3.5초) 남고, 땅 위 고리뿐 아니라 하늘로 뻗는 기둥도
-    // 같이 세워서 나무·건물에 가려도 멀리서부터 눈에 띈다. 협동 플레이에서 "여기로 와" 신호로 쓴다.
-    pingMarker(x2, z2, color = 16763904, css = "#ffcc55") {
-      const ring = new Xs(
-        new qu(0.15, 0.24, 28),
-        new es({ color, transparent: true, opacity: 0.95, side: p })
-      );
-      ring.rotation.x = -Math.PI / 2;
-      ring.position.set(x2, 0.15, z2);
-      this.sm.scene.add(ring);
-      const beam = new Xs(
-        new su(0.1, 0.1, 6, 8, 1, true),
-        new es({ color, transparent: true, opacity: 0.55, side: p })
-      );
-      beam.position.set(x2, 3, z2);
-      this.sm.scene.add(beam);
-      this.pings.push({ ring, beam, t: 0, life: 3.5, css });
-    }
-    // 3D 좌표 위에 뜨는 데미지/획득 텍스트
-    float(text, x2, y2, z2, cls = "") {
-      const el2 = document.createElement("div");
-      el2.className = `float ${cls}`;
-      el2.textContent = text;
-      this.layer.appendChild(el2);
-      this.floats.push({ el: el2, x: x2, y: y2, z: z2, t: 0, life: 1 });
-    }
-    update(dt2) {
-      for (let i = this.sparks.length - 1; i >= 0; i--) {
-        const s2 = this.sparks[i];
-        s2.t += dt2;
-        if (s2.t >= s2.life) {
-          s2.mesh.visible = false;
-          this._pool.push(s2.mesh);
-          this.sparks.splice(i, 1);
-          continue;
-        }
-        s2.vy -= 14 * dt2;
-        s2.mesh.position.x += s2.vx * dt2;
-        s2.mesh.position.y += s2.vy * dt2;
-        s2.mesh.position.z += s2.vz * dt2;
-        if (s2.mesh.position.y < 0.05) {
-          s2.mesh.position.y = 0.05;
-          s2.vy *= -0.3;
-          s2.vx *= 0.6;
-          s2.vz *= 0.6;
-        }
-        s2.mesh.scale.setScalar(Math.max(0.05, 1 - s2.t / s2.life));
-      }
-      for (let i = this.rings.length - 1; i >= 0; i--) {
-        const r = this.rings[i];
-        r.t += dt2;
-        const k2 = r.t / r.life;
-        if (k2 >= 1) {
-          this.sm.scene.remove(r.mesh);
-          r.mesh.geometry.dispose();
-          r.mesh.material.dispose();
-          this.rings.splice(i, 1);
-          continue;
-        }
-        r.mesh.scale.setScalar(0.4 + k2 * r.radius * 1.2);
-        r.mesh.material.opacity = 0.9 * (1 - k2);
-      }
-      for (let i = this.pings.length - 1; i >= 0; i--) {
-        const p2 = this.pings[i];
-        p2.t += dt2;
-        const k2 = p2.t / p2.life;
-        if (k2 >= 1) {
-          this.sm.scene.remove(p2.ring);
-          this.sm.scene.remove(p2.beam);
-          p2.ring.geometry.dispose();
-          p2.ring.material.dispose();
-          p2.beam.geometry.dispose();
-          p2.beam.material.dispose();
-          this.pings.splice(i, 1);
-          continue;
-        }
-        p2.ring.scale.setScalar(0.4 + k2 * 5);
-        p2.ring.material.opacity = 0.95 * (1 - k2);
-        const pulse = 0.4 + Math.abs(Math.sin(p2.t * 6)) * 0.3;
-        p2.beam.material.opacity = pulse * (1 - k2);
-      }
-      const v2 = new Ui();
-      for (let i = this.floats.length - 1; i >= 0; i--) {
-        const f = this.floats[i];
-        f.t += dt2;
-        if (f.t >= f.life) {
-          f.el.remove();
-          this.floats.splice(i, 1);
-          continue;
-        }
-        v2.set(f.x, f.y + f.t * 1.6, f.z);
-        const p2 = this.sm.worldToScreen(v2);
-        if (!p2.visible) {
-          f.el.style.display = "none";
-          continue;
-        }
-        f.el.style.display = "";
-        f.el.style.transform = `translate(-50%,-50%) translate(${p2.x}px, ${p2.y}px)`;
-        f.el.style.opacity = String(1 - Math.pow(f.t / f.life, 2));
-      }
-    }
-  };
-  var ProjectilePool = class {
-    constructor(sm2) {
-      this.sm = sm2;
-      this.items = [];
-      this.pool = [];
-      this.geo = new Zu(0.22, 8, 6);
-    }
-    fire(from, to2, speed, color, onHit) {
-      let m2 = this.pool.pop();
-      if (!m2) {
-        m2 = new Xs(this.geo, new es({ color }));
-        this.sm.scene.add(m2);
-      }
-      m2.material.color.setHex(color);
-      m2.visible = true;
-      m2.position.copy(from);
-      this.items.push({
-        mesh: m2,
-        from: from.clone(),
-        to: to2.clone(),
-        t: 0,
-        dur: Math.max(0.06, from.distanceTo(to2) / speed),
-        onHit
-      });
-    }
-    update(dt2) {
-      for (let i = this.items.length - 1; i >= 0; i--) {
-        const p2 = this.items[i];
-        p2.t += dt2;
-        const k2 = Math.min(1, p2.t / p2.dur);
-        p2.mesh.position.lerpVectors(p2.from, p2.to, k2);
-        p2.mesh.position.y += Math.sin(k2 * Math.PI) * 1.1;
-        if (k2 >= 1) {
-          p2.onHit?.(p2.mesh.position);
-          p2.mesh.visible = false;
-          this.pool.push(p2.mesh);
-          this.items.splice(i, 1);
-        }
       }
     }
   };
@@ -18165,6 +18865,7 @@ button.corner.mute.off { opacity: 0.5; }
       this.outfitLv = 0;
       this.weaponProficiencyLv = 0;
       this.blindUntil = 0;
+      this.rootedUntil = 0;
       this.harvesting = null;
       this.attackCd = 0;
       this.swing = 0;
@@ -18173,6 +18874,7 @@ button.corner.mute.off { opacity: 0.5; }
       this.reviveAssisted = false;
       this.blocking = false;
       this._blockStartAt = -99;
+      this.crewing = null;
       this.mesh = this._makeMesh();
       this.mesh.position.set(this.x, 0, this.z);
     }
@@ -18213,6 +18915,11 @@ button.corner.mute.off { opacity: 0.5; }
     get harvestMult() {
       return CFG.harvest.upgrade[this.harvestLv - 1].mult;
     }
+    // 🕸️ 속박 군주 전용 — 이동만 막는다(공격·채집은 그대로 가능, 크리스탈 자성 군주의 순간이동
+    // 강제나 타워 탑승과는 다르게 "제자리에서 계속 싸울 수는 있다"는 점이 핵심).
+    get rooted() {
+      return performance.now() / 1e3 < this.rootedUntil;
+    }
     // 곡괭이는 만들어 두는 것만으로는 부족하고, 손에 쥐고 있어야 정수석을 캘 수 있다
     get holdingPickaxe() {
       return this.heldWeapon === "pickaxe";
@@ -18220,7 +18927,7 @@ button.corner.mute.off { opacity: 0.5; }
     // 기본 공격치에 지금 손에 든 무기의 효과만 더한다 (여러 자루를 동시에 들 수는 없다)
     get attackStats() {
       const base = CFG.player.attack;
-      const out = { dmg: base.dmg, range: base.range, arc: base.arc, cd: base.cd, knockback: 0, slow: 0, slowTime: 0, lifesteal: 0 };
+      const out = { dmg: base.dmg, range: base.range, arc: base.arc, cd: base.cd, knockback: 0, slow: 0, slowTime: 0, lifesteal: 0, mark: 0, markTime: 0, markRadius: 0 };
       const eff = CFG.craft[this.heldWeapon]?.effect;
       if (eff) for (const k2 of Object.keys(eff)) out[k2] += eff[k2];
       const bonus = CFG.weaponUpgrade.perLv[this.heldWeapon];
@@ -18331,7 +19038,10 @@ button.corner.mute.off { opacity: 0.5; }
     animate(dt2, moving) {
       this._updateWeapon();
       const t2 = performance.now() / 1e3;
-      if (this.blocking) {
+      if (this.crewing) {
+        this.arm.rotation.x = -0.7 + Math.sin(t2 * 3) * 0.05;
+        this.tool.rotation.x = -0.9;
+      } else if (this.blocking) {
         this.arm.rotation.x = -1.3;
         this.tool.rotation.x = -1.6;
       } else if (this.swing > 0) {
@@ -18350,7 +19060,7 @@ button.corner.mute.off { opacity: 0.5; }
       this.mesh.position.y = bob;
       this.mesh.rotation.y = this.rot;
       this.ring.material.opacity = this.alive ? this.isLocal ? 0.85 : 0.45 : this.reviveAssisted ? 0.45 + Math.abs(Math.sin(t2 * 8)) * 0.35 : 0.15;
-      this.mat.emissive?.setHex(this.blocking ? 3377407 : this.combatUntil > t2 ? 6693410 : 0);
+      this.mat.emissive?.setHex(this.crewing ? 16763989 : this.rooted ? 11163118 : this.blocking ? 3377407 : this.combatUntil > t2 ? 6693410 : 0);
       this.mat.opacity = this.invulnerable ? 0.35 + Math.abs(Math.sin(t2 * 26)) * 0.35 : 1;
     }
   };
@@ -18401,7 +19111,9 @@ button.corner.mute.off { opacity: 0.5; }
         this.hp = Math.min(this.maxHp, this.hp + CFG.player.regen * dt2);
       }
       let moving;
-      if (dashing) {
+      if ((this.crewing || this.rooted) && !dashing) {
+        moving = false;
+      } else if (dashing) {
         const dc2 = CFG.player.dash;
         this.x += this.dashDir.x * dc2.speed * dt2;
         this.z += this.dashDir.z * dc2.speed * dt2;
@@ -18475,18 +19187,18 @@ button.corner.mute.off { opacity: 0.5; }
     }
     // 채집 시도/진행. 완료 시 노드를 돌려준다.
     // 특정 자원을 콕 집어 캐기 시작한다 (클릭/탭으로 고른 것). 성공하면 true.
-    beginHarvest(node, world) {
+    beginHarvest(node, world, relicMult = 1) {
       if (!this.alive || !node || node.depleted) return false;
       if (needsPickaxe(node.type) && !this.holdingPickaxe) return false;
       if (dist(this.x, this.z, node.x, node.z) > CFG.harvest.range) return false;
       const weatherMult = world?.weatherKind === "clear" ? WEATHER.clear.harvestTimeMult : 1;
-      this.harvesting = { node, t: 0, need: CFG.harvest[node.type].time * this.harvestMult * weatherMult };
+      this.harvesting = { node, t: 0, need: CFG.harvest[node.type].time * this.harvestMult * weatherMult * relicMult };
       this.rot = Math.atan2(node.x - this.x, node.z - this.z);
       return true;
     }
     // holding 이 true 면 근처 자원을 자동으로 잡아 캔다 (F 키 유지용).
     // 이미 캐던 것이 있으면 holding 과 무관하게 계속 캔다 — 클릭으로 시작한 채집이 그대로 이어진다.
-    tickHarvest(dt2, world, holding) {
+    tickHarvest(dt2, world, holding, relicMult = 1) {
       if (!this.alive) return null;
       if (!this.harvesting) {
         if (!holding) return null;
@@ -18494,7 +19206,7 @@ button.corner.mute.off { opacity: 0.5; }
         if (!node) return null;
         if (needsPickaxe(node.type) && !this.holdingPickaxe) return null;
         const weatherMult = world?.weatherKind === "clear" ? WEATHER.clear.harvestTimeMult : 1;
-        this.harvesting = { node, t: 0, need: CFG.harvest[node.type].time * this.harvestMult * weatherMult };
+        this.harvesting = { node, t: 0, need: CFG.harvest[node.type].time * this.harvestMult * weatherMult * relicMult };
         this.rot = Math.atan2(node.x - this.x, node.z - this.z);
       }
       const h2 = this.harvesting;
@@ -18550,6 +19262,8 @@ button.corner.mute.off { opacity: 0.5; }
       const wasBlocking = this.blocking;
       this.blocking = !!s2.blocking;
       if (this.blocking && !wasBlocking) this._blockStartAt = performance.now() / 1e3;
+      this.crewing = s2.crewing || null;
+      this.rootedUntil = s2.rootLeft > 0 ? performance.now() / 1e3 + s2.rootLeft : 0;
       this.harvesting = s2.harvesting ? { t: 0, need: 1 } : null;
       if (s2.held) {
         this.tools[s2.held] = true;
@@ -19470,7 +20184,7 @@ button.corner.mute.off { opacity: 0.5; }
       if (this.pet?.type !== type || this.pet?.lv !== lv) {
         const tc2 = CFG.tame[type];
         this.petBodyMat.color.setHex(tc2.color);
-        const base = type === "wolf" ? 1.15 : type === "stagking" ? 1.05 : 0.85;
+        const base = type === "wolf" ? 1.15 : type === "stagking" ? 1.05 : type === "hawk" ? 0.7 : 0.85;
         this.petGroup.scale.setScalar(base * (1 + lv * 0.12));
         this.petRing.material.color.setHex(tc2.color);
       }
@@ -19487,9 +20201,10 @@ button.corner.mute.off { opacity: 0.5; }
         if (this.petRing) this.petRing.visible = false;
         return;
       }
-      const { x: x2, z: z2, rot } = this.pet;
+      const { x: x2, z: z2, rot, type } = this.pet;
       this.petGroup.visible = true;
-      this.petGroup.position.set(x2, 0.36 + Math.abs(Math.sin(now * 5)) * 0.08, z2);
+      const baseY = type === "hawk" ? 2.6 : 0.36;
+      this.petGroup.position.set(x2, baseY + Math.abs(Math.sin(now * 5)) * 0.08, z2);
       if (rot !== void 0) this.petGroup.rotation.y = rot;
       this.petRing.visible = true;
       this.petRing.position.set(x2, 0.05, z2);
@@ -19672,7 +20387,7 @@ button.corner.mute.off { opacity: 0.5; }
   // js/game.js
   var SAVE_KEY = "cd.save";
   var _nativeRandom = Math.random.bind(Math);
-  var BESTIARY_ANNOUNCED_ELSEWHERE = /* @__PURE__ */ new Set(["healer", "bomber", "raccoon", "burrower", "commander", "treasure", "wolf", "stagking", "golem", "boss", "frostlord", "warden", "looter", "colossus", "wraith", "galelord", "curselord", "grovelord", "magnetlord", "shadowlord"]);
+  var BESTIARY_ANNOUNCED_ELSEWHERE = /* @__PURE__ */ new Set(["healer", "bomber", "raccoon", "burrower", "commander", "treasure", "wolf", "stagking", "golem", "boss", "frostlord", "warden", "looter", "colossus", "wraith", "galelord", "curselord", "grovelord", "magnetlord", "shadowlord", "weblord", "splitlord"]);
   var Game = class {
     constructor(canvas2, fxLayer2) {
       this.sm = new SceneManager(canvas2);
@@ -19718,6 +20433,7 @@ button.corner.mute.off { opacity: 0.5; }
         built: 0,
         kills: 0,
         shardEarned: 0,
+        riskWavesCleared: 0,
         spentWood: 0,
         spentStone: 0,
         spentIron: 0,
@@ -19765,6 +20481,7 @@ button.corner.mute.off { opacity: 0.5; }
       this._waveMark = { time: 0, kills: 0 };
       this._bossActive = false;
       this._bossWaveDamaged = false;
+      this._crewSeconds = 0;
       this.sm.resetNight();
       this.sm.resetWeather();
       this.world.weatherKind = null;
@@ -19801,10 +20518,11 @@ button.corner.mute.off { opacity: 0.5; }
       this._seenArmory = false;
       this._seenGaleBlink = false;
       this._seenDagger = false;
+      this._seenGrace = false;
       this._seenCrit = false;
       this._seenParry = false;
       this._lastStandReady = false;
-      this.boonMult = { atk: 1, towerDmg: 1, skillCostDelta: 0, bounty: 1, crystalUpgradeCostDelta: 0, weaponUpgradeCostDelta: 0, weaponSpecCostDelta: 0, prepDelta: 0, venomChance: 0, desperationBonus: 0, moveSpeedMult: 1, atkSpeedMult: 1, ammoSaveChance: 0, critChanceDelta: 0, downTimeMult: 1, rangeMult: 1, petDmgMult: 1, shardBonus: 0 };
+      this.boonMult = { atk: 1, towerDmg: 1, skillCostDelta: 0, bounty: 1, crystalUpgradeCostDelta: 0, weaponUpgradeCostDelta: 0, weaponSpecCostDelta: 0, prepDelta: 0, venomChance: 0, desperationBonus: 0, moveSpeedMult: 1, atkSpeedMult: 1, ammoSaveChance: 0, critChanceDelta: 0, downTimeMult: 1, rangeMult: 1, petDmgMult: 1, shardBonus: 0, harvestTimeMult: 1 };
       this.pendingBoon = null;
       this._queuedEndlessBoon = false;
       this._dropTimer = CFG.supplyDrop.firstDelay;
@@ -19826,6 +20544,8 @@ button.corner.mute.off { opacity: 0.5; }
       this._icePitTimers = this.world.icePits.map((_, i) => ({ phase: "dormant", timeLeft: CFG.icePit.dormant * (0.3 + i * 0.3), tickTimer: 0 }));
       this._seenIcePit = false;
       this.pickedBoons = {};
+      this._riskArmed = false;
+      this._riskWasActive = false;
       this.world.clearMeteor();
       this.world.clearCrater();
       this.world.clearSpirit();
@@ -19838,7 +20558,7 @@ button.corner.mute.off { opacity: 0.5; }
       this._scoutLifeLeft = 0;
       this._nestTimer = CFG.nestEvent.firstDelay;
       this._merchant = null;
-      this.tempBoon = { atk: 1, towerDmg: 1, speed: 1, atkWavesLeft: 0, towerWavesLeft: 0, speedWavesLeft: 0 };
+      this.tempBoon = { atk: 1, towerDmg: 1, speed: 1, harvest: 1, atkWavesLeft: 0, towerWavesLeft: 0, speedWavesLeft: 0, harvestWavesLeft: 0 };
       this._pingCd = 0;
       this.buildMode = null;
       this.paused = false;
@@ -19869,7 +20589,10 @@ button.corner.mute.off { opacity: 0.5; }
       if (perks.weaponProficiencyLv > p2.weaponProficiencyLv) p2.weaponProficiencyLv = perks.weaponProficiencyLv;
       if (p2.weaponProficiencyLv > 0) {
         for (const k2 of perks.tools || []) {
-          if (CFG.weaponUpgrade.perLv[k2] && (p2.weaponLv[k2] || 0) < p2.weaponProficiencyLv) p2.weaponLv[k2] = p2.weaponProficiencyLv;
+          if (CFG.weaponUpgrade.perLv[k2] && (p2.weaponLv[k2] || 0) < p2.weaponProficiencyLv) {
+            p2.weaponLv[k2] = p2.weaponProficiencyLv;
+            if (p2.weaponLv[k2] >= CFG.weaponUpgrade.maxLv) this._unlockAchievement("weaponMaster", playerId);
+          }
         }
       }
       if (perks.hpBonus > 0) {
@@ -20059,7 +20782,7 @@ button.corner.mute.off { opacity: 0.5; }
       this.buildMgr.onDetectBurrow = (e) => {
         if (this._seenDetect) return;
         this._seenDetect = true;
-        this.ui?.toast("\u{1F531} \uD0D0\uC9C0 \uBC94\uC704\uAC00 \uD30C\uBB3B\uD78C \uAD74\uCC29\uBCD1\uC744 \uCC3E\uC544\uB0C8\uB2E4! \uBC18\uACBD \uC548 \uD0C0\uC6CC\uAC00 \uC870\uC900\uD560 \uC218 \uC788\uB2E4 (\uBCF4\uB8E8 Lv.2 \uC774\uC0C1, \uB610\uB294 \uAC10\uC2DC\uD0D1)", "good");
+        this.ui?.toast("\u{1F531} \uD0D0\uC9C0 \uBC94\uC704\uAC00 \uD30C\uBB3B\uD78C \uAD74\uCC29\uBCD1\uC744 \uCC3E\uC544\uB0C8\uB2E4! \uBC18\uACBD \uC548 \uD0C0\uC6CC\uAC00 \uC870\uC900\uD560 \uC218 \uC788\uB2E4 (\uBCF4\uB8E8 Lv.2 \uC774\uC0C1)", "good");
       };
       this.buildMgr.onAmmoEmpty = (b) => {
         const a2 = CFG.ammo.types[b.ammoType];
@@ -20210,6 +20933,29 @@ button.corner.mute.off { opacity: 0.5; }
           this.ui?.toast("\u{1F311} \uCE60\uD751 \uAD70\uC8FC\uB294 \uD53C\uD574\uB3C4 \uC774\uB3D9 \uAC15\uC81C\uB3C4 \uC5C6\uB2E4 \u2014 \uB300\uC2E0 \uC5B4\uB514\uC11C \uC801\uC774 \uC624\uB294\uC9C0 \uC7A0\uAE50 \uBCF4\uC774\uC9C0 \uC54A\uAC8C \uB41C\uB2E4", "warn");
         }
       };
+      this.enemyMgr.onBossWeb = (e) => {
+        if (!this.isHost) return;
+        const c2 = CFG.bossPattern;
+        const until = performance.now() / 1e3 + c2.webDuration;
+        let webbed = 0;
+        for (const p2 of this.players.values()) {
+          if (!p2.alive || p2.invulnerable) continue;
+          if (dist(p2.x, p2.z, e.x, e.z) > c2.webRadius) continue;
+          if (p2.id === this.local.id) this.local.rootedUntil = until;
+          else this.net.send("root", { to: p2.id, dur: c2.webDuration });
+          webbed++;
+        }
+        this.fx.burst(e.x, 1.8, e.z, 11163118, 20, 7);
+        if (webbed) {
+          this.ui?.toast(`\u{1F578}\uFE0F \uC18D\uBC15 \uAD70\uC8FC\uC758 \uAC70\uBBF8\uC904\uC5D0 ${webbed}\uBA85\uC774 \uAC78\uB838\uB2E4! ${c2.webDuration}\uCD08\uAC04 \uC6C0\uC9C1\uC77C \uC218 \uC5C6\uB2E4(\uACF5\uACA9\xB7\uCC44\uC9D1\uC740 \uADF8\uB300\uB85C)`, "bad");
+        } else {
+          this.ui?.toast("\u{1F578}\uFE0F \uC18D\uBC15 \uAD70\uC8FC\uAC00 \uAC70\uBBF8\uC904\uC744 \uBFCC\uB838\uC9C0\uB9CC \uC544\uBB34\uB3C4 \uBC18\uACBD \uC548\uC5D0 \uC5C6\uC5C8\uB2E4", "good");
+        }
+        if (!this._seenWeb) {
+          this._seenWeb = true;
+          this.ui?.toast("\u{1F578}\uFE0F \uC18D\uBC15 \uAD70\uC8FC\uC758 \uAC70\uBBF8\uC904\uC740 \uBBF8\uB9AC \uBC18\uACBD \uBC16\uC73C\uB85C \uBC8C\uC5B4\uC838 \uC788\uAC70\uB098, \uBC1C\uB3D9 \uC9C1\uC804\uC5D0 \uD68C\uD53C \uB3CC\uC9C4(V)\uC73C\uB85C \uBB34\uC801 \uC0C1\uD0DC\uBA74 \uD53C\uD560 \uC218 \uC788\uB2E4 \u2014 \uAC78\uB824\uB3C4 \uC81C\uC790\uB9AC\uC5D0\uC11C \uACC4\uC18D \uC2F8\uC6B8 \uC218\uB294 \uC788\uB2E4", "warn");
+        }
+      };
       this.enemyMgr.onBossCharge = (e) => {
         const reach = e.st.radius + 1.4;
         let hit = null;
@@ -20357,8 +21103,26 @@ button.corner.mute.off { opacity: 0.5; }
         this.fx.burst(b.x, 1.4, b.z, 12303291, 5, 3);
         this.sfx.buildingHit();
         this._variantLeech(e, dmg);
+        if (b.key === "decoy" && !this._seenDecoyLure) {
+          this._seenDecoyLure = true;
+          this.ui?.toast("\u{1F4EF} \uBBF8\uB07C\uAC00 \uD1B5\uD588\uB2E4! \uBAAC\uC2A4\uD130\uAC00 \uD06C\uB9AC\uC2A4\uD0C8 \uB300\uC2E0 \uC720\uC778\uBAA9\uC744 \uBB3C\uACE0 \uC788\uB2E4", "good");
+        }
+        if (b.key === "beacon" && !this._seenBeaconLure) {
+          this._seenBeaconLure = true;
+          this.ui?.toast("\u{1F3EE} \uBD09\uD654\uB300\uAC00 \uD1B5\uD588\uB2E4! \uBE44\uD589 \uBAAC\uC2A4\uD130\uAC00 \uD06C\uB9AC\uC2A4\uD0C8 \uB300\uC2E0 \uBD09\uD654\uB300\uB97C \uB178\uB9AC\uACE0 \uC788\uB2E4", "good");
+        }
         if (destroyed) {
           this.fx.burst(b.x, 1.2, b.z, 8947848, 16, 6);
+          if (b.key === "outpost") {
+            this.ui?.toast("\u{1F6A9} \uC804\uCD08\uAE30\uC9C0\uAC00 \uD30C\uAD34\uB410\uB2E4! \uADF8 \uC8FC\uC704 \uAC74\uC124 \uAD6C\uC5ED\uC774 \uC0AC\uB77C\uC9D1\uB2C8\uB2E4 (\uC774\uBBF8 \uC9C0\uC740 \uAC74\uBB3C\uC740 \uB0A8\uC2B5\uB2C8\uB2E4)", "bad");
+            if (this.net.online) this.net.send("outpostLost", {});
+          } else if (b.key === "decoy") {
+            this.ui?.toast("\u{1F4EF} \uD5C8\uC218\uC544\uBE44 \uC720\uC778\uBAA9\uC774 \uD30C\uAD34\uB410\uB2E4! \uBB36\uC5EC \uC788\uB358 \uBAAC\uC2A4\uD130\uAC00 \uB2E4\uC2DC \uD06C\uB9AC\uC2A4\uD0C8\uB85C \uD5A5\uD55C\uB2E4", "bad");
+            if (this.net.online) this.net.send("decoyLost", {});
+          } else if (b.key === "beacon") {
+            this.ui?.toast("\u{1F3EE} \uBD09\uD654\uB300\uAC00 \uD30C\uAD34\uB410\uB2E4! \uC774\uB04C\uB9AC\uB358 \uBE44\uD589 \uBAAC\uC2A4\uD130\uAC00 \uB2E4\uC2DC \uD06C\uB9AC\uC2A4\uD0C8\uB85C \uD5A5\uD55C\uB2E4", "bad");
+            if (this.net.online) this.net.send("beaconLost", {});
+          }
           this.buildMgr.remove(b.id);
         }
       };
@@ -20411,6 +21175,12 @@ button.corner.mute.off { opacity: 0.5; }
       };
       this.wave.onWaveStart = (w2, total) => {
         this._clearWildlife();
+        const rc = CFG.risk;
+        this._riskWasActive = this._riskArmed;
+        CFG.wave.riskHpMult = this._riskArmed ? rc.hpMult : 1;
+        CFG.wave.riskDmgMult = this._riskArmed ? rc.dmgMult : 1;
+        if (this._riskArmed) this.ui?.toast(`\u26A0\uFE0F \uC704\uD5D8 \uACC4\uC57D \uBC1C\uB3D9! \uC774\uBC88 \uC6E8\uC774\uBE0C \uBAAC\uC2A4\uD130\uAC00 \uB354 \uAC15\uD558\uB2E4 \u2014 \uB300\uC2E0 \uBCF4\uC0C1\uB3C4 \uCEE4\uC9C4\uB2E4`, "warn");
+        this._riskArmed = false;
         this.ui?.toast(this._waveStartLabel(w2, total), "warn");
         const wKind = weatherOf(w2);
         if (wKind && !this.stats.weathersSeen.includes(wKind)) {
@@ -20431,6 +21201,15 @@ button.corner.mute.off { opacity: 0.5; }
         }
       };
       this.wave.onWaveClear = (w2, reward, won) => {
+        if (this._riskWasActive) {
+          const rc = CFG.risk;
+          reward.wood = Math.round(reward.wood * rc.rewardMult);
+          reward.stone = Math.round(reward.stone * rc.rewardMult);
+          if (reward.shard) reward.shard = Math.round(reward.shard * rc.rewardMult);
+          this._riskWasActive = false;
+          this._unlockAchievement("gambler");
+          this.stats.riskWavesCleared = (this.stats.riskWavesCleared || 0) + 1;
+        }
         if (this.boonMult.shardBonus && reward.shard) reward.shard += this.boonMult.shardBonus;
         if (this.isHost) this._grantReward(reward);
         this.ui?.toast(won ? "\uB9C8\uC9C0\uB9C9 \uC6E8\uC774\uBE0C \uACA9\uD1F4!" : `\uC6E8\uC774\uBE0C ${w2} \uD074\uB9AC\uC5B4! \uBCF4\uC0C1 \u{1FAB5}${reward.wood} \u{1FAA8}${reward.stone}${reward.shard ? ` \u{1F4A0}${reward.shard}` : ""}`, "good");
@@ -20531,23 +21310,33 @@ button.corner.mute.off { opacity: 0.5; }
       if (t2.atkWavesLeft > 0 && --t2.atkWavesLeft <= 0) t2.atk = 1;
       if (t2.towerWavesLeft > 0 && --t2.towerWavesLeft <= 0) t2.towerDmg = 1;
       if (t2.speedWavesLeft > 0 && --t2.speedWavesLeft <= 0) t2.speed = 1;
+      if (t2.harvestWavesLeft > 0 && --t2.harvestWavesLeft <= 0) t2.harvest = 1;
       this._decayFeast();
     }
     // 떠돌이 상인: 웨이브 클리어 직후(호스트에서만) 확률적으로 등장해, 이번 준비 시간에만
     // 무작위 품목 2개를 판다. 다음 웨이브가 시작되면(_updateMerchant) 자동으로 사라진다.
+    // 🌙 다음 웨이브가 밤 웨이브면(7웨이브마다) 확률과 무관하게 반드시 등장하고, night:true로
+    // 표시된 밤 전용 품목(moonBundle)이 한 자리를 차지한다 — 평소 무작위 풀에서는 그 품목을
+    // 빼서 밤이 아닐 때 우연히 뜨는 일이 없게 한다.
     _maybeSpawnMerchant(clearedWave) {
       const c2 = CFG.merchant;
-      if (clearedWave < c2.minWave || Math.random() >= c2.chance) {
+      const isNight = (clearedWave + 1) % CFG.wave.nightEvery === 0;
+      if (!isNight && (clearedWave < c2.minWave || Math.random() >= c2.chance)) {
         this._merchant = null;
         return;
       }
-      const keys = Object.keys(c2.pool);
-      const offers = [];
-      for (let i = 0; i < c2.offerCount && keys.length; i++) {
+      const nightKey = Object.keys(c2.pool).find((k2) => c2.pool[k2].night);
+      const keys = Object.keys(c2.pool).filter((k2) => !c2.pool[k2].night);
+      const offers = isNight && nightKey ? [nightKey] : [];
+      for (let i = offers.length; i < c2.offerCount && keys.length; i++) {
         offers.push(keys.splice(Math.floor(Math.random() * keys.length), 1)[0]);
       }
       this._merchant = { offers, boughtBy: {} };
-      this.ui?.toast("\u{1F9F3} \uB5A0\uB3CC\uC774 \uC0C1\uC778\uC774 \uC654\uB2E4! \uC774\uBC88 \uC900\uBE44 \uC2DC\uAC04\uC5D0\uB9CC \uBB3C\uAC74\uC744 \uD310\uB2E4", "good");
+      if (isNight) {
+        this.ui?.toast("\u{1F319}\u{1F9F3} \uB2EC\uBE5B \uC0C1\uC778\uC774 \uC654\uB2E4! \uBC24\uC5D0\uB9CC \uD30C\uB294 \uD2B9\uBCC4\uD55C \uBB3C\uAC74\uC774 \uC788\uB2E4", "good");
+      } else {
+        this.ui?.toast("\u{1F9F3} \uB5A0\uB3CC\uC774 \uC0C1\uC778\uC774 \uC654\uB2E4! \uC774\uBC88 \uC900\uBE44 \uC2DC\uAC04\uC5D0\uB9CC \uBB3C\uAC74\uC744 \uD310\uB2E4", "good");
+      }
     }
     requestBuyMerchant(key) {
       if (this.isHost) this.hostBuyMerchant(this.local.id, key);
@@ -20583,6 +21372,9 @@ button.corner.mute.off { opacity: 0.5; }
       } else if (o.kind === "tempSpeed") {
         this.tempBoon.speed = Math.max(this.tempBoon.speed, o.value);
         this.tempBoon.speedWavesLeft = 1;
+      } else if (o.kind === "tempHarvest") {
+        this.tempBoon.harvest = Math.min(this.tempBoon.harvest, o.value);
+        this.tempBoon.harvestWavesLeft = 1;
       } else if (o.kind === "shard" || o.kind === "iron") {
         const pool = this._poolOf(playerId);
         pool[o.kind] = (pool[o.kind] || 0) + o.value;
@@ -20618,6 +21410,7 @@ button.corner.mute.off { opacity: 0.5; }
       this.tempBoon.atkWavesLeft = 1;
       this.tempBoon.towerDmg = Math.max(this.tempBoon.towerDmg, 1.5);
       this.tempBoon.towerWavesLeft = 1;
+      this._unlockAchievement("jackpot", playerId);
       return "\u{1F381} \uB300\uBC15!! \uB2E4\uC74C \uC6E8\uC774\uBE0C \uB3D9\uC548 \uADFC\uC811\xB7\uD0C0\uC6CC \uACF5\uACA9\uB825\uC774 \uBAA8\uB450 +50%!";
     }
     // playerId 를 넘기면 그 사람의 개인 행동에 대한 업적이라는 뜻 — 호스트가 참가자 대신 처리하는
@@ -21068,6 +21861,10 @@ button.corner.mute.off { opacity: 0.5; }
         this._seenStagking = true;
         this.ui?.toast("\u{1F451} \uC804\uC124\uC758 \uC0AC\uC2B4\uC655 \uB4F1\uC7A5! \uC0AC\uB0E5\uAC10 \uC911 \uAC00\uC7A5 \uD76C\uADC0\uD558\uB2E4 \u2014 \uC5EC\uC6B0\uCC98\uB7FC \uBE60\uB974\uAC8C \uB3C4\uB9DD\uCE58\uB2E4\uAC00\uB3C4 \uB9DE\uD788\uBA74 \uACF0\uBCF4\uB2E4 \uC138\uAC8C \uBC18\uACA9\uD55C\uB2E4. \uC7A1\uC73C\uBA74 \uD2B9\uBCC4\uD55C \uC694\uB9AC \uC7AC\uB8CC\uAC00 \uB41C\uB2E4", "warn");
       }
+      if (e && type === "hawk" && !this._seenHawk) {
+        this._seenHawk = true;
+        this.ui?.toast("\u{1F985} \uB9E4 \uB4F1\uC7A5! \uC0AC\uB0E5\uAC10 \uC911 \uC720\uC77C\uD558\uAC8C \uD558\uB298\uC744 \uB0A0\uBA70 \uAC00\uC7A5 \uBA40\uB9AC\uC11C\uBD80\uD130 \uB3C4\uB9DD\uCE5C\uB2E4 \u2014 \uAE38\uB4E4\uC774\uBA74 \uC720\uC77C\uD55C \uC6D0\uAC70\uB9AC \uB3D9\uB8CC\uAC00 \uB418\uC5B4 \uC548\uC804\uAC70\uB9AC\uB97C \uB450\uACE0 \uC801\uC744 \uC3DC\uB2E4", "warn");
+      }
     }
     // 돌 파수꾼 — hunt.weights 풀과 별개로 훨씬 드물게, 한 번에 하나만 등장한다(_updateHunt와
     // 달리 maxAlive 대신 살아있는 개체 유무 자체를 검사). PREP에서만, wild:true라 웨이브가
@@ -21132,7 +21929,7 @@ button.corner.mute.off { opacity: 0.5; }
       this._notify(playerId, `${r.icon} ${r.name}\uC744(\uB97C) \uBA39\uC5C8\uB2E4! ${r.desc}`, "good");
       if (!this.stats.dishesCooked.includes(key)) {
         this.stats.dishesCooked.push(key);
-        if (this.stats.dishesCooked.length >= Object.keys(CFG.cook).length) this._unlockAchievement("gourmet", playerId);
+        if (this.stats.dishesCooked.length >= Object.keys(CFG.cook).length) this._unlockAchievement("gourmet");
       }
       if (playerId === this.local.id) this.sfx.upgrade();
     }
@@ -21175,6 +21972,9 @@ button.corner.mute.off { opacity: 0.5; }
     }
     get feastCritDelta() {
       return this.feast.kind === "crit" ? CFG.cook.stagking.value : 0;
+    }
+    get feastRangeMult() {
+      return this.feast.kind === "range" ? CFG.cook.hawk.value : 1;
     }
     _updateTreasure(dt2) {
       const c2 = CFG.treasureEvent;
@@ -21295,6 +22095,9 @@ button.corner.mute.off { opacity: 0.5; }
     // 협공 콤보: 서로 다른 플레이어가 같은 적을 짧은 시간 안에 연달아 때리면 두 번째 타격에 보너스가
     // 붙는다. 각자 흩어져서 몬스터를 나눠 잡는 대신 "같이 한 놈부터 잡는" 선택을 보상한다.
     _hurtEnemy(e, dmg, kind = "tower", fromX, fromZ, playerId) {
+      if (e.markedUntil > performance.now() / 1e3) {
+        dmg = Math.round(dmg * e.markMult);
+      }
       if (e.variant === "armored" && (kind === "tower" || kind === "frost")) {
         dmg = Math.max(1, Math.round(dmg * CFG.variants.armored.towerDmgMult));
       }
@@ -21351,8 +22154,15 @@ button.corner.mute.off { opacity: 0.5; }
       if (kind === "player" && playerId && this.world.crystal.graceLv > 0) {
         const p2 = this.players.get(playerId);
         if (p2 && dist(p2.x, p2.z, 0, 0) <= CFG.crystalUpgrade.grace.radius) {
-          const heal = applied * CFG.crystalUpgrade.grace.lifestealPctPerLv * this.world.crystal.graceLv;
-          if (heal > 0) this._healPlayer(playerId, heal);
+          const heal = Math.round(applied * CFG.crystalUpgrade.grace.lifestealPctPerLv * this.world.crystal.graceLv);
+          if (heal > 0) {
+            this._healPlayer(playerId, heal);
+            this.fx.float(`+${heal}`, p2.x, 2, p2.z, "good");
+            if (!this._seenGrace) {
+              this._seenGrace = true;
+              this._notify(playerId, "\u{1F64F} \uAC00\uD638! \uD06C\uB9AC\uC2A4\uD0C8 \uAC00\uAE4C\uC774\uC11C \uC9C1\uC811 \uB9DE\uD788\uBA74 \uD53C\uD574\uC758 \uC77C\uBD80\uAC00 \uCCB4\uB825\uC73C\uB85C \uB3CC\uC544\uC628\uB2E4", "good");
+            }
+          }
         }
       }
       if (died) {
@@ -21397,12 +22207,23 @@ button.corner.mute.off { opacity: 0.5; }
           if (["boss", "frostlord", "warden", "looter", "colossus", "wraith", "galelord", "curselord", "grovelord", "magnetlord", "shadowlord"].every((t2) => this.stats.bossKillsSeen.includes(t2))) {
             this._unlockAchievement("allElevenBosses");
           }
+          if (["boss", "frostlord", "warden", "looter", "colossus", "wraith", "galelord", "curselord", "grovelord", "magnetlord", "shadowlord", "weblord"].every((t2) => this.stats.bossKillsSeen.includes(t2))) {
+            this._unlockAchievement("allTwelveBosses");
+          }
+          if (["boss", "frostlord", "warden", "looter", "colossus", "wraith", "galelord", "curselord", "grovelord", "magnetlord", "shadowlord", "weblord", "splitlord"].every((t2) => this.stats.bossKillsSeen.includes(t2))) {
+            this._unlockAchievement("allThirteenBosses");
+          }
         } else {
           this.sfx.enemyDeath();
         }
         if (e.variant === "split") {
           this.enemyMgr.spawnSplit(e);
           this.fx.ring(e.x, e.z, 16755277, 2.4);
+        }
+        if (e.st.splitBoss) {
+          this.enemyMgr.spawnSplitBoss(e);
+          this.fx.ring(e.x, e.z, 16755277, 3.5);
+          this.ui?.toast("\u{1F46F} \uBD84\uC5F4 \uAD70\uC8FC\uAC00 \uC4F0\uB7EC\uC9C4 \uC790\uB9AC\uC5D0\uC11C \uB354 \uC57D\uD55C \uB450 \uB9C8\uB9AC\uB85C \uAC08\uB77C\uC84C\uB2E4! \uC9C4\uC9DC \uB05D\uC740 \uC544\uC9C1\uC774\uB2E4", "bad");
         }
         if (e.st.explode) this._bomberExplode(e);
         if (e.elite) {
@@ -21549,7 +22370,7 @@ button.corner.mute.off { opacity: 0.5; }
     }
     _win() {
       if (this.result) return;
-      Math.random = _nativeRandom;
+      if (!this.daily) Math.random = _nativeRandom;
       this.wave.phase = PHASE.WON;
       this.result = "win";
       this.sfx.win();
@@ -21636,6 +22457,7 @@ button.corner.mute.off { opacity: 0.5; }
       this.stats.built++;
       if (key === "wall" || key === "gate") this.stats.everBuiltWall = true;
       if (b.isTower || b.isSupport) this.stats.everBuiltTower = true;
+      if (key === "decoy") this.stats.everBuiltDecoy = true;
       if (key === "sniper" && !this._seenSniper) {
         this._seenSniper = true;
         this._notify(playerId, "\u{1F3AF} \uC800\uACA9\uD0D1 \uAC74\uC124! \uC0AC\uAC70\uB9AC \uC548\uC5D0\uC11C \uB0A8\uC740 \uCCB4\uB825\uC774 \uAC00\uC7A5 \uB9CE\uC740 \uC801\uC744 \uC800\uACA9\uD569\uB2C8\uB2E4 \u2014 \uB2E4\uB978 \uD0C0\uC6CC\uBCF4\uB2E4 \uC0AC\uAC70\uB9AC\uAC00 \uD6E8\uC52C \uAE41\uB2C8\uB2E4", "good");
@@ -21643,6 +22465,14 @@ button.corner.mute.off { opacity: 0.5; }
       if (key === "outpost" && !this._seenOutpost) {
         this._seenOutpost = true;
         this._notify(playerId, "\u{1F6A9} \uC804\uCD08\uAE30\uC9C0 \uAC74\uC124! \uAE43\uBC1C \uC8FC\uC704\uAC00 \uC0C8 \uAC74\uC124 \uAD6C\uC5ED\uC774 \uB410\uC2B5\uB2C8\uB2E4 \u2014 \uC774\uC81C \uC800\uAE30\uC5D0\uB3C4 \uD0C0\uC6CC\xB7\uBCBD\uC744 \uC9C0\uC744 \uC218 \uC788\uC2B5\uB2C8\uB2E4. \uAE43\uBC1C\uC774 \uBD80\uC11C\uC9C0\uBA74 \uADF8 \uAD6C\uC5ED\uC740 \uC0AC\uB77C\uC9D1\uB2C8\uB2E4", "good");
+      }
+      if (key === "decoy" && !this._seenDecoy) {
+        this._seenDecoy = true;
+        this._notify(playerId, "\u{1F4EF} \uD5C8\uC218\uC544\uBE44 \uC720\uC778\uBAA9 \uAC74\uC124! \uBC18\uACBD \uC548 \uC77C\uBC18 \uBAAC\uC2A4\uD130\uAC00 \uD06C\uB9AC\uC2A4\uD0C8 \uB300\uC2E0 \uC774\uAC83\uBD80\uD130 \uB178\uB9AC\uAC8C \uB429\uB2C8\uB2E4 \u2014 \uC6D0\uD558\uB294 \uACF3\uC73C\uB85C \uBB34\uB9AC\uB97C \uB04C\uC5B4\uC624\uB294 \uBBF8\uB07C\uC785\uB2C8\uB2E4(\uBCF4\uC2A4\xB7\uD2B9\uC218 \uD589\uB3D9 \uBAAC\uC2A4\uD130\uC5D0\uAC8C\uB294 \uC548 \uD1B5\uD569\uB2C8\uB2E4)", "good");
+      }
+      if (key === "beacon" && !this._seenBeacon) {
+        this._seenBeacon = true;
+        this._notify(playerId, "\u{1F3EE} \uBD09\uD654\uB300 \uAC74\uC124! \uBC18\uACBD \uC548 \uBE44\uD589 \uBAAC\uC2A4\uD130(\uBC15\uC950 \uB4F1)\uAC00 \uD06C\uB9AC\uC2A4\uD0C8 \uB300\uC2E0 \uC774\uAC83\uBD80\uD130 \uB178\uB9AC\uAC8C \uB429\uB2C8\uB2E4 \u2014 \uB545 \uC704 \uBAAC\uC2A4\uD130\uC5D0\uAC8C\uB294 \uC548 \uD1B5\uD558\uB294, \uC720\uC778\uBAA9\uC758 \uD558\uB298 \uBC84\uC804\uC785\uB2C8\uB2E4(\uBCF4\uC2A4\uB294 \uBA74\uC5ED)", "good");
       }
     }
     // COST_KEYS(utils.js)를 그대로 따라간다 — 새 재료가 추가돼도 여기 손댈 필요 없이
@@ -21981,6 +22811,64 @@ button.corner.mute.off { opacity: 0.5; }
         this.ui?.toast("\u{1F4A8} \uD68C\uD53C \uB3CC\uC9C4! \uC7A0\uAE50 \uBB34\uC801\uC73C\uB85C \uD280\uC5B4\uB098\uAC04\uB2E4 \u2014 \uBCF4\uC2A4 \uB3CC\uC9C4\uC774\uB098 \uB2E4\uAD6C\uB9AC\uB97C \uD53C\uD558\uAC70\uB098, \uACB0\uACC4 \uBAB9\uC5D0\uAC8C \uC21C\uC2DD\uAC04\uC5D0 \uBD99\uC744 \uB54C \uC368\uB77C", "good");
       }
     }
+    // 탑승 가능한(공격 타워) 대상 중 플레이어와 가장 가까운 것 — CFG.crew.radius 밖이면 null.
+    // 순수 로컬 판정(누가 어느 타워 옆에 있는지는 위치만 알면 계산되므로 서버 승인이 필요 없다) —
+    // 회피 돌진과 같은 이유로 클라이언트가 직접 계산한다.
+    _nearestCrewableTower(x2, z2) {
+      let best = null, bd2 = CFG.crew.radius;
+      for (const b of this.buildMgr.buildings.values()) {
+        if (!b.isTower) continue;
+        const d2 = dist(x2, z2, b.x, b.z);
+        if (d2 <= bd2) {
+          bd2 = d2;
+          best = b;
+        }
+      }
+      return best;
+    }
+    // 손으로 재장전할 수 있는(탄약이 덜 찬) 타워 중 가장 가까운 것 — hostReload 의 판정과
+    // 완전히 같은 기준을 프롬프트 표시용으로도 재사용한다.
+    _nearestReloadable(x2, z2) {
+      let best = null, bd2 = CFG.ammo.reloadRange;
+      for (const b of this.buildMgr.buildings.values()) {
+        if (!b.ammoType || b.ammo >= b.magazine) continue;
+        const d2 = dist(x2, z2, b.x, b.z);
+        if (d2 < bd2) {
+          bd2 = d2;
+          best = b;
+        }
+      }
+      return best;
+    }
+    // 길들일 수 있는 야생 동물(CFG.tame 에 정의된 종류) 중 가장 가까운 것 — 반경 3 밖이면 null.
+    // hostTame 의 판정과 완전히 같은 기준을 프롬프트 표시용으로도 재사용한다(순수 로컬 판정,
+    // crew와 같은 이유로 서버 승인 없이 클라이언트가 직접 계산해도 된다).
+    _nearestTameable(x2, z2) {
+      let best = null, bd2 = 3;
+      for (const e of this.enemyMgr.list) {
+        if (e.dead || !e.st.wild || !CFG.tame[e.type]) continue;
+        const d2 = dist(x2, z2, e.x, e.z);
+        if (d2 < bd2) {
+          bd2 = d2;
+          best = e;
+        }
+      }
+      return best;
+    }
+    // 매 프레임 "지금 어느 타워가 탑승 중인가"를 다시 계산한다 — 탑승 상태(crewing)는 각
+    // 플레이어 객체(로컬은 직접, 참가자는 pos 동기화로)에만 있고 건물 쪽엔 저장하지 않는다.
+    // 그래서 스냅샷에 새 필드가 필요 없다 — 호스트·참가자 모두 이미 알고 있는 플레이어 상태에서
+    // 그때그때 다시 계산할 뿐이라, 저장/이어하기·호스트 승계에서도 따로 복원할 게 없다.
+    _syncCrewedTowers() {
+      const crewedIds = /* @__PURE__ */ new Set();
+      if (this.local.crewing) crewedIds.add(this.local.crewing);
+      for (const p2 of this.players.values()) {
+        if (p2.crewing) crewedIds.add(p2.crewing);
+      }
+      for (const b of this.buildMgr.buildings.values()) {
+        b.crewedBy = crewedIds.has(b.id);
+      }
+    }
     // 미니맵 핑 — 협동 플레이에서 "여기 좀 봐줘"를 말이나 채팅 없이 전달하는 유일한 수단이라
     // 건설·공격처럼 호스트 검증이 필요 없다(자원도 안 쓰고 되돌릴 상태도 없다). 스팸을 막는
     // 쿨다운만 로컬에서 걸고, 신호 자체는 그대로 방송한다 — 찍은 사람도 자기 화면에서 똑같이 보여야
@@ -22023,7 +22911,24 @@ button.corner.mute.off { opacity: 0.5; }
           e.applySlow(a.slow, a.slowTime, performance.now() / 1e3);
           if (!this._seenFrostaxe) {
             this._seenFrostaxe = true;
-            this.ui?.toast("\u2744\uFE0F \uC5BC\uC74C\uB3C4\uB07C\uAC00 \uC801\uC744 \uB454\uD654\uC2DC\uCF30\uB2E4! \uC11C\uB9AC\uD0D1 \uC5C6\uC774\uB3C4 \uC9C1\uC811 \uB2A6\uCDB0\uC11C \uBD99\uC7A1\uC544 \uB458 \uC218 \uC788\uB2E4", "good");
+            this._notify(playerId, "\u2744\uFE0F \uC5BC\uC74C\uB3C4\uB07C\uAC00 \uC801\uC744 \uB454\uD654\uC2DC\uCF30\uB2E4! \uC11C\uB9AC\uD0D1 \uC5C6\uC774\uB3C4 \uC9C1\uC811 \uB2A6\uCDB0\uC11C \uBD99\uC7A1\uC544 \uB458 \uC218 \uC788\uB2E4", "good");
+          }
+        }
+        if (a.mark && !e.dead) {
+          const markUntil = performance.now() / 1e3 + a.markTime;
+          e.markedUntil = markUntil;
+          e.markMult = a.mark;
+          if (a.markRadius) {
+            for (const o of this.enemyMgr.list) {
+              if (o === e || o.dead) continue;
+              if (dist(o.x, o.z, e.x, e.z) > a.markRadius) continue;
+              o.markedUntil = markUntil;
+              o.markMult = a.mark;
+            }
+          }
+          if (!this._seenMark) {
+            this._seenMark = true;
+            this._notify(playerId, "\u{1F4CC} \uB099\uC778\uCE68\uC774 \uC801\uC5D0\uAC8C \uD45C\uC2DD\uC744 \uB0A8\uACBC\uB2E4! \uD45C\uC2DD\uC774 \uAC78\uB9B0 \uB3D9\uC548\uC740 \uD0C0\uC6CC\uB97C \uD3EC\uD568\uD55C \uBAA8\uB4E0 \uD53C\uD574\uAC00 \uCEE4\uC9C4\uB2E4", "good");
           }
         }
         if (e.variant === "thorn") thornDmg += Math.round(applied * CFG.variants.thorn.reflectPct);
@@ -22034,7 +22939,7 @@ button.corner.mute.off { opacity: 0.5; }
           e.z += (e.z - z2) / kd * a.knockback;
           if (!this._seenKnockback) {
             this._seenKnockback = true;
-            this.ui?.toast("\u{1F517} \uCC44\uCC0D\uC774 \uC801\uC744 \uB4A4\uB85C \uBC00\uCCD0\uB0C8\uB2E4! \uAC70\uB9AC\uB97C \uBC8C\uB9AC\uAC70\uB098 \uBB34\uB9AC\uB97C \uD769\uC5B4\uB193\uC744 \uB54C \uC720\uC6A9\uD558\uB2E4", "good");
+            this._notify(playerId, "\u{1F517} \uCC44\uCC0D\uC774 \uC801\uC744 \uB4A4\uB85C \uBC00\uCCD0\uB0C8\uB2E4! \uAC70\uB9AC\uB97C \uBC8C\uB9AC\uAC70\uB098 \uBB34\uB9AC\uB97C \uD769\uC5B4\uB193\uC744 \uB54C \uC720\uC6A9\uD558\uB2E4", "good");
           }
         }
       }
@@ -22043,7 +22948,7 @@ button.corner.mute.off { opacity: 0.5; }
         this._healPlayer(playerId, Math.round(lifestealHeal));
         if (!this._seenDagger) {
           this._seenDagger = true;
-          this.ui?.toast("\u{1F52A} \uB2E8\uAC80\uC774 \uC785\uD78C \uD53C\uD574\uC758 \uC77C\uBD80\uB97C \uCCB4\uB825\uC73C\uB85C \uB3CC\uB824\uC92C\uB2E4! \uBB34\uB9AC \uC18D\uC5D0\uC11C\uB3C4 \uACC4\uC18D \uB54C\uB9AC\uBA70 \uBC84\uD2F8 \uC218 \uC788\uB2E4", "good");
+          this._notify(playerId, "\u{1F52A} \uB2E8\uAC80\uC774 \uC785\uD78C \uD53C\uD574\uC758 \uC77C\uBD80\uB97C \uCCB4\uB825\uC73C\uB85C \uB3CC\uB824\uC92C\uB2E4! \uBB34\uB9AC \uC18D\uC5D0\uC11C\uB3C4 \uACC4\uC18D \uB54C\uB9AC\uBA70 \uBC84\uD2F8 \uC218 \uC788\uB2E4", "good");
         }
       }
     }
@@ -22180,7 +23085,7 @@ button.corner.mute.off { opacity: 0.5; }
           this.ui?.toast(this.local.tools.pickaxe ? "\uACE1\uAD2D\uC774\uB97C \uC190\uC5D0 \uC950\uC5B4\uC57C \uCE98 \uC218 \uC788\uC2B5\uB2C8\uB2E4 (\uC88C\uC0C1\uB2E8 \uB3C4\uAD6C \uC544\uC774\uCF58)" : "\uACE1\uAD2D\uC774\uAC00 \uC788\uC5B4\uC57C \uCE98 \uC218 \uC788\uC2B5\uB2C8\uB2E4 (\uC81C\uC791\uB300\uC5D0\uC11C \uC81C\uC791)", "bad");
           return;
         }
-        if (this.local.beginHarvest(node, this.world)) this.sfx.click();
+        if (this.local.beginHarvest(node, this.world, this.boonMult.harvestTimeMult * this.tempBoon.harvest)) this.sfx.click();
         return;
       }
       this.requestAttack();
@@ -22245,6 +23150,7 @@ button.corner.mute.off { opacity: 0.5; }
       p2.tools[key] = true;
       if (p2.weaponProficiencyLv > 0 && CFG.weaponUpgrade.perLv[key] && (p2.weaponLv[key] || 0) < p2.weaponProficiencyLv) {
         p2.weaponLv[key] = p2.weaponProficiencyLv;
+        if (p2.weaponLv[key] >= CFG.weaponUpgrade.maxLv) this._unlockAchievement("weaponMaster", playerId);
       }
       this._notify(playerId, `${recipe.name} \uC644\uC131! ${recipe.desc}`, "good");
       if (playerId === this.local.id) this.sfx.upgrade();
@@ -22312,15 +23218,7 @@ button.corner.mute.off { opacity: 0.5; }
     hostReload(playerId) {
       const p2 = this.players.get(playerId);
       if (!p2) return;
-      let target = null, bestD = CFG.ammo.reloadRange;
-      for (const b of this.buildMgr.buildings.values()) {
-        if (!b.ammoType || b.ammo >= b.magazine) continue;
-        const d2 = dist(p2.x, p2.z, b.x, b.z);
-        if (d2 < bestD) {
-          bestD = d2;
-          target = b;
-        }
-      }
+      const target = this._nearestReloadable(p2.x, p2.z);
       if (!target) {
         this._notify(playerId, "\uADFC\uCC98\uC5D0 \uD0C4\uC57D\uC744 \uCC44\uC6B8 \uD0C0\uC6CC\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4", "bad");
         return;
@@ -22873,8 +23771,8 @@ button.corner.mute.off { opacity: 0.5; }
       if (this.isHost) this.hostTame(this.local.id);
       else this.net.send("tame", {});
     }
-    // 여우·늑대·곰만 길들일 수 있다(CFG.tame 에 정의된 셋만, 전부 wild:true). 초식동물
-    // (토끼·사슴·멧돼지) 생고기를 미끼로
+    // 여우·늑대·곰·전설의 사슴왕·매만 길들일 수 있다(CFG.tame 에 정의된 다섯만, 전부 wild:true).
+    // 초식동물(토끼·사슴·멧돼지) 생고기를 미끼로
     // 쓰며, 성공/실패 모두 미끼를 소모한다 — 도망 다니는 걸 잡아 쓰다듬는 흉내라 몇 번이고
     // 다시 시도할 수 있지만, 그때마다 실제 자원이 든다. 팀 전체 동료 1마리 제한은 정령 소환과
     // 같은 원칙 — 나눠서 여러 마리를 부리며 화력을 불리지 못하게 막는다.
@@ -22885,17 +23783,9 @@ button.corner.mute.off { opacity: 0.5; }
         this.hostFeedPet(playerId);
         return;
       }
-      let target = null, bestD = 3;
-      for (const e of this.enemyMgr.list) {
-        if (e.dead || !e.st.wild || !CFG.tame[e.type]) continue;
-        const d2 = dist(p2.x, p2.z, e.x, e.z);
-        if (d2 < bestD) {
-          bestD = d2;
-          target = e;
-        }
-      }
+      const target = this._nearestTameable(p2.x, p2.z);
       if (!target) {
-        this._notify(playerId, "\uADFC\uCC98\uC5D0 \uAE38\uB4E4\uC77C \uC218 \uC788\uB294 \uC5EC\uC6B0\xB7\uB291\uB300\xB7\uACF0\xB7\uC804\uC124\uC758 \uC0AC\uC2B4\uC655\uC774 \uC5C6\uC2B5\uB2C8\uB2E4", "bad");
+        this._notify(playerId, "\uADFC\uCC98\uC5D0 \uAE38\uB4E4\uC77C \uC218 \uC788\uB294 \uC5EC\uC6B0\xB7\uB291\uB300\xB7\uACF0\xB7\uC804\uC124\uC758 \uC0AC\uC2B4\uC655\xB7\uB9E4\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4", "bad");
         return;
       }
       const pool = this._poolOf(playerId);
@@ -22960,6 +23850,24 @@ button.corner.mute.off { opacity: 0.5; }
       } else {
         this._notify(playerId, `${tc2.icon} ${tc2.name}\uC5D0\uAC8C \uBA39\uC774\uB97C \uC92C\uB2E4 \u2014 \uB808\uBCA8 ${pet.lv} (\uACF5\uACA9\uB825\xB7\uACF5\uACA9\uC18D\uB3C4 \uC0C1\uC2B9)`, "good");
       }
+    }
+    // ⚠️ 위험 계약 — 준비 시간에 다음 웨이브 한 판만 몬스터를 더 세게(체력·공격력) 만드는 대신
+    // 보상(자원·정수)도 그만큼 키운다. 포탈 봉쇄처럼 "이번 웨이브를 어떻게 맞을지" 미리 정하는
+    // 선택이지만, 위치가 필요 없어(팀 전체에 적용되는 스위치) 근접 판정이 없다 — 아무 데서나
+    // 토글할 수 있다. 웨이브가 시작되는 순간(onWaveStart) 소비되고 자동으로 꺼지므로 매 웨이브
+    // 다시 결정해야 한다.
+    requestRiskContract() {
+      if (this.isHost) this.hostRiskContract(this.local.id);
+      else this.net.send("riskContract", {});
+    }
+    hostRiskContract(playerId) {
+      if (this.wave.phase !== PHASE.PREP) {
+        this._notify(playerId, "\uC804\uD22C \uC911\uC5D0\uB294 \uC704\uD5D8 \uACC4\uC57D\uC744 \uAC78 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4 \u2014 \uC900\uBE44 \uC2DC\uAC04\uC5D0\uB9CC \uAC00\uB2A5\uD569\uB2C8\uB2E4", "bad");
+        return;
+      }
+      this._riskArmed = !this._riskArmed;
+      const rc = CFG.risk;
+      this._notify(playerId, this._riskArmed ? `\u26A0\uFE0F \uC704\uD5D8 \uACC4\uC57D \uCCB4\uACB0 \u2014 \uB2E4\uC74C \uC6E8\uC774\uBE0C \uBAAC\uC2A4\uD130 \uCCB4\uB825 +${Math.round((rc.hpMult - 1) * 100)}%\xB7\uACF5\uACA9\uB825 +${Math.round((rc.dmgMult - 1) * 100)}%, \uB300\uC2E0 \uBCF4\uC0C1 +${Math.round((rc.rewardMult - 1) * 100)}%` : "\uC704\uD5D8 \uACC4\uC57D\uC744 \uCDE8\uC18C\uD588\uB2E4", this._riskArmed ? "warn" : "good");
     }
     // 🪨 포탈 봉쇄 — 준비 시간에 열려 있는 포탈 옆에서 자원을 태워 그 포탈을 다음 전투 한 판 동안
     // 막는다. 적 총수는 waveComposition이 그대로 정하고 스폰 지점만 나머지 포탈로 몰리므로,
@@ -23052,8 +23960,18 @@ button.corner.mute.off { opacity: 0.5; }
         pt2.rot = Math.atan2(target.x - pt2.x, target.z - pt2.z);
         if (pt2.cd <= 0) {
           pt2.cd = 1 / petRate;
-          this._hurtEnemy(target, Math.round(petDmg), "player", pt2.x, pt2.z);
-          this.fx.burst(target.x, 0.6, target.z, tc2.color, 5, 2.5);
+          if (tc2.ranged) {
+            const from = new Ui(pt2.x, 2.4, pt2.z);
+            const to2 = new Ui(target.x, 0.9, target.z);
+            const dmg = Math.round(petDmg);
+            this.projectiles.fire(from, to2, 16, tc2.color, (pos) => {
+              this.fx.burst(pos.x, pos.y, pos.z, tc2.color, 5, 2.5);
+              if (!target.dead) this._hurtEnemy(target, dmg, "player", pt2.x, pt2.z);
+            });
+          } else {
+            this._hurtEnemy(target, Math.round(petDmg), "player", pt2.x, pt2.z);
+            this.fx.burst(target.x, 0.6, target.z, tc2.color, 5, 2.5);
+          }
         }
       } else {
         const owner = this.players.get(pt2.ownerId);
@@ -23074,15 +23992,17 @@ button.corner.mute.off { opacity: 0.5; }
         pt2.awakenCd -= dt2;
         if (pt2.awakenCd <= 0) {
           pt2.awakenCd = awk.interval;
+          const cx = target ? target.x : pt2.x;
+          const cz = target ? target.z : pt2.z;
           let hitAny = false;
           for (const e of this.enemyMgr.list) {
             if (e.dead || e.variant === "ward" || e.st.burrows && e.diving) continue;
-            if (dist(pt2.x, pt2.z, e.x, e.z) > awk.radius) continue;
+            if (dist(cx, cz, e.x, e.z) > awk.radius) continue;
             this._hurtEnemy(e, Math.round(petDmg * awk.dmgMult), "player", pt2.x, pt2.z);
             hitAny = true;
           }
-          this.fx.ring(pt2.x, pt2.z, tc2.color, awk.radius);
-          this.fx.burst(pt2.x, 1, pt2.z, tc2.color, 16, 5);
+          this.fx.ring(cx, cz, tc2.color, awk.radius);
+          this.fx.burst(cx, 1, cz, tc2.color, 16, 5);
           if (hitAny && !this._petAwakenNotified) {
             this._petAwakenNotified = true;
             this._notify(pt2.ownerId, `${tc2.icon} ${tc2.name}\uC774(\uAC00) \uD3EC\uD6A8\uB85C \uC8FC\uBCC0 \uC801\uC744 \uD55C\uAEBC\uBC88\uC5D0 \uD6C4\uB824\uCCE4\uB2E4! (\uCD5C\uB300 \uB808\uBCA8 \uC804\uC6A9 \uACF5\uACA9)`, "good");
@@ -23188,6 +24108,10 @@ button.corner.mute.off { opacity: 0.5; }
           this.players.delete(p2.id);
         }
         this.ui?.toast(`${p2.name} \uB2D8\uC774 \uB098\uAC14\uB2E4`, "bad");
+        const wasAheadOfMe = p2.joinTs < net.joinTs || p2.joinTs === net.joinTs && p2.id < net.selfId;
+        if (this.isHost && wasAheadOfMe) {
+          this.ui?.toast("\u{1F451} \uD638\uC2A4\uD2B8\uAC00 \uB098\uAC00\uC11C \uB2F9\uC2E0\uC774 \uC0C8 \uD638\uC2A4\uD2B8\uAC00 \uB410\uB2E4 \u2014 \uC6E8\uC774\uBE0C \uC2DC\uC791 \uB4F1 \uBC29\uC7A5 \uAD8C\uD55C\uC744 \uC774\uC5B4\uBC1B\uC558\uB2E4", "warn");
+        }
         this.ui?.refreshLobby();
         if (this.isHost && !this._pet && this.world.pet) {
           const wp = this.world.pet;
@@ -23212,7 +24136,7 @@ button.corner.mute.off { opacity: 0.5; }
       });
       net.on("startGame", (d2) => {
         if (this.running && !this.result) return;
-        this.begin({ seed: d2.seed, shared: d2.shared, difficulty: d2.difficulty });
+        this.begin({ seed: d2.seed, shared: d2.shared, difficulty: d2.difficulty, daily: !!d2.daily });
         this._syncRosterIntoGame();
       });
       net.on("pos", (d2, from) => {
@@ -23351,6 +24275,9 @@ button.corner.mute.off { opacity: 0.5; }
       net.on("sealPortal", (d2, from) => {
         if (this.isHost) this.hostSealPortal(from);
       });
+      net.on("riskContract", (d2, from) => {
+        if (this.isHost) this.hostRiskContract(from);
+      });
       net.on("riftRaid", (d2) => {
         this._announceRiftRaid(d2.x, d2.z, d2.n);
       });
@@ -23385,11 +24312,23 @@ button.corner.mute.off { opacity: 0.5; }
       net.on("blind", (d2) => {
         if (d2.to === net.selfId) this.local.blindUntil = performance.now() / 1e3 + d2.dur;
       });
+      net.on("root", (d2) => {
+        if (d2.to === net.selfId) this.local.rootedUntil = performance.now() / 1e3 + d2.dur;
+      });
       net.on("unlockAch", (d2) => {
         if (d2.to === net.selfId) this._unlockAchievement(d2.key);
       });
       net.on("achAnnounce", (d2) => {
         this.ui?.toast(`\u{1F3C6} ${d2.name}\uB2D8\uC774 \uC5C5\uC801\uC744 \uB2EC\uC131\uD588\uC2B5\uB2C8\uB2E4: ${d2.icon} ${d2.title}`, "good");
+      });
+      net.on("outpostLost", () => {
+        this.ui?.toast("\u{1F6A9} \uC804\uCD08\uAE30\uC9C0\uAC00 \uD30C\uAD34\uB410\uB2E4! \uADF8 \uC8FC\uC704 \uAC74\uC124 \uAD6C\uC5ED\uC774 \uC0AC\uB77C\uC9D1\uB2C8\uB2E4 (\uC774\uBBF8 \uC9C0\uC740 \uAC74\uBB3C\uC740 \uB0A8\uC2B5\uB2C8\uB2E4)", "bad");
+      });
+      net.on("decoyLost", () => {
+        this.ui?.toast("\u{1F4EF} \uD5C8\uC218\uC544\uBE44 \uC720\uC778\uBAA9\uC774 \uD30C\uAD34\uB410\uB2E4! \uBB36\uC5EC \uC788\uB358 \uBAAC\uC2A4\uD130\uAC00 \uB2E4\uC2DC \uD06C\uB9AC\uC2A4\uD0C8\uB85C \uD5A5\uD55C\uB2E4", "bad");
+      });
+      net.on("beaconLost", () => {
+        this.ui?.toast("\u{1F3EE} \uBD09\uD654\uB300\uAC00 \uD30C\uAD34\uB410\uB2E4! \uC774\uB04C\uB9AC\uB358 \uBE44\uD589 \uBAAC\uC2A4\uD130\uAC00 \uB2E4\uC2DC \uD06C\uB9AC\uC2A4\uD0C8\uB85C \uD5A5\uD55C\uB2E4", "bad");
       });
       net.on("toast", (d2) => {
         if (d2.to !== net.selfId) return;
@@ -23486,6 +24425,14 @@ button.corner.mute.off { opacity: 0.5; }
         // 다시 안 보내고, 봉쇄된 인덱스만 압축해서 보낸다. 참가자는 스폰을 직접 계산하지 않으니
         // (호스트 전용, wave.update가 isHost 분기 안에서만 돈다) 순수 표시(3D 포탈 외형)용이다.
         psl: this.world.portals.flatMap((po2, i) => po2.sealed ? [i] : []),
+        // 다음 발생까지 남은 시간을 도는 순수 카운트다운 8종(보급품·정수 상자·운석·균열 습격·
+        // 야생 동물·보물게·정찰병·돌 파수꾼) — 전부 begin()에서 한 번만 초기화되고 그 뒤로는
+        // 게임이 끝날 때까지 계속 흘러간다(밤/우박처럼 웨이브마다 새로 리셋되는 타이머와 다르다).
+        // 참가자는 이 값으로 자기 화면에 뭔가를 그리지는 않지만(스폰 자체가 호스트 전용), 참가자가
+        // 나중에 호스트를 승계하면(peerLeave) 이 값이 없으면 전부 begin() 초기값으로 되돌아가
+        // "방금 막 시작한 것"처럼 스케줄이 리셋된다 — 예를 들어 승계 직후 보급품이 16초, 정수
+        // 상자가 50초 동안 안 뜨는 식으로, 실제로는 그럴 시점이 지났어도 다시 기다려야 했다.
+        et: [this._dropTimer, this._shardDropTimer, this._meteorTimer, this._riftRaidTimer, this._huntTimer, this._treasureTimer, this._scoutTimer, this._nestTimer].map((v) => Math.round(v * 10) / 10),
         mt: this._meteorPending ? [Math.round(this._meteorPending.x * 10) / 10, Math.round(this._meteorPending.z * 10) / 10, Math.round(this._meteorPending.timeLeft * 10) / 10] : null,
         lc: this._crater ? [Math.round(this._crater.x * 10) / 10, Math.round(this._crater.z * 10) / 10, Math.round(this._crater.timeLeft * 10) / 10] : null,
         // 늪지대 독가스 구덩이 — 위치는 결정론적(월드 시드)이라 다시 안 보내고, 각 구덩이의 단계만
@@ -23504,6 +24451,11 @@ button.corner.mute.off { opacity: 0.5; }
         ip: this._icePitTimers.length ? this._icePitTimers.map((t2) => t2.phase[0]).join("") : null,
         ipt: this._icePitTimers.length ? this._icePitTimers.map((t2) => Math.round(t2.timeLeft * 10) / 10) : null,
         pb: Object.keys(this.pickedBoons).length ? this.pickedBoons : null,
+        // ⚠️ 위험 계약 — 다음 웨이브에 한해 몬스터를 더 세게, 보상을 더 크게 거는 팀 단위 선택.
+        // 호스트만 켜고 끄지만(portal seal 계열과 같은 host-authoritative 패턴), 참가자도 준비
+        // 시간 UI에서 지금 걸려 있는지 봐야 하므로(안 실으면 참가자는 자기 화면에서 영원히 꺼진
+        // 걸로 보인다) 그대로 실어 보낸다.
+        rk: this._riskArmed,
         mc: this._merchant ? { offers: this._merchant.offers, boughtBy: this._merchant.boughtBy } : null,
         // atkWavesLeft/towerWavesLeft/speedWavesLeft는 참가자 동기화(_applySnapshot)엔 필요 없다
         // (참가자는 매 스냅샷 host가 이미 감쇠시킨 배율 값만 그대로 반영하면 되고, 스스로
@@ -23515,9 +24467,11 @@ button.corner.mute.off { opacity: 0.5; }
           atk: this.tempBoon.atk,
           towerDmg: this.tempBoon.towerDmg,
           speed: this.tempBoon.speed,
+          harvest: this.tempBoon.harvest,
           atkWavesLeft: this.tempBoon.atkWavesLeft,
           towerWavesLeft: this.tempBoon.towerWavesLeft,
-          speedWavesLeft: this.tempBoon.speedWavesLeft
+          speedWavesLeft: this.tempBoon.speedWavesLeft,
+          harvestWavesLeft: this.tempBoon.harvestWavesLeft
         },
         // 잔치 효과(요리)는 상인 물약(tb)과 똑같이 팀 전체가 함께 받는 "누가 먹었든 파티 전원에게
         // 적용" 설계인데, 이 필드가 그동안 스냅샷에 실리지 않았다 — 호스트 자신이 먹었을 때는
@@ -23543,6 +24497,7 @@ button.corner.mute.off { opacity: 0.5; }
           built: this.stats.built,
           kills: this.stats.kills,
           shardEarned: this.stats.shardEarned,
+          riskWavesCleared: this.stats.riskWavesCleared,
           dmgByPlayer: this.stats.dmgByPlayer,
           killsByPlayer: this.stats.killsByPlayer,
           spentWood: this.stats.spentWood,
@@ -23573,7 +24528,8 @@ button.corner.mute.off { opacity: 0.5; }
           scoutsIntercepted: this.stats.scoutsIntercepted,
           earlyStarts: this.stats.earlyStarts,
           everBuiltWall: this.stats.everBuiltWall,
-          everBuiltTower: this.stats.everBuiltTower
+          everBuiltTower: this.stats.everBuiltTower,
+          everBuiltDecoy: this.stats.everBuiltDecoy
         }
       };
     }
@@ -23650,6 +24606,7 @@ button.corner.mute.off { opacity: 0.5; }
         }
       }
       if (s2.pb) this.pickedBoons = s2.pb;
+      this._riskArmed = !!s2.rk;
       if (s2.rf) this.world.setRift(s2.rf[0], s2.rf[1], s2.rf[2], CFG.skills.rift.radius);
       else this.world.clearRift();
       if (s2.sp) this.world.setSpirit(s2.sp[0], s2.sp[1], s2.sp[2]);
@@ -23660,6 +24617,7 @@ button.corner.mute.off { opacity: 0.5; }
         const sealedSet = new Set(s2.psl);
         this.world.portals.forEach((po2, i) => po2.sealed = sealedSet.has(i));
       }
+      if (s2.et) [this._dropTimer, this._shardDropTimer, this._meteorTimer, this._riftRaidTimer, this._huntTimer, this._treasureTimer, this._scoutTimer, this._nestTimer] = s2.et;
       if (!this._merchant && s2.mc) this.ui?.toast("\u{1F9F3} \uB5A0\uB3CC\uC774 \uC0C1\uC778\uC774 \uC654\uB2E4! \uC774\uBC88 \uC900\uBE44 \uC2DC\uAC04\uC5D0\uB9CC \uBB3C\uAC74\uC744 \uD310\uB2E4", "good");
       this._merchant = s2.mc ? { offers: s2.mc.offers, boughtBy: s2.mc.boughtBy || {} } : null;
       if (s2.tb) Object.assign(this.tempBoon, s2.tb);
@@ -23695,11 +24653,13 @@ button.corner.mute.off { opacity: 0.5; }
         if (this.stats.elitesKilled >= 5) this._unlockAchievement("eliteHunter");
         if (this.stats.berserkKilled >= 5) this._unlockAchievement("berserkSlayer");
         if (this.stats.treasuresCaught >= 5) this._unlockAchievement("treasureHunter");
+        if (this.stats.animalsHunted >= 10) this._unlockAchievement("hunter");
         if (this.stats.golemsDefeated >= 3) this._unlockAchievement("stoneBreaker");
         if (this.stats.comboCount >= 10) this._unlockAchievement("duoStrike");
         if (this.stats.critCount >= 20) this._unlockAchievement("criticalEye");
         if (this.stats.mimicsKilled >= 3) this._unlockAchievement("mimicHunter");
         if (this.stats.blocksCount >= 10) this._unlockAchievement("blockMaster");
+        if (this.stats.parryCount >= 5) this._unlockAchievement("perfectParry");
         if (this.stats.repairPostHealed >= 500) this._unlockAchievement("medic");
         if (this.stats.campHealed >= 500) this._unlockAchievement("haven");
         if (this.stats.harvested >= 1e3) this._unlockAchievement("harvestKing");
@@ -23737,6 +24697,12 @@ button.corner.mute.off { opacity: 0.5; }
         }
         if (["boss", "frostlord", "warden", "looter", "colossus", "wraith", "galelord", "curselord", "grovelord", "magnetlord", "shadowlord"].every((t2) => this.stats.bossKillsSeen.includes(t2))) {
           this._unlockAchievement("allElevenBosses");
+        }
+        if (["boss", "frostlord", "warden", "looter", "colossus", "wraith", "galelord", "curselord", "grovelord", "magnetlord", "shadowlord", "weblord"].every((t2) => this.stats.bossKillsSeen.includes(t2))) {
+          this._unlockAchievement("allTwelveBosses");
+        }
+        if (["boss", "frostlord", "warden", "looter", "colossus", "wraith", "galelord", "curselord", "grovelord", "magnetlord", "shadowlord", "weblord", "splitlord"].every((t2) => this.stats.bossKillsSeen.includes(t2))) {
+          this._unlockAchievement("allThirteenBosses");
         }
       }
       if (this.wave.phase === PHASE.LOST && !this.result) {
@@ -23827,8 +24793,11 @@ button.corner.mute.off { opacity: 0.5; }
       this.world.weatherKind = weatherKind;
       this.sm.setWeather(weatherKind);
       this.sm.updateWeather(dt2);
-      const rangeMult = (weatherKind === "fog" ? WEATHER.fog.towerRangeMult : 1) * this.boonMult.rangeMult;
-      if (!over) this.buildMgr.updateTowers(dt2, this.enemyMgr.list, now, rangeMult, this.boonMult.ammoSaveChance, this.isHost);
+      const rangeMult = (weatherKind === "fog" ? WEATHER.fog.towerRangeMult : 1) * this.boonMult.rangeMult * this.feastRangeMult;
+      if (!over) {
+        this._syncCrewedTowers();
+        this.buildMgr.updateTowers(dt2, this.enemyMgr.list, now, rangeMult, this.boonMult.ammoSaveChance, this.isHost);
+      }
       this.sm.setNightMode(this.wave.phase === PHASE.COMBAT && (this.wave.wave + 1) % CFG.wave.nightEvery === 0);
       this.sm.updateNight(dt2);
       const milestoneTier = crystalMilestoneTier(this.wave.wave);
@@ -23874,7 +24843,7 @@ button.corner.mute.off { opacity: 0.5; }
       if (inp.hit(km.get("reload"))) this.requestReload();
       if (inp.hit(km.get("startWave")) && this.wave.phase === PHASE.PREP) this.requestStartWave();
       const pointer = this.sm.updatePointerWorld();
-      const ghostRangeMult = (this.world.weatherKind === "fog" ? WEATHER.fog.towerRangeMult : 1) * this.boonMult.rangeMult;
+      const ghostRangeMult = (this.world.weatherKind === "fog" ? WEATHER.fog.towerRangeMult : 1) * this.boonMult.rangeMult * this.feastRangeMult;
       this.buildMgr.updateGhost(pointer, this.myPool, ghostRangeMult);
       if (inp.clicked) {
         if (this.buildMgr.mode && CFG.builds[this.buildMgr.mode]) {
@@ -23925,14 +24894,32 @@ button.corner.mute.off { opacity: 0.5; }
         }
       }
       if (inp.rightClicked && this.buildMgr.mode) this.setBuildMode(null);
+      const wasCrewingLocal = this.local.crewing;
+      if (this.local.alive && inp.down(km.get("crew")) && !this.buildMgr.mode) {
+        const tw = this._nearestCrewableTower(this.local.x, this.local.z);
+        this.local.crewing = tw ? tw.id : null;
+      } else {
+        this.local.crewing = null;
+      }
+      if (this.local.crewing && !wasCrewingLocal) {
+        this.local.cancelHarvest();
+        this.ui?.toast("\u{1F3AF} \uD0C0\uC6CC \uD0D1\uC2B9! \uD654\uB825\uC774 \uD06C\uAC8C \uC624\uB974\uC9C0\uB9CC \uADF8\uB3D9\uC548 \uC6C0\uC9C1\uC774\uC9C0\uB3C4 \uACF5\uACA9\uD558\uC9C0\uB3C4 \uBABB\uD55C\uB2E4 \u2014 \uD0A4\uB97C \uB5BC\uBA74 \uD574\uC81C\uB41C\uB2E4", "good");
+      } else if (!this.local.crewing && wasCrewingLocal) {
+        this.ui?.toast("\uD0C0\uC6CC \uD0D1\uC2B9 \uD574\uC81C", "warn");
+      }
+      if (this.local.crewing) {
+        this._crewSeconds = (this._crewSeconds || 0) + dt2;
+        if (this._crewSeconds >= 30) this._unlockAchievement("towerCrewer");
+        if (this.stats.everBuiltDecoy) this._unlockAchievement("tactician");
+      }
       const wasBlockingLocal = this.local.blocking;
-      this.local.blocking = this.local.alive && inp.down(km.get("block")) && !this.buildMgr.mode;
+      this.local.blocking = this.local.alive && inp.down(km.get("block")) && !this.buildMgr.mode && !this.local.crewing;
       if (this.local.blocking && !wasBlockingLocal) this.local._blockStartAt = performance.now() / 1e3;
       if (this.local.blocking) this.local.cancelHarvest();
-      if (inp.hit(km.get("attack")) && !this.local.blocking) this.requestAttack();
-      if (inp.hit(km.get("dash"))) this._tryDash();
-      const holding = (inp.down(km.get("harvest")) || inp.down("e") || this.ui?.harvestHeld) && !this.local.blocking;
-      const done = this.local.tickHarvest(dt2, this.world, holding && !this.buildMgr.mode);
+      if (inp.hit(km.get("attack")) && !this.local.blocking && !this.local.crewing) this.requestAttack();
+      if (inp.hit(km.get("dash")) && !this.local.crewing && !this.local.rooted) this._tryDash();
+      const holding = (inp.down(km.get("harvest")) || inp.down("e") || this.ui?.harvestHeld) && !this.local.blocking && !this.local.crewing;
+      const done = this.local.tickHarvest(dt2, this.world, holding && !this.buildMgr.mode, this.boonMult.harvestTimeMult * this.tempBoon.harvest);
       if (done) {
         this.requestHarvest(done.id);
         this.sfx.harvestDone(done.type);
@@ -23976,7 +24963,12 @@ button.corner.mute.off { opacity: 0.5; }
           swing: l2.swing > 0.7,
           invulnerable: l2.invulnerable,
           reviveAssisted: l2.reviveAssisted,
-          blocking: l2.blocking
+          blocking: l2.blocking,
+          crewing: l2.crewing,
+          // 절대 시각(rootedUntil)을 그대로 보내면 안 된다 — performance.now() 는 클라이언트마다
+          // 기준점이 다른 로컬 시계라, 크리스탈 shieldUntil(cs 필드)과 같은 이유로 "남은 시간"만
+          // 상대값으로 실어 보낸다. 받는 쪽은 자기 시계 기준으로 다시 절대 시각을 만든다.
+          rootLeft: l2.rooted ? Math.max(0, Math.round((l2.rootedUntil - performance.now() / 1e3) * 10) / 10) : 0
         });
       }
       if (this.isHost) {
@@ -24057,13 +25049,57 @@ button.corner.mute.off { opacity: 0.5; }
       if (s2.crn !== void 0) this.world.crystal.resonanceLv = s2.crn;
       if (s2.cml !== void 0) this.world.crystal.materielLv = s2.cml;
       this.world.crystal.shieldUntil = s2.cs != null ? performance.now() / 1e3 + s2.cs : 0;
+      if (s2.d) this.world.applyDropSnapshot(s2.d);
+      if (s2.mt) {
+        this.world.setMeteor(s2.mt[0], s2.mt[1], s2.mt[2], CFG.meteor.radius);
+        this._meteorPending = { x: s2.mt[0], z: s2.mt[1], timeLeft: s2.mt[2] };
+      }
+      if (s2.lc) {
+        this.world.setCrater(s2.lc[0], s2.lc[1], s2.lc[2], CFG.meteor.craterRadius);
+        this._crater = { x: s2.lc[0], z: s2.lc[1], timeLeft: s2.lc[2], tickTimer: 0 };
+      }
+      if (s2.sw) {
+        const codeToPhase = { d: "dormant", w: "warn", a: "active" };
+        for (let i = 0; i < s2.sw.length; i++) {
+          const phase = codeToPhase[s2.sw[i]] || "dormant";
+          this.world.setSwampPitPhase(i, phase);
+          const t2 = this._swampTimers[i];
+          if (t2) {
+            t2.phase = phase;
+            t2.timeLeft = s2.swt?.[i] ?? CFG.swampPit[phase];
+            t2.tickTimer = 0;
+          }
+        }
+      }
+      if (s2.ip) {
+        const codeToPhase = { d: "dormant", w: "warn", a: "active" };
+        for (let i = 0; i < s2.ip.length; i++) {
+          const phase = codeToPhase[s2.ip[i]] || "dormant";
+          this.world.setIcePitPhase(i, phase);
+          const t2 = this._icePitTimers[i];
+          if (t2) {
+            t2.phase = phase;
+            t2.timeLeft = s2.ipt?.[i] ?? CFG.icePit[phase];
+          }
+        }
+      }
+      if (s2.rf) {
+        this.world.setRift(s2.rf[0], s2.rf[1], s2.rf[2], CFG.skills.rift.radius);
+        this._rift = { x: s2.rf[0], z: s2.rf[1], timeLeft: s2.rf[2] };
+      }
+      if (s2.sp) {
+        this.world.setSpirit(s2.sp[0], s2.sp[1], s2.sp[2]);
+        this._spirit = { x: s2.sp[0], z: s2.sp[1], ownerId: this.local.id, timeLeft: s2.sp[2], cd: 0 };
+      }
       if (s2.bm) {
         Object.assign(this.boonMult, s2.bm);
         this.wave.prepBonus = this.boonMult.prepDelta || 0;
       }
       if (s2.pb) this.pickedBoons = s2.pb;
+      this._riskArmed = !!s2.rk;
       if (s2.sr) this._shardTrickleStacks = s2.sr;
       if (s2.tb) Object.assign(this.tempBoon, s2.tb);
+      if (s2.et) [this._dropTimer, this._shardDropTimer, this._meteorTimer, this._riftRaidTimer, this._huntTimer, this._treasureTimer, this._scoutTimer, this._nestTimer] = s2.et;
       this._merchant = s2.mc ? { offers: s2.mc.offers, boughtBy: s2.mc.boughtBy || {} } : null;
       if (s2.fs) Object.assign(this.feast, s2.fs);
       if (s2.pt) {

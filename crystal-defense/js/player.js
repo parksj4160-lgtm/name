@@ -71,6 +71,7 @@ var Player = class {
     this.outfitLv = 0;
     this.weaponProficiencyLv = 0;
     this.blindUntil = 0;
+    this.rootedUntil = 0;
     this.harvesting = null;
     this.attackCd = 0;
     this.swing = 0;
@@ -79,6 +80,7 @@ var Player = class {
     this.reviveAssisted = false;
     this.blocking = false;
     this._blockStartAt = -99;
+    this.crewing = null;
     this.mesh = this._makeMesh();
     this.mesh.position.set(this.x, 0, this.z);
   }
@@ -119,6 +121,11 @@ var Player = class {
   get harvestMult() {
     return CFG.harvest.upgrade[this.harvestLv - 1].mult;
   }
+  // 🕸️ 속박 군주 전용 — 이동만 막는다(공격·채집은 그대로 가능, 크리스탈 자성 군주의 순간이동
+  // 강제나 타워 탑승과는 다르게 "제자리에서 계속 싸울 수는 있다"는 점이 핵심).
+  get rooted() {
+    return performance.now() / 1e3 < this.rootedUntil;
+  }
   // 곡괭이는 만들어 두는 것만으로는 부족하고, 손에 쥐고 있어야 정수석을 캘 수 있다
   get holdingPickaxe() {
     return this.heldWeapon === "pickaxe";
@@ -126,7 +133,7 @@ var Player = class {
   // 기본 공격치에 지금 손에 든 무기의 효과만 더한다 (여러 자루를 동시에 들 수는 없다)
   get attackStats() {
     const base = CFG.player.attack;
-    const out = { dmg: base.dmg, range: base.range, arc: base.arc, cd: base.cd, knockback: 0, slow: 0, slowTime: 0, lifesteal: 0 };
+    const out = { dmg: base.dmg, range: base.range, arc: base.arc, cd: base.cd, knockback: 0, slow: 0, slowTime: 0, lifesteal: 0, mark: 0, markTime: 0, markRadius: 0 };
     const eff = CFG.craft[this.heldWeapon]?.effect;
     if (eff) for (const k2 of Object.keys(eff)) out[k2] += eff[k2];
     const bonus = CFG.weaponUpgrade.perLv[this.heldWeapon];
@@ -237,7 +244,10 @@ var Player = class {
   animate(dt2, moving) {
     this._updateWeapon();
     const t2 = performance.now() / 1e3;
-    if (this.blocking) {
+    if (this.crewing) {
+      this.arm.rotation.x = -0.7 + Math.sin(t2 * 3) * 0.05;
+      this.tool.rotation.x = -0.9;
+    } else if (this.blocking) {
       this.arm.rotation.x = -1.3;
       this.tool.rotation.x = -1.6;
     } else if (this.swing > 0) {
@@ -256,7 +266,7 @@ var Player = class {
     this.mesh.position.y = bob;
     this.mesh.rotation.y = this.rot;
     this.ring.material.opacity = this.alive ? this.isLocal ? 0.85 : 0.45 : this.reviveAssisted ? 0.45 + Math.abs(Math.sin(t2 * 8)) * 0.35 : 0.15;
-    this.mat.emissive?.setHex(this.blocking ? 3377407 : this.combatUntil > t2 ? 6693410 : 0);
+    this.mat.emissive?.setHex(this.crewing ? 16763989 : this.rooted ? 11163118 : this.blocking ? 3377407 : this.combatUntil > t2 ? 6693410 : 0);
     this.mat.opacity = this.invulnerable ? 0.35 + Math.abs(Math.sin(t2 * 26)) * 0.35 : 1;
   }
 };
@@ -307,7 +317,9 @@ export var LocalPlayer = class extends Player {
       this.hp = Math.min(this.maxHp, this.hp + CFG.player.regen * dt2);
     }
     let moving;
-    if (dashing) {
+    if ((this.crewing || this.rooted) && !dashing) {
+      moving = false;
+    } else if (dashing) {
       const dc2 = CFG.player.dash;
       this.x += this.dashDir.x * dc2.speed * dt2;
       this.z += this.dashDir.z * dc2.speed * dt2;
@@ -381,18 +393,18 @@ export var LocalPlayer = class extends Player {
   }
   // 채집 시도/진행. 완료 시 노드를 돌려준다.
   // 특정 자원을 콕 집어 캐기 시작한다 (클릭/탭으로 고른 것). 성공하면 true.
-  beginHarvest(node, world) {
+  beginHarvest(node, world, relicMult = 1) {
     if (!this.alive || !node || node.depleted) return false;
     if (needsPickaxe(node.type) && !this.holdingPickaxe) return false;
     if (dist(this.x, this.z, node.x, node.z) > CFG.harvest.range) return false;
     const weatherMult = world?.weatherKind === "clear" ? WEATHER.clear.harvestTimeMult : 1;
-    this.harvesting = { node, t: 0, need: CFG.harvest[node.type].time * this.harvestMult * weatherMult };
+    this.harvesting = { node, t: 0, need: CFG.harvest[node.type].time * this.harvestMult * weatherMult * relicMult };
     this.rot = Math.atan2(node.x - this.x, node.z - this.z);
     return true;
   }
   // holding 이 true 면 근처 자원을 자동으로 잡아 캔다 (F 키 유지용).
   // 이미 캐던 것이 있으면 holding 과 무관하게 계속 캔다 — 클릭으로 시작한 채집이 그대로 이어진다.
-  tickHarvest(dt2, world, holding) {
+  tickHarvest(dt2, world, holding, relicMult = 1) {
     if (!this.alive) return null;
     if (!this.harvesting) {
       if (!holding) return null;
@@ -400,7 +412,7 @@ export var LocalPlayer = class extends Player {
       if (!node) return null;
       if (needsPickaxe(node.type) && !this.holdingPickaxe) return null;
       const weatherMult = world?.weatherKind === "clear" ? WEATHER.clear.harvestTimeMult : 1;
-      this.harvesting = { node, t: 0, need: CFG.harvest[node.type].time * this.harvestMult * weatherMult };
+      this.harvesting = { node, t: 0, need: CFG.harvest[node.type].time * this.harvestMult * weatherMult * relicMult };
       this.rot = Math.atan2(node.x - this.x, node.z - this.z);
     }
     const h2 = this.harvesting;
@@ -456,6 +468,8 @@ export var RemotePlayer = class extends Player {
     const wasBlocking = this.blocking;
     this.blocking = !!s2.blocking;
     if (this.blocking && !wasBlocking) this._blockStartAt = performance.now() / 1e3;
+    this.crewing = s2.crewing || null;
+    this.rootedUntil = s2.rootLeft > 0 ? performance.now() / 1e3 + s2.rootLeft : 0;
     this.harvesting = s2.harvesting ? { t: 0, need: 1 } : null;
     if (s2.held) {
       this.tools[s2.held] = true;

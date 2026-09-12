@@ -51,6 +51,7 @@ var Enemy = class {
       if (statMult.dmg) st.dmg = Math.round(st.dmg * statMult.dmg);
       if (statMult.dmg && st.explode) st.explode = { ...st.explode, dmg: Math.round(st.explode.dmg * statMult.dmg), playerDmg: Math.round(st.explode.playerDmg * statMult.dmg) };
       if (statMult.bounty) st.bounty = { wood: Math.round(st.bounty.wood * statMult.bounty), stone: Math.round(st.bounty.stone * statMult.bounty) };
+      if (statMult.noSplit) st.splitBoss = false;
     }
     this.id = id || nextId2++;
     this.type = type;
@@ -72,6 +73,8 @@ var Enemy = class {
     this.slowUntil = 0;
     this.slowFactor = 1;
     this.rootUntil = 0;
+    this.markedUntil = 0;
+    this.markMult = 1;
     this.poisonDps = 0;
     this.poisonUntil = 0;
     this.poisonTickCd = 0;
@@ -284,6 +287,24 @@ export var EnemyManager = class {
       );
     }
   }
+  // 분열 군주(splitlord) 전용 — spawnSplit과 완전히 같은 원리지만 자식이 다시 분열하면
+  // 안 되므로 noSplit을 같이 넘긴다(Enemy 생성자가 이 플래그를 보고 자식의 splitBoss를 끈다).
+  spawnSplitBoss(parent) {
+    const count = parent.st.splitChildCount;
+    for (let i = 0; i < count; i++) {
+      const a = Math.PI * 2 * i / count + Math.random() * 0.6;
+      const r = parent.st.radius + 0.8;
+      this.spawn(
+        parent.type,
+        parent.wave,
+        parent.x + Math.cos(a) * r,
+        parent.z + Math.sin(a) * r,
+        void 0,
+        null,
+        { hp: parent.st.splitChildHpMult, scale: parent.st.splitChildScaleMult, noSplit: true }
+      );
+    }
+  }
   byId(id) {
     return this.list.find((e) => e.id === id);
   }
@@ -443,6 +464,32 @@ export var EnemyManager = class {
         this._applyPosition(e, dt2, now);
         continue;
       }
+      if (e.st.flies && !e.st.boss) {
+        const beacon = this._nearestBeacon(buildMgr, e.x, e.z);
+        if (beacon) {
+          const d2 = dist(e.x, e.z, beacon.x, beacon.z);
+          if (d2 < 1.7 + e.st.radius) {
+            if (e.attackCd <= 0) {
+              e.attackCd = 1 / e.st.rate;
+              this.onBuildingHit?.(e, beacon);
+            }
+            this._face(e, beacon.x, beacon.z, dt2);
+            this._applyPosition(e, dt2, now);
+            continue;
+          }
+          const dx2 = beacon.x - e.x, dz2 = beacon.z - e.z;
+          const len2 = Math.hypot(dx2, dz2) || 1;
+          let mx2 = dx2 / len2 * speed, mz2 = dz2 / len2 * speed;
+          const sep2 = this._separation(e);
+          mx2 += sep2.x * speed * 0.6;
+          mz2 += sep2.z * speed * 0.6;
+          e.x += mx2 * dt2;
+          e.z += mz2 * dt2;
+          this._face(e, e.x + mx2, e.z + mz2, dt2);
+          this._applyPosition(e, dt2, now);
+          continue;
+        }
+      }
       if (e.st.flies || e.st.burrows) {
         const dx2 = -e.x, dz2 = -e.z;
         const len2 = Math.hypot(dx2, dz2) || 1;
@@ -535,6 +582,32 @@ export var EnemyManager = class {
           }
         }
       }
+      if (!e.st.boss) {
+        const decoy = this._nearestDecoy(buildMgr, e.x, e.z);
+        if (decoy) {
+          const d2 = dist(e.x, e.z, decoy.x, decoy.z);
+          if (d2 < 1.7 + e.st.radius) {
+            if (e.attackCd <= 0) {
+              e.attackCd = 1 / e.st.rate;
+              this.onBuildingHit?.(e, decoy);
+            }
+            this._face(e, decoy.x, decoy.z, dt2);
+            this._applyPosition(e, dt2, now);
+            continue;
+          }
+          const dx2 = decoy.x - e.x, dz2 = decoy.z - e.z;
+          const len2 = Math.hypot(dx2, dz2) || 1;
+          let mx2 = dx2 / len2 * speed, mz2 = dz2 / len2 * speed;
+          const sep2 = this._separation(e);
+          mx2 += sep2.x * speed * 0.6;
+          mz2 += sep2.z * speed * 0.6;
+          e.x += mx2 * dt2;
+          e.z += mz2 * dt2;
+          this._face(e, e.x + mx2, e.z + mz2, dt2);
+          this._applyPosition(e, dt2, now);
+          continue;
+        }
+      }
       const dx = tx - e.x, dz = tz - e.z;
       const len = Math.hypot(dx, dz) || 1;
       let mx = dx / len * speed, mz = dz / len * speed;
@@ -568,6 +641,7 @@ export var EnemyManager = class {
       else if (kind === "curse") this._bossCurse(e);
       else if (kind === "pull") this._bossPull(e);
       else if (kind === "blind") this._bossBlind(e);
+      else if (kind === "web") this._bossWeb(e);
       else this._bossBeginCharge(e);
       return true;
     }
@@ -597,10 +671,11 @@ export var EnemyManager = class {
       const curse = !!e.st.curseBoss;
       const pull = !!e.st.pullBoss;
       const blind = !!e.st.blindBoss;
-      const kind2 = silence ? "silence" : drain ? "drain" : fortify ? "fortify" : siphon ? "siphon" : blink ? "blink" : curse ? "curse" : pull ? "pull" : blind ? "blind" : "summon";
+      const web = !!e.st.webBoss;
+      const kind2 = silence ? "silence" : drain ? "drain" : fortify ? "fortify" : siphon ? "siphon" : blink ? "blink" : curse ? "curse" : pull ? "pull" : blind ? "blind" : web ? "web" : "summon";
       e.castKind = kind2;
-      e.castUntil = silence ? P2.silenceCast : drain ? P2.drainCast : fortify ? P2.fortifyCast : siphon ? P2.siphonCast : blink ? P2.blinkCast : curse ? P2.curseCast : pull ? P2.pullCast : blind ? P2.blindCast : P2.summonCast;
-      const color = silence ? 8011711 : drain ? 16766720 : fortify ? 8945076 : siphon ? 9321645 : blink ? 10217727 : curse ? 10181046 : pull ? 12592851 : blind ? 3355443 : 16733525;
+      e.castUntil = silence ? P2.silenceCast : drain ? P2.drainCast : fortify ? P2.fortifyCast : siphon ? P2.siphonCast : blink ? P2.blinkCast : curse ? P2.curseCast : pull ? P2.pullCast : blind ? P2.blindCast : web ? P2.webCast : P2.summonCast;
+      const color = silence ? 8011711 : drain ? 16766720 : fortify ? 8945076 : siphon ? 9321645 : blink ? 10217727 : curse ? 10181046 : pull ? 12592851 : blind ? 3355443 : web ? 11163118 : 16733525;
       this.fx.ring(e.x, e.z, color, 5);
       this.onBossTelegraph?.(e, kind2);
       return true;
@@ -683,6 +758,12 @@ export var EnemyManager = class {
     this.fx.ring(e.x, e.z, 3355443, CFG.bossPattern.blindRadius);
     this.onBossBlind?.(e);
   }
+  // 속박 군주 전용 — 위 여섯 콜백과 같은 이유(팀 전체 플레이어 목록 접근 필요)로 실제 대상
+  // 판정과 rootedUntil 설정은 game.js 콜백이 처리한다.
+  _bossWeb(e) {
+    this.fx.ring(e.x, e.z, 11163118, CFG.bossPattern.webRadius);
+    this.onBossWeb?.(e);
+  }
   _bossBeginCharge(e) {
     const P2 = CFG.bossPattern;
     const len = Math.hypot(e.x, e.z) || 1;
@@ -713,6 +794,38 @@ export var EnemyManager = class {
       }
     }
     return { x: clamp(sx, -1, 1), z: clamp(sz, -1, 1) };
+  }
+  // 허수아비 유인목(decoy) 전용 — 일반 건물과 달리 "반경 안에 있어야만" 유효한 표적이다
+  // (다른 건물은 거리 무관하게 후보가 되고 경로가 알아서 데려간다).
+  _nearestDecoy(buildMgr, x2, z2) {
+    let best = null, bd2 = Infinity;
+    for (const b of buildMgr.buildings.values()) {
+      if (b.key !== "decoy") continue;
+      const r2 = CFG.builds.decoy.levels[b.level - 1].tauntRadius;
+      const d2 = (b.x - x2) ** 2 + (b.z - z2) ** 2;
+      if (d2 > r2 * r2) continue;
+      if (d2 < bd2) {
+        bd2 = d2;
+        best = b;
+      }
+    }
+    return best;
+  }
+  // 봉화대(beacon) 전용 — 유인목과 완전히 같은 "반경 안에서만 유효한 표적" 판정이지만
+  // 호출부(비행 분기)에서 이미 flies만 걸러 넘기므로 여기서는 반경만 본다.
+  _nearestBeacon(buildMgr, x2, z2) {
+    let best = null, bd2 = Infinity;
+    for (const b of buildMgr.buildings.values()) {
+      if (b.key !== "beacon") continue;
+      const r2 = CFG.builds.beacon.levels[b.level - 1].tauntRadius;
+      const d2 = (b.x - x2) ** 2 + (b.z - z2) ** 2;
+      if (d2 > r2 * r2) continue;
+      if (d2 < bd2) {
+        bd2 = d2;
+        best = b;
+      }
+    }
+    return best;
   }
   // 야생 동물 전용 이동. 셋 다 크리스탈에는 관심이 없다.
   //  - 도망형(토끼·사슴): 사거리 안에 사람이 보이면 반대로 달아나고, 없으면 느긋하게 배회한다.

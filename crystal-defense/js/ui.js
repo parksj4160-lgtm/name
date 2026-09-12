@@ -8,7 +8,7 @@ import { COST_KEYS, RES_ICON, canAfford, clamp, costText, dateSeed, dist, fmtTim
 import { PHASE } from './wave.js';
 
 var $2 = (id) => document.getElementById(id);
-var RESERVED_KEYS = /* @__PURE__ */ new Set(["w", "a", "s", "d", "arrowup", "arrowdown", "arrowleft", "arrowright"]);
+var RESERVED_KEYS = /* @__PURE__ */ new Set(["w", "a", "s", "d", "arrowup", "arrowdown", "arrowleft", "arrowright", "e"]);
 var TUTORIAL_STEPS = [
   "🌳 나무를 직접 클릭하면 캡니다 (바위는 곡괭이를 만들어 쥐어야 캘 수 있어요)",
   "🎒 목재 20을 모았으면 <kbd>I</kbd> 로 인벤토리를 열어 🪚 제작대를 지으세요 (벽·타워는 그 다음)",
@@ -39,6 +39,7 @@ export var UI = class {
       crystalFill: $2("crystal-fill"),
       crystalText: $2("crystal-text"),
       crystalWarning: $2("crystal-warning"),
+      riskVignette: $2("risk-vignette"),
       blindOverlay: $2("blind-overlay"),
       waveLabel: $2("wave-label"),
       waveState: $2("wave-state"),
@@ -52,6 +53,11 @@ export var UI = class {
       dashWrap: $2("dash-wrap"),
       dashFill: $2("dash-fill"),
       dashText: $2("dash-text"),
+      rootWrap: $2("root-wrap"),
+      rootFill: $2("root-fill"),
+      rootText: $2("root-text"),
+      crewWrap: $2("crew-wrap"),
+      crewText: $2("crew-text"),
       prompt: $2("prompt"),
       buildHint: $2("build-hint"),
       invBtn: $2("btn-inv"),
@@ -65,12 +71,18 @@ export var UI = class {
       fxLayer: $2("fx-layer"),
       help: $2("help"),
       touch: $2("touch"),
+      touchAction: $2("touch-action"),
+      touchDash: $2("touch-dash"),
+      touchBlock: $2("touch-block"),
+      skillBar: $2("skill-bar"),
+      riskToggle: $2("risk-toggle"),
       mute: $2("btn-mute"),
       pauseOverlay: $2("pause-overlay"),
       wavePanel: $2("wave-panel"),
       wavePreview: $2("wave-preview"),
       merchantPanel: $2("merchant-panel"),
       merchantOffers: $2("merchant-offers"),
+      merchantHead: $2("merchant-head"),
       btnContinue: $2("btn-continue"),
       tutorial: $2("tutorial"),
       resPanel: $2("res-panel"),
@@ -736,10 +748,11 @@ export var UI = class {
         return;
       }
       this.el.result.classList.add("hidden");
-      const seed = Math.random() * 1e9 | 0;
+      const daily = g22.daily;
+      const seed = daily ? dateSeed() : Math.random() * 1e9 | 0;
       const difficulty = g22.difficulty || "normal";
-      if (g22.net.online) g22.net.send("startGame", { seed, shared: g22.shared, difficulty });
-      g22.begin({ seed, shared: g22.shared, difficulty });
+      if (g22.net.online) g22.net.send("startGame", { seed, shared: g22.shared, difficulty, daily });
+      g22.begin({ seed, shared: g22.shared, difficulty, daily });
       g22._syncRosterIntoGame();
     };
   }
@@ -767,6 +780,7 @@ export var UI = class {
     const g2 = this.game;
     this.el.waveBtn.onclick = () => g2.requestStartWave();
     this.el.hupBtn.onclick = () => g2.requestHarvestUpgrade();
+    this.el.riskToggle.onclick = () => g2.requestRiskContract();
     this.el.invBtn.onclick = () => {
       g2.sfx.click();
       this.toggleInventory();
@@ -969,6 +983,88 @@ export var UI = class {
     };
     stick.addEventListener("pointerup", release);
     stick.addEventListener("pointercancel", release);
+    const actionBtn = this.el.touchAction;
+    actionBtn.addEventListener("pointerdown", (e) => {
+      e.preventDefault();
+      const kind = actionBtn.dataset.kind;
+      if (kind === "crew") {
+        this.game.input.keys.add(this.game.km.get("crew"));
+        actionBtn.classList.add("holding");
+      } else if (kind === "seal") {
+        this.game.requestSealPortal();
+      } else if (kind === "tame") {
+        this.game.requestTame();
+      } else if (kind === "reload") {
+        this.game.requestReload();
+      }
+    });
+    const releaseAction = () => {
+      if (actionBtn.dataset.kind === "crew") this.game.input.keys.delete(this.game.km.get("crew"));
+      actionBtn.classList.remove("holding");
+    };
+    actionBtn.addEventListener("pointerup", releaseAction);
+    actionBtn.addEventListener("pointercancel", releaseAction);
+    const blockBtn = this.el.touchBlock;
+    blockBtn.addEventListener("pointerdown", (e) => {
+      e.preventDefault();
+      this.game.input.keys.add(this.game.km.get("block"));
+      blockBtn.classList.add("holding");
+    });
+    const releaseBlock = () => {
+      this.game.input.keys.delete(this.game.km.get("block"));
+      blockBtn.classList.remove("holding");
+    };
+    blockBtn.addEventListener("pointerup", releaseBlock);
+    blockBtn.addEventListener("pointercancel", releaseBlock);
+    this.el.touchDash.addEventListener("pointerdown", (e) => {
+      e.preventDefault();
+      if (!this.game.local.crewing && !this.game.local.rooted) this.game._tryDash();
+    });
+  }
+  // 정수 스킬 7종을 화면 버튼으로도 쓸 수 있게 한다 — 지금까지 데스크톱도 키보드 단축키뿐이라
+  // 화면에 아무 단서가 없었고(도움말을 안 읽으면 존재 자체를 모른다), 모바일은 누를 방법조차
+  // 없었다. 클릭/탭이 각 request* 메서드를 그대로 호출하므로 비용 판정·토스트 등은 전부 기존
+  // 로직 그대로다 — 여기선 표시와 입력만 추가한다. 한 번만 만들고 이후 세션 재시작에도 재사용한다.
+  _buildSkillBar() {
+    if (this._skillBarBuilt) return;
+    this._skillBarBuilt = true;
+    const order = [
+      ["heal", "shard", "requestShard"],
+      ["blast", "skillBlast", "requestSkillBlast"],
+      ["chill", "skillChill", "requestSkillChill"],
+      ["barrier", "skillBarrier", "requestSkillBarrier"],
+      ["rift", "skillRift", "requestSkillRift"],
+      ["summon", "skillSummon", "requestSkillSummon"],
+      ["overload", "skillOverload", "requestSkillOverload"]
+    ];
+    for (const [key, actionKey, fnName] of order) {
+      const s2 = CFG.skills[key];
+      const btn = document.createElement("button");
+      btn.className = "skill-btn";
+      btn.dataset.skill = key;
+      const costLabel = s2.cost != null ? s2.cost : `${s2.minCost}+`;
+      btn.innerHTML = `<span class="ic">${s2.icon}</span><b>${costLabel}</b>`;
+      btn.title = `${s2.name} (${keyLabel(this.game.km.get(actionKey))}) — ${s2.desc}`;
+      btn.addEventListener("pointerdown", (e) => {
+        e.preventDefault();
+        if (key === "rift") {
+          const p2 = this.game.local, r2 = CFG.skills.rift;
+          const ar2 = r2.aimRange * 0.6;
+          this.game.requestSkillRift({ x: p2.x + Math.sin(p2.rot) * ar2, z: p2.z + Math.cos(p2.rot) * ar2 });
+        } else {
+          this.game[fnName]();
+        }
+      });
+      this.el.skillBar.appendChild(btn);
+    }
+  }
+  _updateSkillBar() {
+    const pool = this.game.myPool;
+    for (const btn of this.el.skillBar.children) {
+      const s2 = CFG.skills[btn.dataset.skill];
+      const cost = s2.cost != null ? s2.cost : s2.minCost;
+      btn.classList.toggle("lack", (pool.shard || 0) < cost);
+    }
   }
   // ---------------------------------------------------------------- 라이프사이클
   onGameStart(resumed = false) {
@@ -981,6 +1077,7 @@ export var UI = class {
     this._invTab = "build";
     this._invRendered = null;
     this._crystalWarned = false;
+    this._buildSkillBar();
     this.el.crystalWarning.classList.add("hidden");
     this.closeInventory();
     this.refreshBuildBar();
@@ -1136,6 +1233,7 @@ export var UI = class {
 <li>처치한 몬스터 <b>${stats.kills}</b></li>
 <li>채집한 자원 <b>${stats.harvested}</b></li>
 <li>💠 획득한 정수 <b>${stats.shardEarned || 0}</b></li>
+${stats.riskWavesCleared ? `<li>⚠️ 위험 계약 승리 <b>${stats.riskWavesCleared}</b>회</li>` : ""}
 <li>소모한 자원 <b>${this._spentSummary(stats)}</b>${this._spendBreakdown(stats)}</li>
 <li>건설한 구조물 <b>${stats.built}</b></li>`;
     this._renderMvp(stats);
@@ -1286,7 +1384,8 @@ export var UI = class {
       time: stats.time,
       kills: stats.kills,
       biome: this.game.world?.biome || null,
-      difficulty: this.game.difficulty || "normal"
+      difficulty: this.game.difficulty || "normal",
+      daily: !!this.game.daily
     });
     hist = hist.slice(0, 10);
     safeSetItem("cd.history", JSON.stringify(hist));
@@ -1339,7 +1438,7 @@ export var UI = class {
     list.innerHTML = hist.map((h2) => {
       const biome2 = h2.biome && CFG.biomes[h2.biome] ? CFG.biomes[h2.biome] : null;
       const diffName = DIFFICULTIES[h2.difficulty]?.label || h2.difficulty;
-      const left = `${h2.win ? "🏆 승리" : "💥 패배"} · 웨이브 ${h2.wave}`;
+      const left = `${h2.win ? "🏆 승리" : "💥 패배"} · 웨이브 ${h2.wave}${h2.daily ? " · 🗓️" : ""}`;
       const right = `${fmtTime(h2.time)} · 처치 ${h2.kills}${biome2 ? ` · ${biome2.icon}${biome2.name}` : ""} · ${diffName}`;
       return `<li class="${h2.win ? "win" : ""}"><span class="h-left">${left}</span><span>${right}</span></li>`;
     }).join("");
@@ -1349,12 +1448,24 @@ export var UI = class {
     el2.className = `toast ${kind}`;
     el2.textContent = text;
     this.el.toasts.appendChild(el2);
-    setTimeout(() => {
-      el2.style.transition = "opacity 0.4s";
-      el2.style.opacity = "0";
-      setTimeout(() => el2.remove(), 400);
-    }, 2400);
-    while (this.el.toasts.children.length > 4) this.el.toasts.firstChild.remove();
+    const fadeOut = (node2) => {
+      if (!node2 || node2.dataset.fading) return;
+      node2.dataset.fading = "1";
+      node2.style.transition = "opacity 0.4s";
+      node2.style.opacity = "0";
+      setTimeout(() => node2.remove(), 400);
+    };
+    setTimeout(() => fadeOut(el2), 2400);
+    let excess = this.el.toasts.children.length - 8;
+    let node = this.el.toasts.firstChild;
+    while (excess > 0 && node) {
+      const next = node.nextSibling;
+      if (!node.dataset.fading) {
+        fadeOut(node);
+        excess--;
+      }
+      node = next;
+    }
   }
   onPauseChange(paused) {
     this.el.pauseOverlay.classList.toggle("hidden", !paused);
@@ -1373,6 +1484,7 @@ export var UI = class {
     this.el.wood.textContent = Math.floor(pool.wood);
     this.el.stone.textContent = Math.floor(pool.stone);
     this.el.shard.textContent = Math.floor(pool.shard || 0);
+    this._updateSkillBar();
     this.el.poolMode.textContent = g2.shared ? "팀 공유 자원" : "개인 자원";
     const nextUp = CFG.harvest.upgrade[g2.local.harvestLv];
     this.el.hupLv.textContent = `Lv.${g2.local.harvestLv}`;
@@ -1439,16 +1551,25 @@ export var UI = class {
       this.el.waveBtn.classList.remove("hidden");
       this._showWavePreview(nextWave);
       this._updateMerchantPanel();
+      const rc = CFG.risk;
+      this.el.riskToggle.classList.remove("hidden");
+      this.el.riskToggle.classList.toggle("armed", g2._riskArmed);
+      this.el.riskToggle.textContent = g2._riskArmed ? `⚠️ 위험 계약: 걸려 있음 (체력·공격력 +${Math.round((rc.hpMult - 1) * 100)}%, 보상 +${Math.round((rc.rewardMult - 1) * 100)}%) — 눌러서 취소` : `⚠️ 위험 계약 — 다음 웨이브만 몬스터를 더 세게, 보상도 더 크게`;
+      this.el.riskVignette.classList.add("hidden");
     } else if (w2.phase === PHASE.COMBAT) {
       this.el.waveState.textContent = `남은 몬스터 ${w2.remaining}`;
       this.el.waveBtn.classList.add("hidden");
       this.el.wavePreview.classList.add("hidden");
       this.el.merchantPanel.classList.add("hidden");
+      this.el.riskToggle.classList.add("hidden");
+      this.el.riskVignette.classList.toggle("hidden", !(CFG.wave.riskHpMult > 1));
     } else {
+      this.el.riskVignette.classList.add("hidden");
       this.el.waveState.textContent = w2.phase === PHASE.WON ? "방어 성공" : "패배";
       this.el.waveBtn.classList.add("hidden");
       this.el.wavePreview.classList.add("hidden");
       this.el.merchantPanel.classList.add("hidden");
+      this.el.riskToggle.classList.add("hidden");
     }
     const waveBottom = this.el.wavePanel.getBoundingClientRect().bottom;
     this.el.toasts.style.top = `${Math.round(waveBottom + 8)}px`;
@@ -1478,7 +1599,27 @@ export var UI = class {
     } else {
       this.el.dashWrap.classList.add("hidden");
     }
+    const rootLeft = p2.rootedUntil - performance.now() / 1e3;
+    if (rootLeft > 0) {
+      this.el.rootWrap.classList.remove("hidden");
+      this.el.rootFill.style.transform = `scaleX(${clamp(rootLeft / CFG.bossPattern.webDuration, 0, 1)})`;
+      this.el.rootText.textContent = `🕸️ 속박! ${rootLeft.toFixed(1)}s`;
+    } else {
+      this.el.rootWrap.classList.add("hidden");
+    }
+    if (p2.crewing) {
+      this.el.crewWrap.classList.remove("hidden");
+      const tw = g2.buildMgr.buildings.get(p2.crewing);
+      const twName = tw ? tw.def.name : "타워";
+      const dmgPct = Math.round((CFG.crew.dmgMult - 1) * 100);
+      const rangePct = Math.round((CFG.crew.rangeMult - 1) * 100);
+      this.el.crewText.textContent = `🎯 ${twName} 탑승 중 (+${dmgPct}%/+${rangePct}%)`;
+    } else {
+      this.el.crewWrap.classList.add("hidden");
+    }
     const near = g2.world.nearestNode(p2.x, p2.z, CFG.harvest.range);
+    const tameTarget = !g2.buildMgr.mode && !g2._pet ? g2._nearestTameable(p2.x, p2.z) : null;
+    const reloadTarget = !g2.buildMgr.mode && !tameTarget ? g2._nearestReloadable(p2.x, p2.z) : null;
     if (near && !g2.buildMgr.mode) {
       this.el.prompt.classList.remove("hidden");
       if (needsPickaxe(near.type) && !p2.holdingPickaxe) {
@@ -1488,6 +1629,19 @@ export var UI = class {
         const label = near.type === "tree" ? "🌳 나무" : near.type === "copper" ? "🟠 구리 광맥" : near.type === "coal" ? "⚫ 석탄층" : "🪨 바위";
         this.el.prompt.innerHTML = `${label} — <b>눌러서 채집</b> (남은 ${near.charges})`;
       }
+      this._hideTouchAction();
+    } else if (tameTarget) {
+      const tc2 = CFG.tame[tameTarget.type];
+      this.el.prompt.classList.remove("hidden");
+      this.el.prompt.innerHTML = `${tc2.icon} ${tc2.name} — <kbd>${keyLabel(g2.km.get("tame"))}</kbd>로 길들이기 시도 (초식동물 생고기 ${CFG.tame.baitCost}개 필요, 성공 확률 ${Math.round(tc2.chance * 100)}%)`;
+      this._showTouchAction("tame", tc2.icon, "길들이기");
+    } else if (reloadTarget) {
+      const a2 = CFG.ammo.types[reloadTarget.ammoType];
+      const pool2 = g2.myPool;
+      const have = g2._ammoOf(pool2)[reloadTarget.ammoType] || 0;
+      this.el.prompt.classList.remove("hidden");
+      this.el.prompt.innerHTML = have > 0 ? `${reloadTarget.def.icon} ${reloadTarget.def.name} — <kbd>${keyLabel(g2.km.get("reload"))}</kbd>로 ${a2.icon} 재장전 (재고 ${have})` : `${reloadTarget.def.icon} ${reloadTarget.def.name} — ${a2.icon} ${a2.name} 재고가 없다`;
+      this._showTouchAction("reload", a2.icon, "재장전");
     } else if (!g2.buildMgr.mode && g2.wave.phase === PHASE.PREP) {
       const openPortals = g2.world.portals.filter((po2) => !po2.sealed);
       const portal = openPortals.find((po2) => dist(p2.x, p2.z, po2.x, po2.z) <= CFG.portalSeal.radius);
@@ -1495,11 +1649,15 @@ export var UI = class {
         const cost = portalSealCost(g2.wave.wave + 1);
         this.el.prompt.classList.remove("hidden");
         this.el.prompt.innerHTML = `🌀 포탈 — <kbd>${keyLabel(g2.km.get("sealPortal"))}</kbd>로 봉쇄 (${costText(cost)}, 다음 웨이브 동안 이쪽에서 적이 안 나온다)`;
+        this._showTouchAction("seal", "🌀", "봉쇄");
       } else {
-        this.el.prompt.classList.add("hidden");
+        this._promptCrewOrHide(g2, p2);
       }
+    } else if (!g2.buildMgr.mode) {
+      this._promptCrewOrHide(g2, p2);
     } else {
       this.el.prompt.classList.add("hidden");
+      this._hideTouchAction();
     }
     this.el.netStatus.textContent = g2.net.online ? g2.isHost ? "호스트" : "참가자" : "싱글";
     this._updateTutorial();
@@ -1508,6 +1666,37 @@ export var UI = class {
     this._updateEnemyTags();
     this._drawMinimap();
     this.refreshBuildBar();
+  }
+  // 채집 노드·포탈 프롬프트가 둘 다 없을 때의 마지막 자리 — 근처에 탑승 가능한 공격 타워가
+  // 있으면 그 대신 안내한다. 도움말을 안 읽은 플레이어도 타워 옆을 지나가다 이 문구를 보고
+  // 타워 탑승을 처음 발견하게 하려는 용도라, 이미 탑승 중일 때는(글로우·토스트로 이미 충분히
+  // 알렸으므로) 다시 뜨지 않는다.
+  _promptCrewOrHide(g2, p2) {
+    const tw = !p2.crewing ? g2._nearestCrewableTower(p2.x, p2.z) : null;
+    if (tw) {
+      this.el.prompt.classList.remove("hidden");
+      const crewDmgPct = Math.round((CFG.crew.dmgMult - 1) * 100);
+      const crewRangePct = Math.round((CFG.crew.rangeMult - 1) * 100);
+      this.el.prompt.innerHTML = `${tw.def.icon} ${tw.def.name} — <kbd>${keyLabel(g2.km.get("crew"))}</kbd>를 눌러 탑승 (공격력 +${crewDmgPct}%·사거리 +${crewRangePct}%, 대신 이동·공격 불가)`;
+      this._showTouchAction("crew", "🎯", "탑승");
+    } else {
+      this.el.prompt.classList.add("hidden");
+      if (p2.crewing) this._showTouchAction("crew", "🎯", "해제하려면 떼기");
+      else this._hideTouchAction();
+    }
+  }
+  _showTouchAction(kind, icon, label) {
+    const btn = this.el.touchAction;
+    if (btn.classList.contains("holding") && btn.dataset.kind !== kind) return;
+    btn.dataset.kind = kind;
+    btn.innerHTML = `<b>${icon}</b>${label}`;
+    btn.classList.remove("hidden");
+  }
+  _hideTouchAction() {
+    const btn = this.el.touchAction;
+    if (btn.dataset.kind === "crew" && btn.classList.contains("holding")) return;
+    btn.classList.add("hidden");
+    btn.dataset.kind = "";
   }
   // 보스·원거리형처럼 색만으로 구분하기 어려운 몬스터 위에 종류 아이콘을, 슬로우·중독 상태에는
   // 상태 아이콘을 띄운다 (색약 접근성 + 일반 플레이어의 순간 판단을 모두 돕는다).
@@ -1602,6 +1791,8 @@ export var UI = class {
     const sig = m.offers.join(",");
     if (this._merchantSig !== sig) {
       this._merchantSig = sig;
+      const isMoonlit = m.offers.some((key) => CFG.merchant.pool[key]?.night);
+      this.el.merchantHead.textContent = isMoonlit ? "🌙 달빛 상인 — 오늘 밤에만" : "🧳 떠돌이 상인 — 이번 준비 시간에만";
       this.el.merchantOffers.innerHTML = m.offers.map((key) => {
         const o = CFG.merchant.pool[key];
         return `<button type="button" class="merchant-card" data-offer="${key}">
@@ -1709,8 +1900,6 @@ export var UI = class {
     ctx.beginPath();
     ctx.arc(size / 2, size / 2, CFG.world.buildRadius * s2, 0, Math.PI * 2);
     ctx.stroke();
-    // 전초기지가 넓혀 놓은 구역도 홈 구역과 같은 방식으로 그린다 — 미니맵만 봐도 지금 내
-    // 영역이 어디까지인지 한눈에 들어와야 이 건물을 어디에 더 세울지 판단할 수 있다.
     ctx.strokeStyle = "rgba(232,96,74,0.7)";
     for (const b of g2.buildMgr.buildings.values()) {
       if (!b.def.expandsZone) continue;

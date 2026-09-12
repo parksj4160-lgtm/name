@@ -35,9 +35,6 @@ export var SceneManager = class {
     const hemi = new THREE.HemisphereLight(10405631, 2765640, 1.15);
     this.scene.add(hemi);
     this.hemi = hemi;
-    // 해를 조금 더 낮고 따뜻하게 — 그림자가 길어져 건물·지형의 입체가 살고, 차가운 hemisphere
-    // 와 색이 갈려서 같은 초록 바닥도 양지/음지가 구분된다(전에는 위에서 거의 수직으로 때려
-    // 그림자가 발밑에만 눌려 있었다)
     const sun = new THREE.DirectionalLight(16770740, 2.35);
     sun.position.set(40, 38, 26);
     sun.castShadow = true;
@@ -55,8 +52,6 @@ export var SceneManager = class {
     this.crystalLight = new THREE.PointLight(6545663, 2.2, 46, 2);
     this.crystalLight.position.set(0, 5, 0);
     this.scene.add(this.crystalLight);
-    // 해 반대쪽에서 약하게 받쳐 주는 차가운 보조광 — 그림자 쪽이 새카맣게 죽지 않고 실루엣의
-    // 윤곽이 남는다. 그림자를 만들지 않으므로(castShadow 없음) 비용이 거의 없다.
     const rim = new THREE.DirectionalLight(8365272, 0.55);
     rim.position.set(-30, 18, -24);
     this.scene.add(rim);
@@ -137,8 +132,6 @@ export var SceneManager = class {
   setGroundTint(color) {
     const hex = color ?? this.groundDefaultColor;
     this.ground.material.color.setHex(hex);
-    // 지면 장식도 같이 물들인다 — 안 그러면 설원·화산지대에 초록 풀포기가 그대로 남아
-    // 지형색만 바뀐 것이 더 어색해진다. 원래 색을 기억해 두고 매번 그 색에서 다시 섞는다.
     if (this._clutter) {
       const t2 = this._clutterTint.setHex(hex);
       for (const c2 of this._clutter) c2.mat.color.copy(c2.base).lerp(t2, c2.mix);
@@ -147,17 +140,12 @@ export var SceneManager = class {
   _setupGround() {
     const size = CFG.world.size;
     this.groundDefaultColor = 3953984;
-    // 바닥을 잘게 나누고 정점마다 밝기·색조를 살짝 흔든다. 단색 판 하나였을 때는 어디를 봐도
-    // 같은 색이라 거리감·기복이 전혀 안 읽혔는데, 정점 색만 흔들어도 지면이 "땅"처럼 보인다.
-    // 정점 색은 재질 색과 곱해지므로 흰색(1.0) 기준으로 흔들어야 `setGroundTint()`의 지형별
-    // 바닥색(설원·화산지대·늪지대)이 그대로 살아난다.
     const SEG = 64;
     const g2 = new THREE.PlaneGeometry(size, size, SEG, SEG);
     const pos = g2.attributes.position;
     const colors = new Float32Array(pos.count * 3);
     for (let i = 0; i < pos.count; i++) {
       const x2 = pos.getX(i), y2 = pos.getY(i);
-      // 서로 다른 주기의 사인파를 겹쳐 규칙성이 눈에 안 띄는 얼룩을 만든다
       const n = Math.sin(x2 * 0.09) * Math.cos(y2 * 0.11) * 0.5 + Math.sin((x2 + y2) * 0.05) * 0.3 + Math.sin(x2 * 0.31 + y2 * 0.27) * 0.2;
       const v2 = 1 + n * 0.11;
       const warm = n * 0.05;
@@ -208,14 +196,11 @@ export var SceneManager = class {
   // 개씩이라 드로우콜은 3개뿐이고, 충돌·상호작용은 전혀 없다.
   _setupClutter() {
     const size = CFG.world.size;
-    // 크리스털 단상 바깥부터 맵 끝까지 — 건설 구역 안에도 깔아야 한다. 시야에 들어오는 건
-    // 대부분 기지 안쪽이라, 바깥에만 뿌리면 화면에는 여전히 빈 바닥만 남는다.
     const inner = 5;
     const outer = size * 0.6;
-    // 시드 고정 난수 — 매 판 같은 배치가 나와서 지형이 "그 맵"으로 기억된다
     let seed = 20260906;
     const rnd = () => {
-      seed = (seed * 1103515245 + 12345) & 2147483647;
+      seed = seed * 1103515245 + 12345 & 2147483647;
       return seed / 2147483647;
     };
     this._clutter = [];
@@ -227,7 +212,6 @@ export var SceneManager = class {
       const pos = new THREE.Vector3(), scl = new THREE.Vector3();
       for (let i = 0; i < count; i++) {
         const a2 = rnd() * Math.PI * 2;
-        // sqrt 로 반지름을 뽑아야 면적당 밀도가 균일해진다(그냥 rnd()면 안쪽에 뭉친다)
         const r2 = Math.sqrt(inner * inner + rnd() * (outer * outer - inner * inner));
         place(pos, scl, e2, r2 * Math.cos(a2), r2 * Math.sin(a2), rnd);
         q2.setFromEuler(e2);
@@ -239,31 +223,42 @@ export var SceneManager = class {
       this._clutter.push({ mat, base: mat.color.clone(), mix });
       return mesh;
     };
-    // 풀포기: 얇은 4각뿔 — 멀리서는 어차피 실루엣만 보인다
-    spread(1400, new THREE.ConeGeometry(0.16, 0.6, 4), new THREE.MeshStandardMaterial({ color: 4881466, roughness: 1 }), 0.55,
-      (pos, scl, e2, x2, z2, rnd) => {
+    spread(
+      1400,
+      new THREE.ConeGeometry(0.16, 0.6, 4),
+      new THREE.MeshStandardMaterial({ color: 4881466, roughness: 1 }),
+      0.55,
+      (pos, scl, e2, x2, z2, rnd2) => {
         pos.set(x2, 0.28, z2);
-        const s2 = 0.7 + rnd() * 0.9;
-        scl.set(s2, s2 * (0.8 + rnd() * 0.7), s2);
-        e2.set(0, rnd() * Math.PI, (rnd() - 0.5) * 0.24);
-      });
-    // 자갈은 일부러 작고 어둡게 — 조금만 키워도 캘 수 있는 바위 노드와 헷갈려서, 플레이어가
-    // 곡괭이를 들고 장식물을 찍으러 가는 일이 생긴다
-    spread(260, new THREE.IcosahedronGeometry(0.22, 0), new THREE.MeshStandardMaterial({ color: 6187106, roughness: 1 }), 0.35,
-      (pos, scl, e2, x2, z2, rnd) => {
-        pos.set(x2, 0.04 + rnd() * 0.03, z2);
-        const s2 = 0.35 + rnd() * 0.35;
-        scl.set(s2, s2 * 0.42, s2 * (0.8 + rnd() * 0.4));
-        e2.set(rnd() * 0.4, rnd() * Math.PI * 2, rnd() * 0.4);
-      });
-    // 들꽃: 아주 작은 채도 높은 점. 한 가지 색 일색인 화면에 보색이 조금 섞이면 눈이 덜 지친다
-    spread(320, new THREE.IcosahedronGeometry(0.12, 0), new THREE.MeshStandardMaterial({ color: 15254634, roughness: 0.8, emissive: 3811840, emissiveIntensity: 0.3 }), 0.25,
-      (pos, scl, e2, x2, z2, rnd) => {
+        const s2 = 0.7 + rnd2() * 0.9;
+        scl.set(s2, s2 * (0.8 + rnd2() * 0.7), s2);
+        e2.set(0, rnd2() * Math.PI, (rnd2() - 0.5) * 0.24);
+      }
+    );
+    spread(
+      260,
+      new THREE.IcosahedronGeometry(0.22, 0),
+      new THREE.MeshStandardMaterial({ color: 6187106, roughness: 1 }),
+      0.35,
+      (pos, scl, e2, x2, z2, rnd2) => {
+        pos.set(x2, 0.04 + rnd2() * 0.03, z2);
+        const s2 = 0.35 + rnd2() * 0.35;
+        scl.set(s2, s2 * 0.42, s2 * (0.8 + rnd2() * 0.4));
+        e2.set(rnd2() * 0.4, rnd2() * Math.PI * 2, rnd2() * 0.4);
+      }
+    );
+    spread(
+      320,
+      new THREE.IcosahedronGeometry(0.12, 0),
+      new THREE.MeshStandardMaterial({ color: 15254634, roughness: 0.8, emissive: 3811840, emissiveIntensity: 0.3 }),
+      0.25,
+      (pos, scl, e2, x2, z2, rnd2) => {
         pos.set(x2, 0.34, z2);
-        const s2 = 0.7 + rnd() * 0.7;
+        const s2 = 0.7 + rnd2() * 0.7;
         scl.set(s2, s2, s2);
-        e2.set(0, rnd() * Math.PI, 0);
-      });
+        e2.set(0, rnd2() * Math.PI, 0);
+      }
+    );
   }
   setBuildGridVisible(v2) {
     this.grid.visible = v2;

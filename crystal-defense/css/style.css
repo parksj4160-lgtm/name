@@ -94,9 +94,12 @@ button.mini:disabled { opacity: 0.45; cursor: not-allowed; }
 .bar span {
   position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
   font-size: 11px; text-shadow: 0 1px 2px rgba(0,0,0,0.8); font-variant-numeric: tabular-nums;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 4px;
 }
 .bar.hp i { background: linear-gradient(90deg, #ff6a7d, #ffb36a); }
 .bar.harvest i { background: linear-gradient(90deg, #b98a4d, #ffd88a); }
+.bar.root i { background: linear-gradient(90deg, #7c3aed, #c084fc); }
+.bar.crew i { background: linear-gradient(90deg, #d4af37, #ffe58a); }
 .wave-row { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
 #wave-label { font-weight: 700; }
 .state { color: var(--warn); flex: 1; }
@@ -110,6 +113,15 @@ button.go:disabled { opacity: 0.4; cursor: not-allowed; }
 .preview { margin-top: 6px; display: flex; gap: 10px; font-size: 12px; color: var(--dim); }
 .preview b { color: var(--text); font-weight: 700; margin-left: 2px; }
 .preview .boss { color: var(--bad); font-weight: 700; }
+.risk-btn {
+  display: block; width: 100%; margin-top: 8px; padding: 6px 10px; border-radius: 8px;
+  background: rgba(255,255,255,0.06); border: 1px solid var(--line); color: var(--dim);
+  font: inherit; font-size: 11px; text-align: left; cursor: pointer; transition: all 0.12s;
+}
+.risk-btn:hover { border-color: var(--warn); color: var(--text); }
+.risk-btn.armed {
+  background: rgba(255,157,74,0.18); border-color: var(--warn); color: var(--text); font-weight: 700;
+}
 .preview.boss-wave { padding: 3px 6px; border-radius: 6px; background: rgba(255,106,125,0.1); animation: bossPulse 1.4s ease-in-out infinite; }
 @keyframes bossPulse {
   0%, 100% { box-shadow: 0 0 0 rgba(255,106,125,0); }
@@ -157,6 +169,25 @@ button.go:disabled { opacity: 0.4; cursor: not-allowed; }
 /* ---------- 플레이어 상태 ---------- */
 #player-panel { left: 14px; bottom: 92px; width: 220px; display: flex; flex-direction: column; gap: 6px; }
 .prompt { font-size: 12px; color: var(--warn); }
+
+/* ---------- 정수 스킬 바 ---------- */
+#skill-bar {
+  position: fixed; left: 14px; bottom: 172px; display: flex; gap: 5px; z-index: 5;
+}
+.skill-btn {
+  position: relative; width: 40px; height: 40px; border-radius: 10px; padding: 0;
+  background: rgba(14,20,33,0.85); border: 1px solid var(--line); color: var(--text);
+  font-family: inherit; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  cursor: pointer; transition: opacity 0.12s, border-color 0.12s;
+}
+.skill-btn .ic { font-size: 17px; line-height: 1; }
+.skill-btn b {
+  position: absolute; right: -3px; bottom: -3px; min-width: 13px; height: 13px; line-height: 13px;
+  border-radius: 7px; background: rgba(95,212,255,0.9); color: #06121c; font-size: 8px; font-weight: 700;
+  text-align: center; padding: 0 2px;
+}
+.skill-btn.lack { opacity: 0.4; }
+.skill-btn:hover { border-color: var(--cyan); }
 
 /* ---------- 인벤토리 열기 버튼 ---------- */
 .inv-open {
@@ -212,6 +243,12 @@ button.go:disabled { opacity: 0.4; cursor: not-allowed; }
 }
 @keyframes crystalPulse { 0%, 100% { opacity: 0.35; } 50% { opacity: 0.9; } }
 
+/* ---------- ⚠️ 위험 계약 발동 중 (은은하게, 깜빡이지 않음 — 크리스탈 위험 경고와 구분) ---------- */
+#risk-vignette {
+  position: fixed; inset: 0; pointer-events: none; z-index: 3;
+  box-shadow: inset 0 0 110px 16px rgba(255, 157, 74, 0.28);
+}
+
 /* ---------- 칠흑 군주의 암흑 (미니맵 몬스터 표시가 가려지는 동안 화면 가장자리가 어두워짐) ---------- */
 #blind-overlay {
   position: fixed; inset: 0; pointer-events: none; z-index: 3;
@@ -253,7 +290,7 @@ button.go:disabled { opacity: 0.4; cursor: not-allowed; }
 
 /* ---------- 오버레이(로비/결과) ---------- */
 .overlay {
-  position: fixed; inset: 0; z-index: 30; display: flex; align-items: center; justify-content: center;
+  position: fixed; inset: 0; z-index: 30; display: flex; align-items: safe center; justify-content: center;
   background: radial-gradient(circle at 50% 30%, rgba(30,60,100,0.55), rgba(5,8,15,0.92));
   backdrop-filter: blur(4px); padding: 16px; overflow: auto;
 }
@@ -461,6 +498,10 @@ button.ghost { background: transparent; color: var(--dim); }
 button.corner {
   position: fixed; right: 14px; top: 50%; width: 34px; height: 34px; border-radius: 50%;
   background: var(--panel); border: 1px solid var(--line); color: var(--text); cursor: pointer; font-size: 15px;
+  /* 로비(#lobby, z-index 30)를 비롯한 모든 오버레이보다 위에 있어야 한다 — 이 버튼을 #hud
+     밖에 둔 이유 자체가 "로비 화면에서도 눌러야 하니까"인데, z-index가 없으면(기본값 auto)
+     전체 화면을 덮는 #lobby가 그 위에 쌓여 클릭을 가로챈다. */
+  z-index: 35;
 }
 button.corner.mute { top: calc(50% - 44px); font-size: 14px; }
 button.corner.mute.off { opacity: 0.5; }
@@ -486,11 +527,24 @@ button.corner.mute.off { opacity: 0.5; }
   border-radius: 50%; background: rgba(95,212,255,0.4); border: 1px solid var(--cyan);
 }
 #touch-buttons { position: absolute; right: 22px; bottom: 210px; display: flex; flex-direction: column; gap: 10px; pointer-events: auto; }
+/* #prompt(근접 상호작용 안내)가 뜬 두 가지(포탈 봉쇄·타워 탑승)에 맞춰서만 나타난다 —
+   나머지(채집·공격)는 이미 대상을 직접 탭하는 것으로 되므로 버튼이 필요 없다. */
+#touch-action {
+  min-width: 64px; min-height: 64px; padding: 8px 14px; border-radius: 16px;
+  background: var(--panel); border: 1px solid var(--cyan); color: var(--text);
+  font-size: 12px; line-height: 1.3; text-align: center; box-shadow: 0 0 14px rgba(95,212,255,0.25);
+}
+#touch-action.holding { background: rgba(95,212,255,0.28); }
+#touch-action b { display: block; font-size: 18px; }
 #touch-buttons button.harvest { background: rgba(185,138,77,0.32); border-color: rgba(255,216,138,0.5); }
 #touch-buttons button {
   width: 76px; height: 76px; border-radius: 50%; font-size: 14px; font-weight: 700;
   background: rgba(14,20,33,0.85); color: var(--text); border: 1px solid var(--line); font-family: inherit;
 }
+/* 막기·회피는 근처 상호작용과 달리 항상 떠 있다 — 데스크톱 키(Q 홀드·V 탭)를 그대로 흉내낼 뿐이라
+   조금 작게 둬서 touch-action(상황별 안내 버튼)이 더 눈에 띄게 했다. */
+#touch-dash, #touch-block { width: 62px; height: 62px; font-size: 24px; opacity: 0.85; }
+#touch-block.holding { background: rgba(255,200,90,0.32); border-color: rgba(255,200,90,0.6); opacity: 1; }
 
 .shake { animation: shake 0.28s; }
 @keyframes shake {
@@ -523,6 +577,11 @@ button.corner.mute.off { opacity: 0.5; }
   /* 조이스틱·터치 버튼 위쪽, 건설 바 위쪽에 겹치지 않는 자리 */
   #player-panel { left: 10px; bottom: 236px; width: 42vw; gap: 4px; }
   .prompt { font-size: 11px; }
+
+  /* 정수 스킬 바 — 조이스틱(왼쪽 아래)과 겹치지 않도록 player-panel보다 더 위로 올린다 */
+  #skill-bar { left: 10px; bottom: 340px; }
+  .skill-btn { width: 34px; height: 34px; border-radius: 8px; }
+  .skill-btn .ic { font-size: 15px; }
 
   /* 인벤토리 버튼은 터치 조작 위로 올린다 */
   .inv-open { bottom: 116px; padding: 8px 14px; font-size: 13px; }

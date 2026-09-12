@@ -105,8 +105,6 @@ export var BuildGrid = class {
       const inZone = zones && zones.some((z2) => Math.hypot(w2.x - z2.x, w2.z - z2.z) <= z2.r);
       if (!inZone) return { ok: false, why: "건설 가능 구역 밖입니다 (🚩 전초기지를 세우면 넓어집니다)" };
     }
-    // 전초기지 자신은 "밖으로 미는" 물건이라 홈 구역 안에서는 지을 수 없고, 서로 겹쳐 세우거나
-    // 포탈을 덮어 스폰을 막을 수도 없다.
     if (def?.expandsZone) {
       if (d2 < CFG.world.outpostMinCore) return { ok: false, why: "전초기지는 방어선 밖에만 세울 수 있습니다" };
       if (zones && zones.some((z2) => Math.hypot(w2.x - z2.x, w2.z - z2.z) < CFG.world.outpostMinGap))
